@@ -22,4 +22,4 @@ COPY src/soliplex /app/src/soliplex
 
 RUN pip3 install -e .
 
-CMD ["/usr/local/bin/soliplex-cli", "serve", "/app/installation"]
+CMD ["/usr/local/bin/soliplex-cli", "serve", "--host=0.0.0.0", "/app/installation"]

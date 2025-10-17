@@ -4,7 +4,11 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    network_mode: "host"
+    # network_mode: "host" # only works on linux
+    ports:
+      - "9000:9000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   # Development environment with hot reload
@@ -13,7 +17,11 @@ services:
     working_dir: /app
     volumes:
       - ..:/app
-    network_mode: "host"
+    # network_mode: "host" # only works on linux
+    ports:
+      - "9000:9000"
     command: flutter run -d web-server --web-hostname=0.0.0.0 --web-port=9001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     profiles:
       - dev
