@@ -57,7 +57,10 @@ Future<Widget> configure() async {
   } else {
     clientSiteUrl = 'ai.soliplex.client';
 
-    const serviceUrlArg = String.fromEnvironment('SERVICE_URL');
+    const serviceUrlArg = String.fromEnvironment(
+      'SERVICE_URL',
+      defaultValue: 'http://localhost:8000',
+    );
 
     if (serviceUrlArg.isEmpty) {
       throw Exception(
