@@ -1,0 +1,68 @@
+# haiku.rag configuration file
+# See https://ggozad.github.io/haiku.rag/configuration/ for details
+
+# Configure 'production' for standard CLI logging, 'development' for Logfire
+environment: development
+
+storage:
+  data_dir: ''
+  monitor_directories: []
+  disable_autocreate: true
+  vacuum_retention_seconds: 60
+
+lancedb:
+  # Configure LanceDB Cloud
+  # uri: ''
+  # api_key: ''
+  # region: ''
+
+  # Configure Amazon S3
+  # Use AWS credentials or IAM roles
+  # uri: s3://my-bucket/my-table
+
+  # Configure Azure Blob Storage
+  # Use Azure credentials
+  # uri: az://my-bucket/my-table
+
+  # Google Cloud Storage
+  # Use GCP credentials
+  # uri: gs://my-bucket/my-table
+  
+  # Configure Hadoop file system
+  # uri: hdfs://namenode:port/path/to/table
+
+embeddings:
+  provider: ollama
+  model: qwen3-embedding
+  vector_dim: 4096
+
+reranking:
+  # Leave 'provider' blank to disable re-ranking
+  provider: ''
+  model: ''
+
+qa:
+  provider: ollama
+  model: qwen3:latest
+
+research:
+  provider: ''
+  model: ''
+
+processing:
+  chunk_size: 256
+  context_chunk_radius: 0
+  markdown_preprocessor: ''
+
+providers:
+  ollama:
+#   Allow this value to be populated from 'os.environ'
+#   base_url: http://localhost:11434
+  vllm:
+    embeddings_base_url: ''
+    rerank_base_url: ''
+    qa_base_url: ''
+    research_base_url: ''
+
+a2a:
+  max_contexts: 1000

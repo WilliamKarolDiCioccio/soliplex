@@ -256,6 +256,7 @@ class Installation(pydantic.BaseModel):
     id: str
     secrets: list[Secret] = []
     environment: dict[str, str] = {}
+    haiku_rag_config_file: pathlib.Path | None = None
     agents: list[Agent] = []
     oidc_paths: list[pathlib.Path] = []
     room_paths: list[pathlib.Path] = []
@@ -280,8 +281,9 @@ class Installation(pydantic.BaseModel):
         return cls(
             id=installation_config.id,
             secrets=secrets,
-            agents=agents,
             environment=installation_config.environment,
+            haiku_rag_config_file=installation_config._haiku_rag_config_file,
+            agents=agents,
             oidc_paths=installation_config.oidc_paths,
             room_paths=installation_config.room_paths,
             completion_paths=installation_config.completion_paths,

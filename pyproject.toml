@@ -19,7 +19,7 @@ dependencies = [
     "python-dotenv",
     "fastapi",
     "fastmcp>=2.12.3,<2.13",
-    "haiku.rag >= 0.12.1, < 0.13.0",
+    "haiku.rag >= 0.13.1",
     "httpx",
     "itsdangerous",
     "jwcrypto",

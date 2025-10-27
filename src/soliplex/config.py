@@ -15,6 +15,7 @@ from urllib import parse as url_parse
 
 import dotenv
 import yaml
+from haiku.rag import config as hr_config
 
 SECRET_PREFIX = "secret:"
 FILE_PREFIX = "file:"
@@ -1663,6 +1664,17 @@ class InstallationConfig:
         }
 
     #
+    # Global haiku-rag configuration
+    #
+    _haiku_rag_config_file: pathlib.Path = None
+
+    @property
+    def haiku_rag_config(self) -> hr_config.AppConfig:
+        """Populate a haiku-rag config object from our environment"""
+        config_yaml = hr_config.load_yaml_config(self._haiku_rag_config_file)
+        return hr_config.AppConfig.model_validate(config_yaml)
+
+    #
     # Agent configurations not bound to a room or completion.
     #
     agent_configs: list[AgentConfig] = dataclasses.field(
@@ -1756,6 +1768,14 @@ class InstallationConfig:
 
             config["environment"] = environment
 
+            hr_config_file = config.pop(
+                "haiku_rag_config_file",
+                "./haiku.rag.yaml",
+            )
+            config["_haiku_rag_config_file"] = (
+                config_path.parent / hr_config_file
+            )
+
             agent_configs = config.pop("agent_configs", ())
             agent_configs = [
                 AgentConfig.from_yaml(None, config_path, agent_config)
@@ -1834,6 +1854,7 @@ class InstallationConfig:
             "meta": self.meta.as_yaml,
             "secrets": [secret.as_yaml for secret in self.secrets],
             "environment": self.environment,
+            "haiku_rag_config_file": str(self._haiku_rag_config_file),
             "agent_configs": [ac.as_yaml for ac in self.agent_configs],
             "oidc_paths": [str(path) for path in self.oidc_paths],
             "room_paths": [str(path) for path in self.room_paths],

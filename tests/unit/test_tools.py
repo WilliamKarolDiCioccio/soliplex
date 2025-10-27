@@ -11,6 +11,7 @@ USER = {
     "full_name": "Phreddy Phlyntstone",
     "email": "phreddy@example.com",
 }
+OLLAMA_BASE_URL = "https://ollama.example.com/"
 
 
 @pytest.mark.anyio
@@ -56,7 +57,11 @@ async def test_search_documents(
 
     search.return_value = expand_context.return_value = docs
 
+    inst_config = mock.create_autospec(config.InstallationConfig)
+    inst_config.environment = {"OLLAMA_BASE_URL": OLLAMA_BASE_URL}
+
     sdt_config = mock.create_autospec(config.SearchDocumentsToolConfig)
+    sdt_config._installation_config = inst_config
     sdt_config.expand_context_radius = w_radius
     sdt_config.return_citations = w_cites
 
@@ -87,7 +92,10 @@ async def test_search_documents(
     else:
         expand_context.assert_not_called()
 
-    hr_class.assert_called_once_with(sdt_config.rag_lancedb_path)
+    hr_class.assert_called_once_with(
+        db_path=sdt_config.rag_lancedb_path,
+        config=inst_config.haiku_rag_config,
+    )
 
 
 @pytest.mark.anyio

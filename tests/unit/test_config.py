@@ -10,6 +10,7 @@ from urllib import parse as url_parse
 
 import pytest
 import yaml
+from haiku.rag import config as hr_config_module
 
 from soliplex import config
 from soliplex import secrets
@@ -800,6 +801,16 @@ environment:
     {CONFIG_KEY_0}: "{CONFIG_VAL_0}"
     {CONFIG_KEY_1}: "{CONFIG_VAL_1}"
     {CONFIG_KEY_2}: "{CONFIG_VAL_2}"
+"""
+
+HAIKU_RAG_CONFIG_FILE = "/path/to/haiku.rag.yaml"
+W_HR_CONFIG_FILE_INSTALLATION_CONFIG_KW = {
+    "id": INSTALLATION_ID,
+    "_haiku_rag_config_file": pathlib.Path(HAIKU_RAG_CONFIG_FILE),
+}
+W_HR_CONFIG_FILE_INSTALLATION_CONFIG_YAML = f"""\
+id: "{INSTALLATION_ID}"
+haiku_rag_config_file: "{HAIKU_RAG_CONFIG_FILE}"
 """
 
 OIDC_PATH_1 = "./oidc"
@@ -3407,6 +3418,26 @@ def test_installation_resolve_environment(
         assert i_config.environment == exp_env
 
 
+def test_installationconfig_haiku_rag_config(temp_dir):
+    hr_config_file = temp_dir / "haiku.rag.yaml"
+    hr_config_file.write_text(f"""\
+providers:
+  ollama:
+    base_url: "{OLLAMA_BASE_URL}"
+""")
+
+    i_config = config.InstallationConfig(
+        id="test-ic",
+        _config_path=temp_dir / "installation.yaml",
+        _haiku_rag_config_file=hr_config_file,
+    )
+
+    hr_config = i_config.haiku_rag_config
+
+    assert isinstance(hr_config, hr_config_module.AppConfig)
+    assert hr_config.providers.ollama.base_url == OLLAMA_BASE_URL
+
+
 def test_installationconfig_agent_configs_map_wo_existing():
     agent_configs = [
         config.AgentConfig(
@@ -3478,6 +3509,10 @@ def test_installationconfig_agent_configs_map_w_existing():
             W_ENVIRONMENT_INSTALLATION_CONFIG_KW.copy(),
         ),
         (
+            W_HR_CONFIG_FILE_INSTALLATION_CONFIG_YAML,
+            W_HR_CONFIG_FILE_INSTALLATION_CONFIG_KW.copy(),
+        ),
+        (
             W_OIDC_PATHS_INSTALLATION_CONFIG_YAML,
             W_OIDC_PATHS_INSTALLATION_CONFIG_KW.copy(),
         ),
@@ -3545,6 +3580,11 @@ def test_installationconfig_from_yaml(
         else:
             expected_kw["meta"] = config.InstallationConfigMeta(
                 _config_path=config_path,
+            )
+
+        if "_haiku_rag_config_file" not in expected_kw:
+            expected_kw["_haiku_rag_config_file"] = (
+                config_path.parent / "haiku.rag.yaml"
             )
 
         expected = config.InstallationConfig(
@@ -3642,6 +3682,7 @@ def test_installationconfig_from_yaml_environ_wo_value(temp_dir, config_yaml):
             expected.meta,
             _config_path=yaml_file,
         ),
+        _haiku_rag_config_file=(yaml_file.parent / "haiku.rag.yaml"),
         oidc_paths=[temp_dir / "oidc"],
         room_paths=[temp_dir / "rooms"],
         completion_paths=[temp_dir / "completions"],
@@ -3675,6 +3716,7 @@ def test_installationconfig_as_yaml():
         environment={
             "OLLAMA_BASE_URL": OLLAMA_BASE_URL,
         },
+        _haiku_rag_config_file=pathlib.Path(HAIKU_RAG_CONFIG_FILE),
         agent_configs=[agent_config],
         oidc_paths=[pathlib.Path("./oidc-test")],
         room_paths=[
@@ -3695,6 +3737,7 @@ def test_installationconfig_as_yaml():
         "environment": {
             "OLLAMA_BASE_URL": OLLAMA_BASE_URL,
         },
+        "haiku_rag_config_file": HAIKU_RAG_CONFIG_FILE,
         "agent_configs": [
             agent_config.as_yaml,
         ],
