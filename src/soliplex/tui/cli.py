@@ -1,6 +1,5 @@
 from importlib.metadata import version
 
-import textual
 import typer
 from rich import console
 
@@ -10,7 +9,7 @@ the_cli = typer.Typer(
     context_settings={
         "help_option_names": ["-h", "--help"],
     },
-    #no_args_is_help=True,
+    # no_args_is_help=True,
 )
 
 the_console = console.Console()
@@ -21,10 +20,10 @@ def get_version():
     the_console.print(f"soliple-tui version {v}")
     raise typer.Exit()
 
+
 def version_callback(value: bool):
     if value:
         get_version()
-
 
 
 @the_cli.command()

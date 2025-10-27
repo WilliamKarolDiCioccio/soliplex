@@ -5,7 +5,6 @@ import textual
 from textual import app as t_app
 from textual import binding as t_binding
 from textual import containers as t_containers
-from textual import screen as t_screen
 from textual import widgets as t_widgets
 
 
@@ -93,12 +92,14 @@ class SoliplexTUI(t_app.App):
                 f"{self.soliplex_url}/api/v1/convos/{self.convo_uuid}"
             )
             streaming_response = requests.post(
-                request_url, json=request_json, stream=True,
+                request_url,
+                json=request_json,
+                stream=True,
             )
             for line in streaming_response.iter_lines():
                 if line:
                     decoded = line.decode("utf-8")
                     chunk = json.loads(decoded)
                     # Soliplex streams the whole thing
-                    #response_content += chunk["content"]
+                    # response_content += chunk["content"]
                     self.call_from_thread(response.update, chunk["content"])
