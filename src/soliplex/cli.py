@@ -428,8 +428,14 @@ def config_as_yaml(
     except config.MissingEnvVars:
         pass
 
-    exported_yaml = yaml.dump(the_installation._config.as_yaml)
+    exported_yaml = yaml.dump(
+        the_installation._config.as_yaml,
+        sort_keys=False,
+    )
 
+    the_console.print(f"#{'-' * 78}")
+    the_console.print(f"# Source: {installation_path}")
+    the_console.print(f"#{'-' * 78}")
     the_console.print(exported_yaml)
 
 
