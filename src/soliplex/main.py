@@ -45,7 +45,6 @@ def create_app(
     installation_path: pathlib.Path = None,
     no_auth_mode: bool = None,
 ):  # pragma: NO COVER
-
     if no_auth_mode is None:
         no_auth_mode = os.environ.get("SOLIPLEX_NO_AUTH_MODE") == "Y"
 
