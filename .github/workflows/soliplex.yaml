@@ -5,7 +5,8 @@ on:
     branches:
       - main
     paths:
-      - 'soliplex/**'
+      - 'pyproject.toml'
+      - 'src/soliplex/**'
       - 'tests/**'
       - '.github/workflows/soliplex.yaml'
       - 'uv.lock'
@@ -13,7 +14,8 @@ on:
     branches:
       - main
     paths:
-      - 'soliplex/**'
+      - 'pyproject.toml'
+      - 'src/soliplex/**'
       - 'tests/**'
       - '.github/workflows/soliplex.yaml'
       - 'uv.lock'
