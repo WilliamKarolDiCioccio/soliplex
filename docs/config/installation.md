@@ -54,6 +54,18 @@ environment:
 See [this page](environment.md) for documentation on configuring the
 installation environment.
 
+## `haiku.rag` Configuration File
+
+The `haiku_rag_config_file` entry points to a YAML file containing
+configuration values for the `haiku.rag` client
+
+If not configured explicitly, the installation configuration expects to
+find this file in the same directory, with the default name `haiku.rag.yaml`.
+
+Pleas see the `haiku.rag` configuration
+[docs](https://ggozad.github.io/haiku.rag/configuration/) for details
+on how to configure the `haiku.rag` client used by Soliplex.
+
 ## Agent Configurations
 
 An installation can declare agent configurations (which are normally bound
