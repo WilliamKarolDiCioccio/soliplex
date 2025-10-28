@@ -10,7 +10,9 @@ storage:
   disable_autocreate: true
   vacuum_retention_seconds: 60
 
-lancedb:
+# This section is for configuring LanceDB in various "remote" modes.
+# Leave it commented out to use local filesystem databases.
+#lancedb:
   # Configure LanceDB Cloud
   # uri: ''
   # api_key: ''
@@ -55,8 +57,9 @@ processing:
   markdown_preprocessor: ''
 
 providers:
-  ollama:
-#   Allow this value to be populated from 'os.environ'
+#  Leave the 'ollama' section commented out to allow it's base URL to be
+#  populated from 'os.environ'
+#  ollama:
 #   base_url: http://localhost:11434
   vllm:
     embeddings_base_url: ''
