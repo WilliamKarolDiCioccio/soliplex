@@ -47,9 +47,11 @@ qa:
   provider: ollama
   model: qwen3:latest
 
-research:
-  provider: ''
-  model: ''
+#
+# Omit this section to accept the defaults.
+#research:
+# provider: ''
+# model: ''
 
 processing:
   chunk_size: 256
