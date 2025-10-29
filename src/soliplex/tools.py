@@ -31,7 +31,18 @@ async def search_documents(
         list[models.SearchResult]: A list of documents with their
         relevance scores, and, optionally, document URIs.
     """  # noqa: E501  The first line is important to the LLM.
-    async with rag_client.HaikuRAG(tool_config.rag_lancedb_path) as rag:
+
+    hr_client_kw = {}
+
+    if tool_config is not None:
+        hr_client_kw["db_path"] = tool_config.rag_lancedb_path
+        hr_client_kw["config"] = (
+            tool_config._installation_config.haiku_rag_config
+        )
+    else:  # pragma: NO COVER
+        pass
+
+    async with rag_client.HaikuRAG(**hr_client_kw) as rag:
         results = await rag.search(
             query,
             limit=tool_config.search_documents_limit,

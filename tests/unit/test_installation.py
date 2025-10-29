@@ -120,25 +120,6 @@ def test_installation_resolve_environment(w_raise):
         the_installation.resolve_environment()
 
 
-def test_installation_configure_haiku_rag():
-    from haiku.rag import config as hr_config
-
-    copied = hr_config.Config.model_copy()
-
-    i_config = mock.create_autospec(
-        config.InstallationConfig,
-        environment={"OLLAMA_BASE_URL": OLLAMA_BASE_URL},
-    )
-    the_installation = installation.Installation(i_config)
-
-    with mock.patch("haiku.rag.config.Config", copied):
-        the_installation.configure_haiku_rag()
-
-    # Check that the 'haiku.rag.config.Config' object was reconfigured
-    # using our config's environment.
-    assert copied.OLLAMA_BASE_URL == OLLAMA_BASE_URL
-
-
 @pytest.mark.parametrize("w_oidc_configs", [[], [object()]])
 def test_installation_auth_disabled(w_oidc_configs):
     i_config = mock.create_autospec(config.InstallationConfig)
@@ -389,10 +370,6 @@ async def test_lifespan(
     w_no_auth_mode,
     exp_oidc_paths,
 ):
-    from haiku.rag import config as hr_config
-
-    copied = hr_config.Config.model_copy()
-
     INSTALLATION_PATH = "/path/to/installation"
 
     smfr.return_value = mcp_apps
@@ -410,19 +387,14 @@ async def test_lifespan(
     if w_no_auth_mode is not None:
         kwargs["no_auth_mode"] = w_no_auth_mode
 
-    with mock.patch("haiku.rag.config.Config", copied):
-        found = [
-            item
-            async for item in installation.lifespan(
-                app,
-                INSTALLATION_PATH,
-                **kwargs,
-            )
-        ]
-
-    # Check that the 'haiku.rag.config.Config' object was reconfigured
-    # using our config's environment.
-    assert copied.OLLAMA_BASE_URL == OLLAMA_BASE_URL
+    found = [
+        item
+        async for item in installation.lifespan(
+            app,
+            INSTALLATION_PATH,
+            **kwargs,
+        )
+    ]
 
     assert len(found) == 1
 

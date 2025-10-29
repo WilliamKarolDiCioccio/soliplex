@@ -51,12 +51,6 @@ $ soliplex-cli list-environment example/installation.yaml
 
 - OLLAMA_BASE_URL          : MISSING
 - DEFAULT_AGENT_MODEL      : qwen3:latest
-- EMBEDDINGS_PROVIDER      : ollama
-- EMBEDDINGS_MODEL         : mxbai-embed-large
-- EMBEDDINGS_VECTOR_DIM    : 1024
-- QA_PROVIDER              : ollama
-- QA_MODEL                 : qwen3:latest
-- RERANK                   : false
 - INSTALLATION_PATH        : file:.
 - RAG_LANCE_DB_PATH        : file:../db/rag
 - LOGFIRE_ENVIRONMENT      : container

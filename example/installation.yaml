@@ -146,28 +146,6 @@ environment:
     value: "qwen3:latest"
 
   #------------------------------------------------------------------------
-  # 'haiku.rag' config vars
-  #------------------------------------------------------------------------
-  #
-  - name: "EMBEDDINGS_PROVIDER"
-    value: "ollama"
-
-  - name: "EMBEDDINGS_MODEL"
-    value: "qwen3-embedding"
-
-  - name: "EMBEDDINGS_VECTOR_DIM"
-    value: "4096"
-
-  - name: "QA_PROVIDER"
-    value: "ollama"
-
-  - name: "QA_MODEL"
-    value: "qwen3:latest"
-
-  - name: "RERANK"
-    value: "false"
-
-  #------------------------------------------------------------------------
   # 'soliplex': on-disk configuration locations
   #------------------------------------------------------------------------
   #
@@ -194,6 +172,12 @@ environment:
   # - name: "MCP_TOKEN_MAX_AGE"
   #   value: 3600
   #------------------------------------------------------------------------
+
+#==========================================================================
+# Global 'haiku-rag' configuration
+#==========================================================================
+
+haiku_rag_config_file: "./haiku.rag.yaml"
 
 #==========================================================================
 # Agent configurations

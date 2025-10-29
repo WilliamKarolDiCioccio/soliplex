@@ -37,6 +37,7 @@ AGENT_MODEL = "test_model"
 AGENT_PROMPT = "You are a test"
 AGENT_BASE_URL = "https://provider.example.com/base"
 OLLAMA_BASE_URL = "https://ollama.example.com/base"
+HAIKU_RAG_CONFIG_FILE = "/path/to/haiku.rag.yaml"
 
 INSTALLATION_ID = "test-installation"
 INSTALLATION_SECRET = "Seeeeeekrit!"
@@ -477,6 +478,16 @@ def installation_environment(request):
 @pytest.fixture(
     params=[
         None,
+        pathlib.Path(HAIKU_RAG_CONFIG_FILE),
+    ],
+)
+def installation_haiku_rag_config_file(request):
+    return _from_param(request, "_haiku_rag_config_file")
+
+
+@pytest.fixture(
+    params=[
+        None,
         [
             config.AgentConfig(
                 id=INSTALLATION_AGENT_ID,
@@ -526,6 +537,7 @@ def installation_oidc_auth_system_configs(request):
 def test_installation_from_config(
     installation_secrets,
     installation_environment,
+    installation_haiku_rag_config_file,
     installation_agents,
     installation_oidc_paths,
     installation_room_paths,
@@ -537,6 +549,7 @@ def test_installation_from_config(
         id=INSTALLATION_ID,
         **installation_secrets,
         **installation_environment,
+        **installation_haiku_rag_config_file,
         **installation_agents,
         **installation_oidc_paths,
         **installation_room_paths,
@@ -563,6 +576,14 @@ def test_installation_from_config(
         )
     else:
         assert installation_model.environment == {}
+
+    if installation_haiku_rag_config_file:
+        assert (
+            installation_model.haiku_rag_config_file
+            == installation_haiku_rag_config_file["_haiku_rag_config_file"]
+        )
+    else:
+        assert installation_model.haiku_rag_config_file is None
 
     for m_agent, c_agent in zip(
         installation_model.agents,
