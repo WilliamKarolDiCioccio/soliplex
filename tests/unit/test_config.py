@@ -3418,12 +3418,11 @@ def test_installation_resolve_environment(
         assert i_config.environment == exp_env
 
 
-def test_installationconfig_haiku_rag_config(temp_dir):
+@pytest.mark.parametrize("w_obu", [False, True])
+def test_installationconfig_haiku_rag_config(temp_dir, w_obu):
     hr_config_file = temp_dir / "haiku.rag.yaml"
-    hr_config_file.write_text(f"""\
-providers:
-  ollama:
-    base_url: "{OLLAMA_BASE_URL}"
+    hr_config_file.write_text("""\
+environment: production
 """)
 
     i_config = config.InstallationConfig(
@@ -3432,10 +3431,15 @@ providers:
         _haiku_rag_config_file=hr_config_file,
     )
 
+    if w_obu:
+        exp_obu = i_config.environment["OLLAMA_BASE_URL"] = OLLAMA_BASE_URL
+    else:
+        exp_obu = "http://localhost:11434"
+
     hr_config = i_config.haiku_rag_config
 
     assert isinstance(hr_config, hr_config_module.AppConfig)
-    assert hr_config.providers.ollama.base_url == OLLAMA_BASE_URL
+    assert hr_config.providers.ollama.base_url == exp_obu
 
 
 def test_installationconfig_agent_configs_map_wo_existing():

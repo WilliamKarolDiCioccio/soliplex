@@ -57,10 +57,16 @@ processing:
   markdown_preprocessor: ''
 
 providers:
+#
 #  Leave the 'ollama' section commented out to allow it's base URL to be
-#  populated from 'os.environ'
+#  populated from 'os.environ' when using the 'haiku-rag' CLI.
+#
+#  In the soliplex server, this value will be replaced by the value
+#  configured for 'OLLAMA_BASE_URL' in the installation environment (if set).
+#
 #  ollama:
 #   base_url: http://localhost:11434
+
   vllm:
     embeddings_base_url: ''
     rerank_base_url: ''
