@@ -6,6 +6,7 @@ from importlib.metadata import version
 
 import typer
 import uvicorn
+import uvicorn.config
 import yaml
 from rich import console
 
@@ -144,13 +145,13 @@ def serve(
     ),
     log_config: pathlib.Path = log_config_option,
     log_level: LogLevelOption = log_level_option,
-    access_log: bool = typer.Option(
-        True,
+    access_log: bool | None = typer.Option(
+        None,
         "--access-log",
         help="Enable/Disable access log",
     ),
     proxy_headers: bool = typer.Option(
-        True,
+        None,
         "--proxy-headers",
         help="Enable/Disable X-Forwarded-Proto, X-Forwarded-For "
         "to populate url scheme and remote address info.",
@@ -183,10 +184,6 @@ def serve(
     uvicorn_kw = {
         "host": host,
         "port": port,
-        "log_config": log_config,
-        "log_level": log_level,
-        "access_log": access_log,
-        "proxy_headers": proxy_headers,
     }
 
     if uds is not None:
@@ -197,6 +194,18 @@ def serve(
 
     if workers is not None:
         uvicorn_kw["workers"] = workers
+
+    if log_config is not None:
+        uvicorn_kw["log_config"] = log_config
+
+    if log_level is not None:
+        uvicorn_kw["log_level"] = log_level
+
+    if access_log is not None:
+        uvicorn_kw["access_log"] = access_log
+
+    if proxy_headers is not None:
+        uvicorn_kw["proxy_headers"] = proxy_headers
 
     if forwarded_allow_ips is not None:
         uvicorn_kw["forwarded_allow_ips"] = forwarded_allow_ips
