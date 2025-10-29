@@ -38,10 +38,10 @@ embeddings:
   model: qwen3-embedding
   vector_dim: 4096
 
-reranking:
-  # Leave 'provider' blank to disable re-ranking
-  provider: ''
-  model: ''
+# Omit the 'reranking' section to disable re-ranking.
+#reranking:
+# provider: ''
+# model: ''
 
 qa:
   provider: ollama
