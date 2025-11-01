@@ -644,6 +644,7 @@ class AgentConfig:
     #
     id: str  # set as 'room-{room_id}' or 'completion-{completion_id}'
     model_name: str = None
+    retries: int = 3
 
     system_prompt: dataclasses.InitVar[str] = None
     _system_prompt_text: str = None
@@ -743,6 +744,7 @@ class AgentConfig:
         return {
             "id": self.id,
             "model_name": self.model_name,
+            "retries": self.retries,
             "system_prompt": prompt,
             "provider_type": self.provider_type.value,
             "provider_base_url": provider_base_url,
