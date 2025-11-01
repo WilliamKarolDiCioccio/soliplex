@@ -5,7 +5,6 @@ import uuid
 import fastapi
 from fastapi import responses
 from fastapi import security
-from pydantic_ai import messages as ai_messages
 
 from soliplex import auth
 from soliplex import convos
@@ -61,13 +60,13 @@ async def post_convos_new_room(
         user=user_profile,
     )
 
-    async with agent.run_stream(
+    agent_run = await agent.run(
         convo_msg.text,
         message_history=[],
         deps=agent_deps,
-    ) as result:
-        await result.get_output()
-        new_messages = result.new_messages()
+    )
+
+    new_messages = agent_run.new_messages()
 
     context_messages = convos._filter_context_messages(new_messages)
 
@@ -180,14 +179,7 @@ async def post_convo(
             message_history=convo.message_history,
             deps=agent_deps,
         ) as result:
-            # output = await result.get_output()
-            async for text in result.stream(debounce_by=0.01):
-                # text here is a `str` and the frontend wants
-                # JSON encoded ModelResponse, so we create one
-                text_part = ai_messages.TextPart(text)
-                mr = ai_messages.ModelResponse(
-                    parts=[text_part], timestamp=result.timestamp()
-                )
+            async for mr, _is_last in result.stream_responses():
                 yield (
                     json.dumps(
                         convos._to_convo_message(mr),

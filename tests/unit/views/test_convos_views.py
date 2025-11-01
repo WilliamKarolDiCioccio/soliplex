@@ -108,9 +108,26 @@ def _make_the_installation():
     return mock.create_autospec(installation.Installation, instance=True)
 
 
-async def get_chunks(**kwargs):
-    for chunk in CHUNKS:
-        yield chunk
+async def get_chunk_messages(**kwargs):
+    for chunk in CHUNKS[:-1]:
+        yield (
+            ai_messages.ModelResponse(
+                parts=[
+                    ai_messages.TextPart(content=chunk),
+                ],
+                timestamp=TS_3,
+            ),
+            False,
+        )
+    yield (
+        ai_messages.ModelResponse(
+            parts=[
+                ai_messages.TextPart(content=CHUNKS[-1]),
+            ],
+            timestamp=TS_3,
+        ),
+        True,
+    )
 
 
 async def _check_streaming_response(found):
@@ -202,17 +219,13 @@ async def test_post_convos_new_room(
         the_convos.new_conversation.assert_not_called()
 
     else:
-        agent = mock.Mock(spec_set=["run_stream"])
-        the_installation.get_agent_for_room.return_value = agent
-        s_rslt = mock.MagicMock()
-        agent.run_stream.return_value = s_rslt
-        ctx_result = s_rslt.__aenter__.return_value
-        ctx_result.get_output.return_value = "Who knows? Not me!"
-        ctx_result.timestamp = mock.Mock(spec_set=(), return_value=NOW)
-        ctx_result.new_messages = mock.Mock(
+        agent = mock.Mock(spec_set=["run"], run=mock.AsyncMock())
+        run_rslt = agent.run.return_value = mock.Mock()
+        run_rslt.new_messages = mock.Mock(
             spec_set=(),
             return_value=NEW_AI_MESSAGES,
         )
+        the_installation.get_agent_for_room.return_value = agent
 
         found = await convos_views.post_convos_new_room(
             request=request,
@@ -235,7 +248,7 @@ async def test_post_convos_new_room(
             user=exp_user_profile,
         )
 
-        agent.run_stream.assert_called_once_with(
+        agent.run.assert_called_once_with(
             USER_PROMPT,
             message_history=[],
             deps=expected_deps,
@@ -381,8 +394,7 @@ async def test_post_convo(
     s_rslt = mock.MagicMock()
     agent.run_stream.return_value = s_rslt
     ctx_result = s_rslt.__aenter__.return_value
-    ctx_result.stream = get_chunks
-    ctx_result.timestamp = mock.Mock(spec_set=(), return_value=NOW)
+    ctx_result.stream_responses = get_chunk_messages
     ctx_result.new_messages = mock.Mock(
         spec_set=(),
         return_value=NEW_AI_MESSAGES,
