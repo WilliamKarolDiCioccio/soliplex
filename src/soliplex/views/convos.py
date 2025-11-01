@@ -22,68 +22,6 @@ depend_the_installation = installation.depend_the_installation
 # =============================================================================
 
 
-@util.logfire_span("POST /v1/convos/new")
-@router.post(
-    "/v1/convos/new",
-    summary="Post new conversation",
-    deprecated=True,
-)
-async def post_convos_new(
-    request: fastapi.Request,
-    convo_msg: models.NewConvoClientMessage,
-    the_installation: installation.Installation = depend_the_installation,
-    the_convos: convos.Conversations = convos.depend_the_convos,
-    token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
-) -> models.Conversation:
-    """Create a new conversation
-
-    Room ID supplied in the request body, along with the initial
-    user message.
-    """
-    user = auth.authenticate(the_installation, token)
-    user_profile = models.UserProfile(
-        given_name=user.get("given_name", "<unknown>"),
-        family_name=user.get("family_name", "<unknown>"),
-        email=user.get("email", "<unknown>"),
-        preferred_username=user.get("preferred_username", "<unknown>"),
-    )
-    user_name = user_profile.preferred_username
-
-    try:
-        agent = the_installation.get_agent_for_room(
-            convo_msg.room_id,
-            user=user,
-        )
-    except KeyError:
-        raise fastapi.HTTPException(
-            status_code=404,
-            detail=f"No such room: {convo_msg.room_id}",
-        ) from None
-
-    agent_deps = models.AgentDependencies(
-        the_installation=the_installation,
-        user=user_profile,
-    )
-
-    async with agent.run_stream(
-        convo_msg.text,
-        message_history=[],
-        deps=agent_deps,
-    ) as result:
-        await result.get_output()
-        new_messages = result.new_messages()
-
-    context_messages = convos._filter_context_messages(new_messages)
-
-    info = await the_convos.new_conversation(
-        user_name,
-        convo_msg.room_id,
-        convo_msg.text,
-        new_messages=context_messages,
-    )
-    return models.Conversation.from_convos_info(info)
-
-
 @util.logfire_span("POST /v1/convos/new/{room_id}")
 @router.post("/v1/convos/new/{room_id}", summary="Post new conversation")
 async def post_convos_new_room(
