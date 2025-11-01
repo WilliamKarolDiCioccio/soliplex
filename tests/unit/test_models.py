@@ -35,6 +35,7 @@ COMPLETION_NAME = "Test Room"
 AGENT_ID = "test_agent"
 AGENT_MODEL = "test_model"
 AGENT_PROMPT = "You are a test"
+AGENT_RETRIES = 7
 AGENT_BASE_URL = "https://provider.example.com/base"
 OLLAMA_BASE_URL = "https://ollama.example.com/base"
 HAIKU_RAG_CONFIG_FILE = "/path/to/haiku.rag.yaml"
@@ -288,6 +289,11 @@ def test_mcp_client_toolset_from_config_w_sdtc():
     assert params["query_params"] == mcp_ct_config.query_params
 
 
+@pytest.fixture(params=[None, AGENT_RETRIES])
+def agent_retries(request):
+    return _from_param(request, "retries")
+
+
 @pytest.fixture(params=[*config.LLMProviderType])
 def agent_provider_type(request):
     return _from_param(request, "provider_type")
@@ -307,6 +313,7 @@ def installation_config():
 
 
 def test_agent_from_config(
+    agent_retries,
     agent_provider_type,
     agent_provider_base_url,
     installation_config,
@@ -316,6 +323,7 @@ def test_agent_from_config(
         model_name=AGENT_MODEL,
         system_prompt=AGENT_PROMPT,
         _installation_config=installation_config,
+        **agent_retries,
         **agent_provider_type,
         **agent_provider_base_url,
     )
@@ -325,10 +333,16 @@ def test_agent_from_config(
     else:
         exp_base = f"{AGENT_BASE_URL}/v1"
 
+    if not agent_retries:
+        exp_retries = 3
+    else:
+        exp_retries = AGENT_RETRIES
+
     agent_model = models.Agent.from_config(agent_config)
 
     assert agent_model.id == AGENT_ID
     assert agent_model.model_name == AGENT_MODEL
+    assert agent_model.retries == exp_retries
     assert agent_model.system_prompt == AGENT_PROMPT
     assert agent_model.provider_base_url == exp_base
 

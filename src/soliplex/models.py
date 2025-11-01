@@ -117,6 +117,7 @@ ConfiguredMCPClientToolsets = dict[str, MCPClientToolset]
 class Agent(pydantic.BaseModel):
     id: str
     model_name: str
+    retries: int
     system_prompt: str
     provider_type: config.LLMProviderType  # enum, not dataclass
     provider_base_url: str
@@ -128,6 +129,7 @@ class Agent(pydantic.BaseModel):
         return cls(
             id=agent_config.id,
             model_name=agent_config.model_name,
+            retries=agent_config.retries,
             system_prompt=agent_config.get_system_prompt(),
             provider_type=agent_config.provider_type,
             provider_base_url=llm_provider_kw["base_url"],

@@ -328,7 +328,6 @@ EMPTY_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 """
 
-
 BARE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     system_prompt=SYSTEM_PROMPT,
@@ -338,6 +337,16 @@ BARE_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 system_prompt: "{SYSTEM_PROMPT}"
 model_name: "{MODEL_NAME}"
+"""
+
+AGENT_RETRIES = 7
+W_RETRIES_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    retries=AGENT_RETRIES,
+)
+W_RETRIES_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+retries: {AGENT_RETRIES}
 """
 
 W_PROMPT_FILE_AGENT_CONFIG_KW = dict(
@@ -1844,6 +1853,10 @@ def test_agentconfig_ctor(installation_config, kw):
         (EMPTY_AGENT_CONFIG_YAML, EMPTY_AGENT_CONFIG_KW.copy()),
         (BARE_AGENT_CONFIG_YAML, BARE_AGENT_CONFIG_KW.copy()),
         (
+            W_RETRIES_AGENT_CONFIG_YAML,
+            W_RETRIES_AGENT_CONFIG_KW.copy(),
+        ),
+        (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
             W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
         ),
@@ -1980,6 +1993,7 @@ def test_agentconfig_llm_provider_kw(
     [
         EMPTY_AGENT_CONFIG_KW.copy(),
         BARE_AGENT_CONFIG_KW.copy(),
+        W_RETRIES_AGENT_CONFIG_KW.copy(),
         W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
     ],
 )
@@ -2008,6 +2022,7 @@ def test_agentconfig_as_yaml(
         "id": AGENT_ID,
         "system_prompt": system_prompt,
         "model_name": model_name,
+        "retries": agent_config_kw.get("retries", 3),
         "provider_type": "ollama",
     }
 
