@@ -18,6 +18,13 @@ QUIZ_JUDGE_AGENT_MODEL = "test-model"
 OLLAMA_BASE_URL = "https://example.com:12345"
 
 
+def _from_param(request, key):
+    kw = {}
+    if request.param is not None:  # pragma: NO COVER
+        kw[key] = request.param
+    return kw
+
+
 @pytest.fixture
 def qa_question():
     return config.QuizQuestion(
@@ -51,20 +58,37 @@ def installation_config():
     return installation
 
 
+@pytest.fixture(
+    params=[
+        config.LLMProviderType.OLLAMA,
+        config.LLMProviderType.OPENAI,
+    ],
+)
+def agent_provider_type(request) -> dict:
+    return _from_param(request, "provider_type")
+
+
 @pytest.fixture
-def a_quiz(qa_question, mc_question, installation_config):
+def a_quiz(
+    qa_question,
+    mc_question,
+    installation_config,
+    agent_provider_type,
+):
+    judge_agent = mock.create_autospec(
+        config.AgentConfig,
+        id="quiz-testing-judge",
+        model_name=QUIZ_JUDGE_AGENT_MODEL,
+        llm_provider_kw={
+            "provider_base_url": f"{OLLAMA_BASE_URL}/v1",
+            "api_key": "dummy",
+        },
+        **agent_provider_type,
+    )
     quiz = config.QuizConfig(
         id="testing",
         question_file="ignored.json",
-        judge_agent=mock.create_autospec(
-            config.AgentConfig,
-            id="quiz-testing-judge",
-            model_name=QUIZ_JUDGE_AGENT_MODEL,
-            llm_provider_kw={
-                "provider_base_url": f"{OLLAMA_BASE_URL}/v1",
-                "api_key": "dummy",
-            },
-        ),
+        judge_agent=judge_agent,
         _installation_config=installation_config,
     )
     quiz._questions_map = {
@@ -74,15 +98,21 @@ def a_quiz(qa_question, mc_question, installation_config):
     return quiz
 
 
+@mock.patch("pydantic_ai.providers.openai.OpenAIProvider")
 @mock.patch("pydantic_ai.providers.ollama.OllamaProvider")
 @mock.patch("pydantic_ai.models.openai.OpenAIChatModel")
 @mock.patch("pydantic_ai.Agent")
 def test_get_quiz_judge_agent(
     agent_klass,
     model_klass,
-    provider_klass,
+    ollama_provider_klass,
+    openai_provider_klass,
     a_quiz,
 ):
+    is_openai = (
+        a_quiz.judge_agent.provider_type == config.LLMProviderType.OPENAI
+    )
+
     found = quizzes.get_quiz_judge_agent(a_quiz)
 
     assert found is agent_klass.return_value
@@ -93,14 +123,24 @@ def test_get_quiz_judge_agent(
         system_prompt=quizzes.ANSWER_EQUIVALENCE_RUBRIC,
     )
 
-    model_klass.assert_called_once_with(
-        model_name=a_quiz.judge_agent.model_name,
-        provider=provider_klass.return_value,
-    )
-
-    provider_klass.assert_called_once_with(
-        **a_quiz.judge_agent.llm_provider_kw,
-    )
+    if is_openai:
+        model_klass.assert_called_once_with(
+            model_name=a_quiz.judge_agent.model_name,
+            provider=openai_provider_klass.return_value,
+        )
+        openai_provider_klass.assert_called_once_with(
+            **a_quiz.judge_agent.llm_provider_kw,
+        )
+        ollama_provider_klass.assert_not_called()
+    else:
+        model_klass.assert_called_once_with(
+            model_name=a_quiz.judge_agent.model_name,
+            provider=ollama_provider_klass.return_value,
+        )
+        openai_provider_klass.assert_not_called()
+        ollama_provider_klass.assert_called_once_with(
+            **a_quiz.judge_agent.llm_provider_kw,
+        )
 
 
 @pytest.mark.anyio
