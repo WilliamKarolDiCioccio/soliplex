@@ -4,6 +4,7 @@ from unittest import mock
 import fastapi
 import pytest
 
+from soliplex import aguix
 from soliplex import config
 from soliplex import convos
 from soliplex import installation
@@ -410,6 +411,9 @@ async def test_lifespan(
 
     the_convos = found[0]["the_convos"]
     assert isinstance(the_convos, convos.Conversations)
+
+    the_agui_interactions = found[0]["the_agui_interactions"]
+    assert isinstance(the_agui_interactions, aguix.Interactions)
 
     for f_call, (key, mcp_app) in zip(
         app.mount.call_args_list,

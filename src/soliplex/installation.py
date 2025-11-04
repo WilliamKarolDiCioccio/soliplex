@@ -6,6 +6,7 @@ import fastapi
 import pydantic_ai
 
 from soliplex import agents
+from soliplex import aguix
 from soliplex import config
 from soliplex import convos
 from soliplex import mcp_server
@@ -122,10 +123,12 @@ async def lifespan(
     the_installation.resolve_secrets()
     the_installation.resolve_environment()
     the_convos = convos.Conversations()
+    the_agui_interactions = aguix.Interactions()
 
     context = {
         "the_installation": the_installation,
         "the_convos": the_convos,
+        "the_agui_interactions": the_agui_interactions,
     }
 
     async with contextlib.AsyncExitStack() as stack:
