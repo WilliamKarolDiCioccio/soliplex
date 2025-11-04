@@ -257,10 +257,13 @@ async def test_get_room_mcp_token(auth_fn, gust, w_error):
         (AUTH_USER, AUTH_USER),
     ],
 )
-@mock.patch("pydantic_ai.ag_ui.handle_ag_ui_request")
+# XXX pydantic-ai==1.4.0
+# @mock.patch("pydantic_ai.ag_ui.handle_ag_ui_request")
+@mock.patch("pydantic_ai.ui.ag_ui.AGUIAdapter")
 @mock.patch("soliplex.auth.authenticate")
-async def test_post_room_agui(auth_fn, haur, w_error, w_auth_user, exp_user):
+async def test_post_room_agui(auth_fn, aga, w_error, w_auth_user, exp_user):
     auth_fn.return_value = w_auth_user
+    aga.dispatch_request = mock.AsyncMock()
 
     ROOM_ID = "test-room"
     AGENT = object()
@@ -302,9 +305,9 @@ async def test_post_room_agui(auth_fn, haur, w_error, w_auth_user, exp_user):
             user=exp_user_profile,
         )
 
-        assert found is haur.return_value
+        assert found is aga.dispatch_request.return_value
 
-        haur.assert_called_once_with(
+        aga.dispatch_request.assert_called_once_with(
             agent=AGENT,
             request=request,
             deps=expected_deps,

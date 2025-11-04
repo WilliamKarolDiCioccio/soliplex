@@ -1,7 +1,9 @@
 import fastapi
 from fastapi import responses
 from fastapi import security
-from pydantic_ai import ag_ui as ai_ag_ui
+
+# from pydantic_ai import ag_ui as ai_ag_ui  # XXX: pydantic-ai==1.4.0
+from pydantic_ai.ui import ag_ui as ai_ag_ui
 
 from soliplex import auth
 from soliplex import installation
@@ -146,9 +148,8 @@ async def post_room_agui(
         user=user_profile,
     )
 
-    # 'pydantic-ai 1.4.0' doesn't have 'AGUIAdapter'.
-    # return await ai_ag_ui.AGUIAdapter.dispatch_request(
-    return await ai_ag_ui.handle_ag_ui_request(
+    # return await ai_ag_ui.handle_ag_ui_request(  # XXX: pydantic-ai==1.4.0
+    return await ai_ag_ui.AGUIAdapter.dispatch_request(
         request=request,
         agent=agent,
         deps=agent_deps,
