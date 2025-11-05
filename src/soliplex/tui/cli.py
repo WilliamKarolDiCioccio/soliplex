@@ -31,7 +31,8 @@ def tui(
     version: bool = typer.Option(None, "--version", "-v"),
     soliplex_url: str = typer.Option("http://localhost:8000", "--url"),
     room_id: str = typer.Option("haiku", "-r", "--room-id"),
+    use_agui: bool = typer.Option(None, "--use-agui"),
 ):
-    tui_app = main.SoliplexTUI(soliplex_url, room_id)
+    tui_app = main.SoliplexTUI(soliplex_url, room_id, use_agui)
 
     tui_app.run()

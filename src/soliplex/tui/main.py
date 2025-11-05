@@ -46,10 +46,12 @@ class SoliplexTUI(t_app.App):
         t_binding.Binding("ctrl+q", "quit", "quit", id="quit"),
     ]
 
-    def __init__(self, soliplex_url, room_id, *args, **kwargs):
+    def __init__(self, soliplex_url, room_id, use_agui, *args, **kwargs):
         self.soliplex_url = soliplex_url
         self.room_id = room_id
         self.convo_uuid = None
+        self.use_agui = use_agui
+        self.run_count = 0
         super().__init__(*args, **kwargs)
 
     def compose(self) -> t_app.ComposeResult:
@@ -69,7 +71,11 @@ class SoliplexTUI(t_app.App):
         event.input.clear()
         await chat_view.mount(Prompt(event.value))
         await chat_view.mount(response := Response())
-        self.send_prompt(event.value, response)
+
+        if self.use_agui:
+            self.send_agui_prompt(event.value, response)
+        else:
+            self.send_prompt(event.value, response)
 
     @textual.work(thread=True)
     def send_prompt(self, prompt: str, response: Response) -> None:
@@ -103,3 +109,57 @@ class SoliplexTUI(t_app.App):
                     # Soliplex streams the whole thing
                     # response_content += chunk["content"]
                     self.call_from_thread(response.update, chunk["content"])
+
+    @textual.work(thread=True)
+    def send_agui_prompt(self, prompt: str, response: Response) -> None:
+        """Get the AG-UI response in a thread."""
+        self.run_count += 1
+        response_content = ""
+        request_json = {
+            "thread_id": "testing",
+            "run_id": f"soliplex-tui:{self.run_count}",
+            "state": {},
+            "messages": [
+                {"id": "user_001", "role": "user", "content": prompt}
+            ],
+            "tools": [],
+            "context": [],
+            "forwarded_props": {},
+        }
+        request_url = f"{self.soliplex_url}/api/v1/rooms/{self.room_id}/agui"
+        streaming_response = requests.post(
+            request_url,
+            json=request_json,
+            stream=True,
+        )
+
+        for line in streaming_response.iter_lines():
+            if line:
+                decoded = line.decode("utf-8")
+
+                if decoded.startswith("data: "):
+                    decoded = decoded[len("data: ") :]
+
+                chunk = json.loads(decoded)
+
+                if chunk["type"] == "THINKING_START":
+                    response_content += "\n\n** thinking **\n\n"
+
+                elif chunk["type"] == "THINKING_TEXT_MESSAGE_CONTENT":
+                    response_content += chunk["delta"]
+
+                elif chunk["type"] == "TOOL_CALL_START":
+                    response_content += (
+                        f"\n\n** calling tool {chunk['toolCallName']} **"
+                    )
+
+                elif chunk["type"] == "TEXT_MESSAGE_START":
+                    response_content += "\n\n** response **\n\n"
+
+                elif chunk["type"] == "TEXT_MESSAGE_CONTENT":
+                    response_content += chunk["delta"]
+
+                elif chunk["type"] == "RUN_FINISHED":
+                    response_content += "\n\n** done **"
+
+                self.call_from_thread(response.update, response_content)
