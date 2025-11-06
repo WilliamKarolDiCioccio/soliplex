@@ -5,6 +5,7 @@ import functools
 import inspect
 import json
 import pathlib
+import typing
 from unittest import mock
 from urllib import parse as url_parse
 
@@ -328,6 +329,15 @@ EMPTY_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 """
 
+EMPTY_W_KIND_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    kind="testing",
+)
+EMPTY_W_KIND_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+kind: "testing"
+"""
+
 BARE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     system_prompt=SYSTEM_PROMPT,
@@ -598,6 +608,7 @@ BARE_ICMETA_KW = {
     "tool_configs": [],
     "mcp_toolset_configs": [],
     "mcp_server_tool_wrappers": [],
+    "agent_configs": [],
     "secret_sources": [],
 }
 BARE_ICMETA_YAML = """\
@@ -610,6 +621,7 @@ W_TOOL_CONFIGS_ICMETA_KW = {
     ],
     "mcp_toolset_configs": [],
     "mcp_server_tool_wrappers": [],
+    "agent_configs": [],
     "secret_sources": [],
 }
 W_TOOL_CONFIGS_ICMETA_YAML = """\
@@ -624,6 +636,7 @@ W_MCP_TOOLSET_CONFIGS_ICMETA_KW = {
         config.ConfigMeta(config_klass=config.Stdio_MCP_ClientToolsetConfig),
     ],
     "mcp_server_tool_wrappers": [],
+    "agent_configs": [],
     "secret_sources": [],
 }
 W_MCP_TOOLSET_CONFIGS_ICMETA_YAML = """\
@@ -641,6 +654,7 @@ W_MCP_SERVER_TOOL_WRAPPER_ICMETA_KW = {
             wrapper_klass=config.WithQueryMCPWrapper,
         ),
     ],
+    "agent_configs": [],
     "secret_sources": [],
 }
 W_MCP_SERVER_TOOL_WRAPPER_ICMETA_YAML = """\
@@ -650,11 +664,27 @@ meta:
       "wrapper_klass": "soliplex.config.WithQueryMCPWrapper"
 """
 
+W_AGENT_CONFIGS_ICMETA_KW = {
+    "tool_configs": [],
+    "mcp_toolset_configs": [],
+    "mcp_server_tool_wrappers": [],
+    "agent_configs": [
+        config.ConfigMeta(config_klass=config.AgentConfig),
+    ],
+    "secret_sources": [],
+}
+W_AGENT_CONFIGS_ICMETA_YAML = """\
+meta:
+  agent_configs:
+      - "soliplex.config.AgentConfig"
+"""
+
 SECRET_SOURCE_FUNC = lambda source: "SEEKRIT"  # noqa E731
 W_SECRET_SOURCE_ICMETA_KW = {
     "tool_configs": [],
     "mcp_toolset_configs": [],
     "mcp_server_tool_wrappers": [],
+    "agent_configs": [],
     "secret_sources": [
         config.ConfigMeta(
             config_klass=config.EnvVarSecretSource,
@@ -682,6 +712,9 @@ FULL_ICMETA_KW = {
             config.WithQueryMCPWrapper,
         ),
     ],
+    "agent_configs": [
+        config.ConfigMeta(config_klass=config.AgentConfig),
+    ],
     "secret_sources": [
         config.ConfigMeta(
             config_klass=config.EnvVarSecretSource,
@@ -699,6 +732,8 @@ meta:
   mcp_server_tool_wrappers:
     - "config_klass": "soliplex.config.SearchDocumentsToolConfig"
       "wrapper_klass": "soliplex.config.WithQueryMCPWrapper"
+  agent_configs:
+      - "soliplex.config.AgentConfig"
   secret_sources:
     - "config_klass": "soliplex.config.EnvVarSecretSource"
       "registered_func": "soliplex.config.test_secret_func"
@@ -2047,6 +2082,62 @@ def test_agentconfig_as_yaml(
     installation_config.get_secret.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "agent_config, expected_kw",
+    [
+        (EMPTY_AGENT_CONFIG_KW.copy(), EMPTY_AGENT_CONFIG_KW),
+        (EMPTY_W_KIND_AGENT_CONFIG_KW.copy(), EMPTY_W_KIND_AGENT_CONFIG_KW),
+    ],
+)
+def test_extract_agent_configs(
+    installation_config,
+    temp_dir,
+    agent_config,
+    expected_kw,
+):
+    @dataclasses.dataclass
+    class TestAgentConfig:
+        id: str
+        kind: typing.ClassVar[str] = "testing"
+        _installation_config: config.InstallationConfig = None
+        _config_path: pathlib.Path = None
+
+        @classmethod
+        def from_yaml(cls, i_config, c_path, c_dict):
+            return cls(
+                _installation_config=i_config,
+                _config_path=c_path,
+                **c_dict,
+            )
+
+    if agent_config.get("kind") == "testing":
+        kw_no_kind = {k: v for k, v in expected_kw.items() if k != "kind"}
+        expected = TestAgentConfig(
+            _installation_config=installation_config,
+            _config_path=temp_dir,
+            **kw_no_kind,
+        )
+    else:
+        expected = config.AgentConfig(
+            _installation_config=installation_config,
+            _config_path=temp_dir,
+            **expected_kw,
+        )
+
+    # Register our extension agent config
+    with mock.patch.dict(
+        "soliplex.config.AGENT_CONFIG_CLASSES_BY_KIND",
+        testing=TestAgentConfig,
+    ):
+        found = config.extract_agent_config(
+            installation_config,
+            temp_dir,
+            agent_config,
+        )
+
+    assert found == expected
+
+
 @pytest.fixture
 def qa_question():
     return config.QuizQuestion(
@@ -3045,6 +3136,7 @@ def patched_soliplex_config():
         patched["TOOL_CONFIG_CLASSES_BY_TOOL_NAME"] = {}
         patched["MCP_TOOLSET_CONFIG_CLASSES_BY_KIND"] = {}
         patched["MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME"] = {}
+        patched["AGENT_CONFIG_CLASSES_BY_KIND"] = {}
         patched["SECRET_GETTERS_BY_KIND"] = {}
 
         yield patched
@@ -3061,6 +3153,7 @@ def patched_soliplex_config():
             W_MCP_SERVER_TOOL_WRAPPER_ICMETA_YAML,
             W_MCP_SERVER_TOOL_WRAPPER_ICMETA_KW,
         ),
+        (W_AGENT_CONFIGS_ICMETA_YAML, W_AGENT_CONFIGS_ICMETA_KW),
         (
             W_SECRET_SOURCE_ICMETA_YAML,
             W_SECRET_SOURCE_ICMETA_KW,
@@ -3157,6 +3250,18 @@ def test_installationconfigmeta_from_yaml(
                     is wcs_by_class_name[wrapper_klass]
                 )
 
+        if config_meta and "agent_configs" in config_dict["meta"]:
+            acs_by_kind = patched_soliplex_config[
+                "AGENT_CONFIG_CLASSES_BY_KIND"
+            ]
+            acs_by_class_name = {
+                f"{klass.__module__}.{klass.__name__}": klass
+                for klass in acs_by_kind.values()
+            }
+            for klass_name in config_meta["agent_configs"]:
+                kind = acs_by_class_name[klass_name].kind
+                assert kind in acs_by_kind
+
         if config_meta and "secret_sources" in config_meta:
             sg_by_kind = patched_soliplex_config["SECRET_GETTERS_BY_KIND"]
             assert sg_by_kind == {
@@ -3165,12 +3270,14 @@ def test_installationconfigmeta_from_yaml(
 
 
 @pytest.mark.parametrize("w_secret_reg", [False, True])
-@pytest.mark.parametrize("w_sdtc", [False, True])
+@pytest.mark.parametrize("w_agent", [False, True])
 @pytest.mark.parametrize("w_mcp_toolsets", [False, True])
+@pytest.mark.parametrize("w_sdtc", [False, True])
 def test_installationconfigmeta_as_yaml(
     patched_soliplex_config,
     w_sdtc,
     w_mcp_toolsets,
+    w_agent,
     w_secret_reg,
 ):
     icmeta_kw = {}
@@ -3184,6 +3291,7 @@ def test_installationconfigmeta_as_yaml(
         expected_dict["tool_configs"].append(
             "soliplex.config.SearchDocumentsToolConfig",
         )
+
         config.MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME[
             config.SearchDocumentsToolConfig.tool_name
         ] = config.WithQueryMCPWrapper
@@ -3200,6 +3308,14 @@ def test_installationconfigmeta_as_yaml(
         ] = config.Stdio_MCP_ClientToolsetConfig
         expected_dict["mcp_toolset_configs"].append(
             "soliplex.config.Stdio_MCP_ClientToolsetConfig",
+        )
+
+    if w_agent:
+        config.AGENT_CONFIG_CLASSES_BY_KIND[config.AgentConfig.kind] = (
+            config.AgentConfig
+        )
+        expected_dict["agent_configs"].append(
+            "soliplex.config.AgentConfig",
         )
 
     if w_secret_reg:
