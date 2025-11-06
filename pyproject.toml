@@ -18,17 +18,14 @@ dependencies = [
     "docling",
     "python-dotenv",
     "fastapi",
-    "fastmcp>=2.13.0.2,<2.14",
-    "haiku.rag >= 0.13.1",
+    "fastmcp >= 2.13.0.2, < 2.14",
+    "haiku.rag >= 0.14.1",
     "httpx",
     "itsdangerous",
     "jwcrypto",
     "logfire[fastapi]",
-    "openai>=1.12.0",
-    # Work around https://github.com/pydantic/pydantic-ai/issues/2818
-    # We may need to exclude more versions if they make e.g. a 1.10.*
-    # release without fixing the bug.
-    "pydantic-ai >= 1.0.11, !=1.5.*, !=1.6.*, !=1.7.*, !=1.8.*, !=1.9.*",
+    "openai >= 1.12.0",
+    "pydantic-ai >= 1.11.1",
     "pyjwt",
     "python-dotenv",
     "python-keycloak",
