@@ -53,16 +53,32 @@ Key files:
 
 ## Quick Start
 
-### Backend
+### Install Soliplex and dependencies
 
 ```bash
 # Install
 python3.13 -m venv venv
 source venv/bin/activate
 pip install -e .
+```
 
-# Run
-soliplex-cli serve example --no-auth-mode
+### Index Soliplex docs into RAG database
+
+```bash
+source venv/bin/activate
+export OLLAMA_BASE_URL=<your Ollama server / port>
+haiku-rag --config example/haiku.rag.yaml \
+  add-src --db db/rag/rag.lancedb docs/
+...
+17 documents added successfully.
+```
+
+See: `docs/rag.md` for more options.
+
+### Run Soliplex backend server
+
+```bash
+soliplex-cli serve example/minimal.yaml --no-auth-mode
 ```
 
 ### Frontend
