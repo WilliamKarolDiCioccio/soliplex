@@ -73,7 +73,7 @@ haiku-rag --config example/haiku.rag.yaml \
 17 documents added successfully.
 ```
 
-See: `docs/indexing.md` for more options.
+See: `docs/rag.md` for more options.
 
 ### Run Soliplex backend server
 
