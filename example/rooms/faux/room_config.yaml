@@ -1,0 +1,8 @@
+id: "faux"
+name: "Faux Agent Test"
+description: "Testing faux agent"
+agent:
+  kind: "factory"
+  factory_name: "soliplex.examples.faux_agent_factory"
+  with_agent_config: true
+allow_mcp: false

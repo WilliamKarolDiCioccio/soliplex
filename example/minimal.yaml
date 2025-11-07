@@ -94,6 +94,7 @@ environment:
 room_paths:
   - "./rooms/haiku"
   - "./rooms/joker"
+  - "./rooms/faux"
   - "./rooms/quiztest"
 
 #==========================================================================
