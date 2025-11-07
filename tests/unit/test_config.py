@@ -370,6 +370,33 @@ system_prompt: ./prompt.txt
 model_name: "{MODEL_NAME}"
 """
 
+WO_CONFIG_PYTHON_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    factory_name="soliplex.config.test_factory_wo_config",
+    with_agent_config=False,
+)
+WO_CONFIG_PYTHON_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+factory_name: "soliplex.config.test_factory_wo_config"
+with_agent_config: false
+"""
+
+W_CONFIG_PYTHON_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    factory_name="soliplex.config.test_factory_w_config",
+    with_agent_config=True,
+    extra_config={
+        "foo": "Bar",
+    },
+)
+W_CONFIG_PYTHON_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+factory_name: "soliplex.config.test_factory_w_config"
+with_agent_config: true
+extra_config:
+  foo: "Bar"
+"""
+
 Q_UUID_1 = "DEADBEEF"
 QUESTION_1 = "What color is the sky"
 ANSWER_1 = "blue"
@@ -670,6 +697,7 @@ W_AGENT_CONFIGS_ICMETA_KW = {
     "mcp_server_tool_wrappers": [],
     "agent_configs": [
         config.ConfigMeta(config_klass=config.AgentConfig),
+        config.ConfigMeta(config_klass=config.FactoryAgentConfig),
     ],
     "secret_sources": [],
 }
@@ -677,6 +705,7 @@ W_AGENT_CONFIGS_ICMETA_YAML = """\
 meta:
   agent_configs:
       - "soliplex.config.AgentConfig"
+      - "soliplex.config.FactoryAgentConfig"
 """
 
 SECRET_SOURCE_FUNC = lambda source: "SEEKRIT"  # noqa E731
@@ -714,6 +743,7 @@ FULL_ICMETA_KW = {
     ],
     "agent_configs": [
         config.ConfigMeta(config_klass=config.AgentConfig),
+        config.ConfigMeta(config_klass=config.FactoryAgentConfig),
     ],
     "secret_sources": [
         config.ConfigMeta(
@@ -734,6 +764,7 @@ meta:
       "wrapper_klass": "soliplex.config.WithQueryMCPWrapper"
   agent_configs:
       - "soliplex.config.AgentConfig"
+      - "soliplex.config.FactoryAgentConfig"
   secret_sources:
     - "config_klass": "soliplex.config.EnvVarSecretSource"
       "registered_func": "soliplex.config.test_secret_func"
@@ -2080,6 +2111,135 @@ def test_agentconfig_as_yaml(
     assert found == expected
 
     installation_config.get_secret.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+    ],
+)
+def test_factoryagentconfig_ctor(kw):
+    found = config.FactoryAgentConfig(**kw)
+
+    assert found.id == AGENT_ID
+    assert found.factory_name == kw["factory_name"]
+    assert found.with_agent_config == kw["with_agent_config"]
+    assert found.extra_config == kw.get("extra_config", {})
+
+
+@pytest.mark.parametrize("w_existing", [False, True])
+@pytest.mark.parametrize(
+    "kw",
+    [
+        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+    ],
+)
+def test_factoryagentconfig_factory(kw, w_existing):
+    def existing():  # pragma: NO COVER
+        pass
+
+    def test_factory(ctx, agent_config=None):
+        "This is a test"
+
+    pyagent_config = config.FactoryAgentConfig(**kw)
+
+    if w_existing:
+        pyagent_config._factory = existing
+
+    _, factory_name = kw["factory_name"].rsplit(".", 1)
+    patch = {factory_name: test_factory}
+
+    with mock.patch.dict("soliplex.config.__dict__", **patch):
+        found = pyagent_config.factory
+
+    if w_existing:
+        assert found is existing
+
+    else:
+        if kw["with_agent_config"]:
+            assert isinstance(found, functools.partial)
+            assert found.func is test_factory
+            assert found.keywords == {"agent_config": pyagent_config}
+            assert found.__name__ == test_factory.__name__
+            assert found.__doc__ == test_factory.__doc__
+        else:
+            assert found is test_factory
+
+
+@pytest.mark.parametrize(
+    "config_yaml, expected_kw",
+    [
+        (BOGUS_AGENT_CONFIG_YAML, None),
+        (
+            WO_CONFIG_PYTHON_AGENT_CONFIG_YAML,
+            WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        ),
+        (
+            W_CONFIG_PYTHON_AGENT_CONFIG_YAML,
+            W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        ),
+    ],
+)
+def test_factoryagentconfig_from_yaml(
+    installation_config,
+    temp_dir,
+    config_yaml,
+    expected_kw,
+):
+    yaml_file = temp_dir / "test.yaml"
+    yaml_file.write_text(config_yaml)
+
+    with yaml_file.open() as stream:
+        config_dict = yaml.safe_load(stream)
+
+    if expected_kw is None:
+        with pytest.raises(config.FromYamlException):
+            config.FactoryAgentConfig.from_yaml(
+                installation_config,
+                yaml_file,
+                config_dict,
+            )
+    else:
+        expected = config.FactoryAgentConfig(
+            _installation_config=installation_config,
+            _config_path=yaml_file,
+            **expected_kw,
+        )
+
+        found = config.FactoryAgentConfig.from_yaml(
+            installation_config,
+            yaml_file,
+            config_dict,
+        )
+
+        assert found == expected
+
+
+@pytest.mark.parametrize(
+    "kw",
+    [
+        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+    ],
+)
+def test_factoryagentconfig_as_yaml(
+    installation_config,
+    kw,
+):
+    kw = copy.deepcopy(kw)
+    expected = copy.deepcopy(kw)
+
+    if "extra_config" not in expected:
+        expected["extra_config"] = {}
+
+    aconfig = config.FactoryAgentConfig(**kw)
+
+    found = aconfig.as_yaml
+
+    assert found == expected
 
 
 @pytest.mark.parametrize(

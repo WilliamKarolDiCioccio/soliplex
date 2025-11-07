@@ -16,6 +16,7 @@ from urllib import parse as url_parse
 import dotenv
 import yaml
 from haiku.rag import config as hr_config
+from pydantic_ai.agent import abstract as ai_ag_abstract
 
 SECRET_PREFIX = "secret:"
 FILE_PREFIX = "file:"
@@ -753,10 +754,77 @@ class AgentConfig:
         }
 
 
+AgentFactory = abc.Callable[[], ai_ag_abstract.AbstractAgent]
+
+
+@dataclasses.dataclass
+class FactoryAgentConfig:
+    id: str
+    factory_name: str  # dotted name for import
+    kind: typing.ClassVar[str] = "factory"
+    with_agent_config: bool = False
+    extra_config: dict[str, typing.Any] = dataclasses.field(
+        default_factory=dict,
+    )
+
+    _factory: AgentFactory = None
+
+    # Set by `from_yaml` factory
+    _installation_config: InstallationConfig = None
+    _config_path: pathlib.Path = None
+
+    @property
+    def factory(self) -> AgentFactory:
+        if self._factory is None:
+            module_name, factory_id = self.factory_name.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            factory = getattr(module, factory_id)
+
+            if self.with_agent_config:
+                self._factory = functools.update_wrapper(
+                    functools.partial(factory, agent_config=self),
+                    factory,
+                )
+            else:
+                self._factory = factory
+
+        return self._factory
+
+    @classmethod
+    def from_yaml(
+        cls,
+        installation_config: InstallationConfig,
+        config_path: pathlib.Path,
+        config_dict: dict,
+    ):
+        try:
+            config_dict["_installation_config"] = installation_config
+            config_dict["_config_path"] = config_path
+
+            return cls(**config_dict)
+
+        except Exception as exc:
+            raise FromYamlException(
+                config_path,
+                "python_agent",
+                config_dict,
+            ) from exc
+
+    @property
+    def as_yaml(self) -> dict:
+        return {
+            "id": self.id,
+            "factory_name": self.factory_name,
+            "with_agent_config": self.with_agent_config,
+            "extra_config": self.extra_config,
+        }
+
+
 AGENT_CONFIG_CLASSES_BY_KIND = {
     klass.kind: klass
     for klass in [
         AgentConfig,
+        FactoryAgentConfig,
     ]
 }
 

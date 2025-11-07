@@ -26,6 +26,40 @@ def make_mcp_client_toolset(toolset_config):
     return toolset_klass(**toolset_config.tool_kwargs)
 
 
+def _get_default_agent_from_configs(
+    agent_config: config.AgentConfig,
+    tool_configs: config.ToolConfigMap,
+    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+) -> pydantic_ai.Agent:
+    """Build a Pydantic AI agent from a config"""
+    provider_kw = agent_config.llm_provider_kw
+
+    if agent_config.provider_type == config.LLMProviderType.OLLAMA:
+        provider_kw["api_key"] = "dummy"
+        provider = ollama_providers.OllamaProvider(**provider_kw)
+    else:
+        provider = openai_providers.OpenAIProvider(**provider_kw)
+
+    tools = [
+        make_ai_tool(tool_config) for tool_config in tool_configs.values()
+    ]
+    toolsets = [
+        make_mcp_client_toolset(mctc)
+        for mctc in mcp_client_toolset_configs.values()
+    ]
+
+    return pydantic_ai.Agent(
+        model=openai_models.OpenAIChatModel(
+            model_name=agent_config.model_name,
+            provider=provider,
+        ),
+        tools=tools,
+        toolsets=toolsets,
+        instructions=agent_config.get_system_prompt(),
+        deps_type=models.AgentDependencies,
+    )
+
+
 def get_agent_from_configs(
     agent_config: config.AgentConfig,
     tool_configs: config.ToolConfigMap,
@@ -34,31 +68,16 @@ def get_agent_from_configs(
     """Get or create an agent from the specified agent and tool configs."""
 
     if agent_config.id not in _agent_cache:
-        provider_kw = agent_config.llm_provider_kw
+        if agent_config.kind == "default":
+            agent = _get_default_agent_from_configs(
+                agent_config,
+                tool_configs,
+                mcp_client_toolset_configs,
+            )
 
-        if agent_config.provider_type == config.LLMProviderType.OLLAMA:
-            provider_kw["api_key"] = "dummy"
-            provider = ollama_providers.OllamaProvider(**provider_kw)
         else:
-            provider = openai_providers.OpenAIProvider(**provider_kw)
+            agent = agent_config.factory()
 
-        tools = [
-            make_ai_tool(tool_config) for tool_config in tool_configs.values()
-        ]
-        toolsets = [
-            make_mcp_client_toolset(mctc)
-            for mctc in mcp_client_toolset_configs.values()
-        ]
-
-        _agent_cache[agent_config.id] = pydantic_ai.Agent(
-            model=openai_models.OpenAIChatModel(
-                model_name=agent_config.model_name,
-                provider=provider,
-            ),
-            tools=tools,
-            toolsets=toolsets,
-            instructions=agent_config.get_system_prompt(),
-            deps_type=models.AgentDependencies,
-        )
+        _agent_cache[agent_config.id] = agent
 
     return _agent_cache[agent_config.id]
