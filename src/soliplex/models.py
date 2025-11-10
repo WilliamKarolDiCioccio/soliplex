@@ -114,7 +114,7 @@ class MCPClientToolset(pydantic.BaseModel):
 ConfiguredMCPClientToolsets = dict[str, MCPClientToolset]
 
 
-class Agent(pydantic.BaseModel):
+class DefaultAgent(pydantic.BaseModel):
     id: str
     model_name: str
     retries: int
@@ -137,6 +137,25 @@ class Agent(pydantic.BaseModel):
         )
 
 
+class FactoryAgent(pydantic.BaseModel):
+    id: str
+    factory_name: str  # dotted name for import
+    with_agent_config: bool
+    extra_config: dict[str, typing.Any]
+
+    @classmethod
+    def from_config(cls, agent_config: config.AgentConfig):
+        return cls(
+            id=agent_config.id,
+            factory_name=agent_config.factory_name,
+            with_agent_config=agent_config.with_agent_config,
+            extra_config=agent_config.extra_config,
+        )
+
+
+Agent = DefaultAgent | FactoryAgent
+
+
 class Room(pydantic.BaseModel):
     id: str
     name: str
@@ -151,6 +170,13 @@ class Room(pydantic.BaseModel):
 
     @classmethod
     def from_config(cls, room_config: config.RoomConfig):
+        agent_config = room_config.agent_config
+
+        if agent_config.kind == "factory":
+            agent = FactoryAgent.from_config(room_config.agent_config)
+        else:
+            agent = DefaultAgent.from_config(room_config.agent_config)
+
         return cls(
             id=room_config.id,
             name=room_config.name,
@@ -174,7 +200,7 @@ class Room(pydantic.BaseModel):
             quizzes={
                 quiz.id: Quiz.from_config(quiz) for quiz in room_config.quizzes
             },
-            agent=Agent.from_config(room_config.agent_config),
+            agent=agent,
         )
 
 
@@ -189,6 +215,13 @@ class Completion(pydantic.BaseModel):
 
     @classmethod
     def from_config(cls, completion_config: config.CompletionConfig):
+        agent_config = completion_config.agent_config
+
+        if agent_config.kind == "factory":
+            agent = FactoryAgent.from_config(completion_config.agent_config)
+        else:
+            agent = DefaultAgent.from_config(completion_config.agent_config)
+
         return cls(
             id=completion_config.id,
             name=completion_config.name,
@@ -199,7 +232,7 @@ class Completion(pydantic.BaseModel):
                     tool_config,
                 ) in completion_config.tool_configs.items()
             },
-            agent=Agent.from_config(completion_config.agent_config),
+            agent=agent,
         )
 
 
@@ -259,7 +292,7 @@ class Installation(pydantic.BaseModel):
     secrets: list[Secret] = []
     environment: dict[str, str] = {}
     haiku_rag_config_file: pathlib.Path | None = None
-    agents: list[Agent] = []
+    agents: list[DefaultAgent] = []
     oidc_paths: list[pathlib.Path] = []
     room_paths: list[pathlib.Path] = []
     completion_paths: list[pathlib.Path] = []
@@ -277,7 +310,7 @@ class Installation(pydantic.BaseModel):
             for secret_config in installation_config.secrets
         ]
         agents = [
-            Agent.from_config(agent_config)
+            DefaultAgent.from_config(agent_config)
             for agent_config in installation_config.agent_configs
         ]
         return cls(

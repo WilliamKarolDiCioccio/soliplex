@@ -63,6 +63,23 @@ meta:
     wrapper_klass: "soliplex.config.WithQueryMCPWrapper"
 ```
 
+## Registering Agent Configuration Classes
+
+The `meta.agent_configs` section enumerates agent configuration types so that
+they can be referenced by their `kind`.
+
+The section contains a list of Python "dotted names", i.e. strings which
+can be used to import the configuration class.
+
+By default, Soliplex registers its own agent config class, just as though
+we configured explicitly:
+
+```yaml
+meta:
+  tool_configs:
+  - "soliplex.config.AgentConfig"
+```
+
 ## Registering Secret Source Configurations
 
 Each [installation secret](installation.md#secrets) can be

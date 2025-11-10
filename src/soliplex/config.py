@@ -16,6 +16,7 @@ from urllib import parse as url_parse
 import dotenv
 import yaml
 from haiku.rag import config as hr_config
+from pydantic_ai.agent import abstract as ai_ag_abstract
 
 SECRET_PREFIX = "secret:"
 FILE_PREFIX = "file:"
@@ -418,11 +419,14 @@ TOOL_CONFIG_CLASSES_BY_TOOL_NAME = {
 }
 
 
+ToolConfigMap = dict[str, ToolConfig]
+
+
 def extract_tool_configs(
     installation_config: InstallationConfig,
     config_path: pathlib.Path,
     config: dict,
-):
+) -> ToolConfigMap:
     tool_configs = {}
 
     for t_config in config.pop("tools", ()):
@@ -437,9 +441,6 @@ def extract_tool_configs(
         tool_configs[tool_config.kind] = tool_config
 
     return tool_configs
-
-
-ToolConfigMap = dict[str, ToolConfig]
 
 
 @dataclasses.dataclass
@@ -643,6 +644,7 @@ class AgentConfig:
     # Agent-specific options
     #
     id: str  # set as 'room-{room_id}' or 'completion-{completion_id}'
+    kind: typing.ClassVar[str] = "default"
     model_name: str = None
     retries: int = 3
 
@@ -752,6 +754,100 @@ class AgentConfig:
         }
 
 
+AgentFactory = abc.Callable[[], ai_ag_abstract.AbstractAgent]
+
+
+@dataclasses.dataclass
+class FactoryAgentConfig:
+    id: str
+    factory_name: str  # dotted name for import
+    kind: typing.ClassVar[str] = "factory"
+    with_agent_config: bool = False
+    extra_config: dict[str, typing.Any] = dataclasses.field(
+        default_factory=dict,
+    )
+
+    _factory: AgentFactory = None
+
+    # Set by `from_yaml` factory
+    _installation_config: InstallationConfig = None
+    _config_path: pathlib.Path = None
+
+    @property
+    def factory(self) -> AgentFactory:
+        if self._factory is None:
+            module_name, factory_id = self.factory_name.rsplit(".", 1)
+            module = importlib.import_module(module_name)
+            factory = getattr(module, factory_id)
+
+            if self.with_agent_config:
+                self._factory = functools.update_wrapper(
+                    functools.partial(factory, agent_config=self),
+                    factory,
+                )
+            else:
+                self._factory = factory
+
+        return self._factory
+
+    @classmethod
+    def from_yaml(
+        cls,
+        installation_config: InstallationConfig,
+        config_path: pathlib.Path,
+        config_dict: dict,
+    ):
+        try:
+            config_dict["_installation_config"] = installation_config
+            config_dict["_config_path"] = config_path
+
+            return cls(**config_dict)
+
+        except Exception as exc:
+            raise FromYamlException(
+                config_path,
+                "python_agent",
+                config_dict,
+            ) from exc
+
+    @property
+    def as_yaml(self) -> dict:
+        return {
+            "id": self.id,
+            "factory_name": self.factory_name,
+            "with_agent_config": self.with_agent_config,
+            "extra_config": self.extra_config,
+        }
+
+
+AGENT_CONFIG_CLASSES_BY_KIND = {
+    klass.kind: klass
+    for klass in [
+        AgentConfig,
+        FactoryAgentConfig,
+    ]
+}
+
+
+def extract_agent_config(
+    installation_config: InstallationConfig,
+    config_path: pathlib.Path,
+    config: dict,
+) -> AgentConfig:  # or subclass
+    agent_kind = config.get("kind")
+
+    if agent_kind is not None:  # kind is a typing.ClassVar
+        config = {key: value for key, value in config.items() if key != "kind"}
+
+    ac_class = AGENT_CONFIG_CLASSES_BY_KIND.get(agent_kind, AgentConfig)
+
+    return ac_class.from_yaml(
+        installation_config,
+        config_path,
+        config,
+    )
+
+
 # ============================================================================
 #   Quiz-related configuration types
 # ============================================================================
@@ -810,7 +906,7 @@ class QuizConfig:
 
             ja_config = config.pop("judge_agent", None)
             if ja_config is not None:
-                config["judge_agent"] = AgentConfig.from_yaml(
+                config["judge_agent"] = extract_agent_config(
                     installation_config,
                     config_path,
                     ja_config,
@@ -991,7 +1087,7 @@ class RoomConfig:
             agent_config_yaml = config.pop("agent")
             agent_config_yaml["id"] = f"room-{room_id}"
 
-            config["agent_config"] = AgentConfig.from_yaml(
+            config["agent_config"] = extract_agent_config(
                 installation_config,
                 config_path,
                 agent_config_yaml,
@@ -1101,7 +1197,7 @@ class CompletionConfig:
         agent_config_yaml = config.pop("agent")
         agent_config_yaml["id"] = f"completion-{completion_id}"
 
-        config["agent_config"] = AgentConfig.from_yaml(
+        config["agent_config"] = extract_agent_config(
             installation_config,
             config_path,
             agent_config_yaml,
@@ -1471,6 +1567,7 @@ class InstallationConfigMeta:
     tool_configs: list[str | ConfigMeta] = ()
     mcp_toolset_configs: list[str | ConfigMeta] = ()
     mcp_server_tool_wrappers: list[ConfigMeta] = ()
+    agent_configs: list[ConfigMeta] = ()
     secret_sources: list[ConfigMeta] = ()
 
     # Set by `from_yaml` factory
@@ -1502,6 +1599,11 @@ class InstallationConfigMeta:
                 )
             ]
 
+            config_dict["agent_configs"] = [
+                ConfigMeta.from_yaml(ac_yaml)
+                for ac_yaml in config_dict.get("agent_configs", ())
+            ]
+
             config_dict["secret_sources"] = [
                 ConfigMeta.from_yaml(ss_yaml)
                 for ss_yaml in config_dict.get("secret_sources", ())
@@ -1518,7 +1620,6 @@ class InstallationConfigMeta:
 
     def __post_init__(self):
         self.tool_configs = list(self.tool_configs)
-
         for tc_meta in self.tool_configs:
             klass = tc_meta.config_klass
             TOOL_CONFIG_CLASSES_BY_TOOL_NAME[klass.tool_name] = klass
@@ -1534,6 +1635,11 @@ class InstallationConfigMeta:
             tool_name = config_klass.tool_name
             wrapper_klass = mstw_meta.wrapper_klass
             MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME[tool_name] = wrapper_klass
+
+        self.agent_configs = list(self.agent_configs)
+        for ac_meta in self.agent_configs:
+            klass = ac_meta.config_klass
+            AGENT_CONFIG_CLASSES_BY_KIND[klass.kind] = klass
 
         self.secret_sources = list(self.secret_sources)
         for ss_meta in self.secret_sources:
@@ -1561,6 +1667,10 @@ class InstallationConfigMeta:
             }
             for tool_name, wrapper_klass in mcptcw_items
         ]
+        agent_config_entries = [
+            _dotted_name(klass)
+            for klass in AGENT_CONFIG_CLASSES_BY_KIND.values()
+        ]
         secret_source_entries = [
             {
                 "config_klass": _dotted_name(SourceClassesByKind[kind]),
@@ -1572,6 +1682,7 @@ class InstallationConfigMeta:
             "tool_configs": tool_config_entries,
             "mcp_toolset_configs": mcp_toolset_config_entries,
             "mcp_server_tool_wrappers": mcp_server_tool_wrapper_entries,
+            "agent_configs": agent_config_entries,
             "secret_sources": secret_source_entries,
         }
 
@@ -1782,10 +1893,13 @@ class InstallationConfig:
                 config_path.parent / hr_config_file
             )
 
-            agent_configs = config.pop("agent_configs", ())
             agent_configs = [
-                AgentConfig.from_yaml(None, config_path, agent_config)
-                for agent_config in agent_configs
+                extract_agent_config(
+                    None,
+                    config_path,
+                    a_config,
+                )
+                for a_config in config.get("agent_configs", ())
             ]
             config["agent_configs"] = agent_configs
 

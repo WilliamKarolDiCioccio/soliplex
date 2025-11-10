@@ -1,4 +1,9 @@
+import typing
+from collections import abc
+
 import pydantic_ai
+from pydantic_ai import agent as ai_agent
+from pydantic_ai import mcp as ai_mcp
 from pydantic_ai import tools as ai_tools
 from pydantic_ai.models import openai as openai_models
 from pydantic_ai.providers import ollama as ollama_providers
@@ -8,11 +13,21 @@ from soliplex import config
 from soliplex import mcp_client
 from soliplex import models
 
+SoliplexAgent = ai_agent.AbstractAgent[models.AgentDependencies, typing.Any]
+AgentFactory = abc.Callable[
+    [
+        config.AgentConfig,
+        config.ToolConfigMap,
+        config.MCP_ClientToolsetConfigMap,
+    ],
+    SoliplexAgent,
+]
+
 # Cache for agents to avoid recreating them
 _agent_cache: dict[str, pydantic_ai.Agent] = {}
 
 
-def make_ai_tool(tool_config) -> ai_tools.Tool:
+def make_ai_tool(tool_config: config.ToolConfig) -> ai_tools.Tool:
     tool_func = tool_config.tool_with_config
 
     return ai_tools.Tool(
@@ -21,44 +36,68 @@ def make_ai_tool(tool_config) -> ai_tools.Tool:
     )
 
 
-def make_mcp_client_toolset(toolset_config):
+def make_mcp_client_toolset(
+    toolset_config: config.MCP_ClientToolsetConfig,
+) -> ai_mcp.MCPServer:
     toolset_klass = mcp_client.TOOLSET_CLASS_BY_KIND[toolset_config.kind]
     return toolset_klass(**toolset_config.tool_kwargs)
+
+
+def _get_default_agent_from_configs(
+    agent_config: config.AgentConfig,
+    tool_configs: config.ToolConfigMap,
+    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+) -> SoliplexAgent:
+    """Build a Pydantic AI agent from a config"""
+    provider_kw = agent_config.llm_provider_kw
+
+    if agent_config.provider_type == config.LLMProviderType.OLLAMA:
+        provider_kw["api_key"] = "dummy"
+        provider = ollama_providers.OllamaProvider(**provider_kw)
+    else:
+        provider = openai_providers.OpenAIProvider(**provider_kw)
+
+    tools = [
+        make_ai_tool(tool_config) for tool_config in tool_configs.values()
+    ]
+    toolsets = [
+        make_mcp_client_toolset(mctc)
+        for mctc in mcp_client_toolset_configs.values()
+    ]
+
+    return pydantic_ai.Agent(
+        model=openai_models.OpenAIChatModel(
+            model_name=agent_config.model_name,
+            provider=provider,
+        ),
+        tools=tools,
+        toolsets=toolsets,
+        instructions=agent_config.get_system_prompt(),
+        deps_type=models.AgentDependencies,
+    )
 
 
 def get_agent_from_configs(
     agent_config: config.AgentConfig,
     tool_configs: config.ToolConfigMap,
     mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
-) -> pydantic_ai.Agent:
+) -> SoliplexAgent:
     """Get or create an agent from the specified agent and tool configs."""
 
     if agent_config.id not in _agent_cache:
-        provider_kw = agent_config.llm_provider_kw
+        if agent_config.kind == "default":
+            agent = _get_default_agent_from_configs(
+                agent_config,
+                tool_configs,
+                mcp_client_toolset_configs,
+            )
 
-        if agent_config.provider_type == config.LLMProviderType.OLLAMA:
-            provider_kw["api_key"] = "dummy"
-            provider = ollama_providers.OllamaProvider(**provider_kw)
         else:
-            provider = openai_providers.OpenAIProvider(**provider_kw)
+            agent = agent_config.factory(
+                tool_configs=tool_configs,
+                mcp_client_toolset_configs=mcp_client_toolset_configs,
+            )
 
-        tools = [
-            make_ai_tool(tool_config) for tool_config in tool_configs.values()
-        ]
-        toolsets = [
-            make_mcp_client_toolset(mctc)
-            for mctc in mcp_client_toolset_configs.values()
-        ]
-
-        _agent_cache[agent_config.id] = pydantic_ai.Agent(
-            model=openai_models.OpenAIChatModel(
-                model_name=agent_config.model_name,
-                provider=provider,
-            ),
-            tools=tools,
-            toolsets=toolsets,
-            instructions=agent_config.get_system_prompt(),
-            deps_type=models.AgentDependencies,
-        )
+        _agent_cache[agent_config.id] = agent
 
     return _agent_cache[agent_config.id]

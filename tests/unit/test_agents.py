@@ -99,7 +99,7 @@ def mcp_ct_configs_tools(request):
 @mock.patch("pydantic_ai.providers.openai.OpenAIProvider")
 @mock.patch("pydantic_ai.models.openai.OpenAIChatModel")
 @mock.patch("pydantic_ai.Agent")
-def test_get_agent_from_configs_wo_hit(
+def test_get_agent_from_configs_wo_hit_w_default_kind(
     agent_klass,
     model_klass,
     oai_provider_klass,
@@ -110,6 +110,7 @@ def test_get_agent_from_configs_wo_hit(
     w_oai,
 ):
     agent_config = mock.create_autospec(config.AgentConfig)
+    agent_config.kind = "default"
     agent_config.id = ROOM_ID
     agent_config.model_name = MODEL
     agent_config.get_system_prompt.return_value = SYSTEM_PROMPT
@@ -186,6 +187,36 @@ def test_get_agent_from_configs_wo_hit(
 
         oll_provider_klass.assert_called_once_with(**llm_provider_kw)
         oai_provider_klass.assert_not_called()
+
+
+def test_get_agent_from_configs_wo_hit_w_python_kind():
+    agent_config = mock.create_autospec(config.FactoryAgentConfig)
+    agent_config.kind = "factory"
+    agent_config.id = ROOM_ID
+
+    tool_config = mock.create_autospec(config.ToolConfig)
+    tool_configs = {"test_tool": tool_config}
+
+    mcpcts = mock.create_autospec(config.MCP_ClientToolsetConfig)
+    mcpcts_configs = {"test_mcpcts": mcpcts}
+
+    with (
+        mock.patch.dict("soliplex.agents._agent_cache", clear=True) as cache,
+    ):
+        found = agents.get_agent_from_configs(
+            agent_config,
+            tool_configs=tool_configs,
+            mcp_client_toolset_configs=mcpcts_configs,
+        )
+
+        assert cache[ROOM_ID] is found
+
+    assert found is agent_config.factory.return_value
+
+    agent_config.factory.assert_called_once_with(
+        tool_configs=tool_configs,
+        mcp_client_toolset_configs=mcpcts_configs,
+    )
 
 
 def test_get_agent_from_configs_w_hit():

@@ -40,6 +40,8 @@ AGENT_BASE_URL = "https://provider.example.com/base"
 OLLAMA_BASE_URL = "https://ollama.example.com/base"
 HAIKU_RAG_CONFIG_FILE = "/path/to/haiku.rag.yaml"
 
+FACTORY_NAME = "some.package.function"
+
 INSTALLATION_ID = "test-installation"
 INSTALLATION_SECRET = "Seeeeeekrit!"
 INSTALLATION_ENVVAR_NAME = "TEST_ENVVAR"
@@ -312,7 +314,7 @@ def installation_config():
     return installation
 
 
-def test_agent_from_config(
+def test_defaultagent_from_config(
     agent_retries,
     agent_provider_type,
     agent_provider_base_url,
@@ -338,13 +340,50 @@ def test_agent_from_config(
     else:
         exp_retries = AGENT_RETRIES
 
-    agent_model = models.Agent.from_config(agent_config)
+    agent_model = models.DefaultAgent.from_config(agent_config)
 
     assert agent_model.id == AGENT_ID
     assert agent_model.model_name == AGENT_MODEL
     assert agent_model.retries == exp_retries
     assert agent_model.system_prompt == AGENT_PROMPT
     assert agent_model.provider_base_url == exp_base
+
+
+@pytest.fixture(params=[False, True])
+def with_agent_config(request):
+    return _from_param(request, "with_agent_config")
+
+
+@pytest.fixture(params=[None, {"foo": "Bar"}])
+def extra_config(request):
+    return _from_param(request, "extra_config")
+
+
+def test_factoryagent_from_config(
+    installation_config,
+    with_agent_config,
+    extra_config,
+):
+    agent_config = config.FactoryAgentConfig(
+        id=AGENT_ID,
+        factory_name=FACTORY_NAME,
+        _installation_config=installation_config,
+        **with_agent_config,
+        **extra_config,
+    )
+
+    exp_with_agent_config = with_agent_config["with_agent_config"]
+    if not extra_config:
+        exp_extra = {}
+    else:
+        exp_extra = extra_config["extra_config"]
+
+    agent_model = models.FactoryAgent.from_config(agent_config)
+
+    assert agent_model.id == AGENT_ID
+    assert agent_model.factory_name == FACTORY_NAME
+    assert agent_model.with_agent_config == exp_with_agent_config
+    assert agent_model.extra_config == exp_extra
 
 
 @pytest.fixture(params=[None, ROOM_WELCOME])
@@ -383,14 +422,22 @@ def room_quizzes(request, quiz_path):
     return kw
 
 
-@pytest.fixture
-def room_agent(installation_config):
-    return config.AgentConfig(
-        id=AGENT_ID,
-        model_name=AGENT_MODEL,
-        system_prompt=AGENT_PROMPT,
-        _installation_config=installation_config,
-    )
+@pytest.fixture(params=["default", "factory"])
+def room_agent(request, installation_config):
+    if request.param == "default":
+        return config.AgentConfig(
+            id=AGENT_ID,
+            model_name=AGENT_MODEL,
+            system_prompt=AGENT_PROMPT,
+            _installation_config=installation_config,
+        )
+    else:
+        return config.FactoryAgentConfig(
+            id=AGENT_ID,
+            factory_name=FACTORY_NAME,
+            with_agent_config=False,
+            _installation_config=installation_config,
+        )
 
 
 def test_room_from_config(
@@ -418,8 +465,14 @@ def test_room_from_config(
     assert room_model.description == ROOM_DESCRIPTION
 
     assert room_model.agent.id == AGENT_ID
-    assert room_model.agent.model_name == AGENT_MODEL
-    assert room_model.agent.system_prompt == AGENT_PROMPT
+
+    if room_agent.kind == "default":
+        assert room_model.agent.model_name == AGENT_MODEL
+        assert room_model.agent.system_prompt == AGENT_PROMPT
+    else:
+        assert room_model.agent.factory_name == FACTORY_NAME
+        assert room_model.agent.with_agent_config is False
+        assert room_model.agent.extra_config == {}
 
     if room_welcome:
         assert room_model.welcome_message == room_welcome["welcome_message"]
@@ -462,8 +515,14 @@ def test_completion_from_config(room_agent, room_tools):
     assert completion_model.name == ROOM_NAME
 
     assert completion_model.agent.id == AGENT_ID
-    assert completion_model.agent.model_name == AGENT_MODEL
-    assert completion_model.agent.system_prompt == AGENT_PROMPT
+
+    if room_agent.kind == "default":
+        assert completion_model.agent.model_name == AGENT_MODEL
+        assert completion_model.agent.system_prompt == AGENT_PROMPT
+    else:
+        assert completion_model.agent.factory_name == FACTORY_NAME
+        assert completion_model.agent.with_agent_config is False
+        assert completion_model.agent.extra_config == {}
 
     if room_tools:
         assert completion_model.tools == {

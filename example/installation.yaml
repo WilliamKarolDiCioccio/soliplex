@@ -52,6 +52,17 @@ meta:
   #------------------------------------------------------------------------
 
   #------------------------------------------------------------------------
+  # Register agent configuration types so that they can be referenced by
+  # their 'kind'
+  #
+  # 'soliplex.config.AgentConfig' is registered by default,
+  # just as if we configured here:
+  #
+  # agent_configs:
+  # - "soliplex.config.AgentConfig"
+  #------------------------------------------------------------------------
+
+  #------------------------------------------------------------------------
   # Register implementation functions for different secret source classes
   #
   # By default, these classes are configured to use the corresponding
