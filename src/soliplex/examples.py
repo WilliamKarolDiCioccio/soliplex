@@ -21,7 +21,11 @@ You must return just a single joke.
 """
 
 
-def joker_agent_factory(agent_config):  # pragma NO COVER
+def joker_agent_factory(
+    agent_config,
+    tool_configs: config.ToolConfigMap = None,
+    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap = None,
+):  # pragma NO COVER
     installation_config = agent_config._installation_config
 
     provider_base_url = installation_config.get_environment("OLLAMA_BASE_URL")
@@ -70,9 +74,16 @@ NativeEvent = (
 MessageHistory = typing.Sequence[ai_messages.ModelMessage]
 
 
+async def faux_tool() -> str:
+    """Return something random"""
+    return "something random"
+
+
 @dataclasses.dataclass
 class FauxAgent:
     agent_config: config.FactoryAgentConfig
+    tool_configs: config.ToolConfigMap = None
+    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap = None
 
     output_type = None
 
@@ -92,9 +103,10 @@ class FauxAgent:
         **kwargs,
     ) -> abc.AsyncIterator[NativeEvent]:
         think_part = ai_messages.ThinkingPart("I'm thinking")
+        part_index = 0
 
         yield ai_messages.PartStartEvent(
-            index=0,
+            index=part_index,
             part=think_part,
         )
         last_message = message_history[-1]
@@ -121,9 +133,25 @@ class FauxAgent:
             time.sleep(random.uniform(0.5, 2.0))
 
         yield ai_messages.PartEndEvent(
-            index=0,
+            index=part_index,
             part=think_part,
         )
+
+        for tool_name in self.tool_configs:
+            tc_part = ai_messages.ToolCallPart(tool_name)
+            part_index += 1
+
+            yield ai_messages.PartStartEvent(
+                index=part_index,
+                part=tc_part,
+            )
+
+            time.sleep(random.uniform(0.5, 2.0))
+
+            yield ai_messages.PartEndEvent(
+                index=part_index,
+                part=tc_part,
+            )
 
         time.sleep(random.uniform(2.5, 3.0))
 
@@ -138,5 +166,9 @@ class FauxAgent:
         )
 
 
-def faux_agent_factory(agent_config: config.FactoryAgentConfig):
-    return FauxAgent(agent_config)
+def faux_agent_factory(
+    agent_config: config.FactoryAgentConfig,
+    tool_configs: config.ToolConfigMap = None,
+    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap = None,
+):
+    return FauxAgent(agent_config, tool_configs, mcp_client_toolset_configs)

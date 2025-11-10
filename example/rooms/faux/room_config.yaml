@@ -5,4 +5,6 @@ agent:
   kind: "factory"
   factory_name: "soliplex.examples.faux_agent_factory"
   with_agent_config: true
+tools:
+  - tool_name: "soliplex.examples.faux_tool"
 allow_mcp: false

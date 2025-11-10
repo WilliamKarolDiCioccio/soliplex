@@ -194,19 +194,29 @@ def test_get_agent_from_configs_wo_hit_w_python_kind():
     agent_config.kind = "factory"
     agent_config.id = ROOM_ID
 
+    tool_config = mock.create_autospec(config.ToolConfig)
+    tool_configs = {"test_tool": tool_config}
+
+    mcpcts = mock.create_autospec(config.MCP_ClientToolsetConfig)
+    mcpcts_configs = {"test_mcpcts": mcpcts}
+
     with (
         mock.patch.dict("soliplex.agents._agent_cache", clear=True) as cache,
     ):
         found = agents.get_agent_from_configs(
             agent_config,
-            tool_configs={},
-            mcp_client_toolset_configs={},
+            tool_configs=tool_configs,
+            mcp_client_toolset_configs=mcpcts_configs,
         )
 
         assert cache[ROOM_ID] is found
 
     assert found is agent_config.factory.return_value
-    agent_config.factory.assert_called_once_with()
+
+    agent_config.factory.assert_called_once_with(
+        tool_configs=tool_configs,
+        mcp_client_toolset_configs=mcpcts_configs,
+    )
 
 
 def test_get_agent_from_configs_w_hit():
