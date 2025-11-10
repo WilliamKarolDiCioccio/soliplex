@@ -55,11 +55,12 @@ meta:
   # Register agent configuration types so that they can be referenced by
   # their 'kind'
   #
-  # 'soliplex.config.AgentConfig' is registered by default,
-  # just as if we configured here:
+  # 'soliplex.config.AgentConfig' and 'soliplex.config.FactoryAgentConfig'
+  # are registered by default, just as if we configured here:
   #
   # agent_configs:
   # - "soliplex.config.AgentConfig"
+  # - "soliplex.config.FactoryAgentConfig"
   #------------------------------------------------------------------------
 
   #------------------------------------------------------------------------
