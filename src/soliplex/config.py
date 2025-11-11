@@ -1,5 +1,6 @@
 from __future__ import annotations  # forward refs in typing decls
 
+import copy
 import dataclasses
 import enum
 import functools
@@ -660,6 +661,10 @@ class AgentConfig:
     _installation_config: InstallationConfig = None
     _config_path: pathlib.Path = None
 
+    # Use a config from the top-level InstallationConfig's 'agent_configs'
+    # as a template.
+    _template_id: str = None
+
     def __post_init__(self, system_prompt):
         if self.model_name is None:
             if self._installation_config is not None:
@@ -680,6 +685,22 @@ class AgentConfig:
         try:
             config["_installation_config"] = installation_config
             config["_config_path"] = config_path
+
+            if "template_id" in config:
+                template_id = config.pop("template_id")
+
+                # Cannot use 'agent_configs_map' because we might still be
+                # initalizing the IC.
+                ic_agent_configs_map = {
+                    agent_config.id: agent_config
+                    for agent_config in installation_config.agent_configs
+                }
+
+                template_config = ic_agent_configs_map[template_id]
+                local_config = copy.deepcopy(config)
+                local_config["_template_id"] = template_id
+
+                config = template_config.as_yaml | local_config
 
             if "system_prompt" in config:
                 system_prompt = config.pop("system_prompt")
