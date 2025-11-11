@@ -118,7 +118,7 @@ class DefaultAgent(pydantic.BaseModel):
     id: str
     model_name: str
     retries: int
-    system_prompt: str
+    system_prompt: str | None
     provider_type: config.LLMProviderType  # enum, not dataclass
     provider_base_url: str
     provider_key: str
