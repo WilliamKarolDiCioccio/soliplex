@@ -81,6 +81,16 @@ environment:
 # Agent configurations
 #==========================================================================
 
+agent_configs:
+
+  - id: "ollama_qwen3"
+    model_name: "qwen3:latest"
+    # No prompt:  this config is just a template
+
+  - id: "ollama_gpt_oss"
+    model_name: "gpt-oss:20b"
+    # No prompt:  this config is just a template
+
 #==========================================================================
 # OIDC authentication provider configuration
 #==========================================================================

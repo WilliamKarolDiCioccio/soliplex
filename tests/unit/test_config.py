@@ -212,9 +212,12 @@ FULL_HTTP_MCTC_CONFIG_YAML = """
 
 
 AGENT_ID = "testing"
+TEMPLATE_AGENT_ID = "testing-template"
 SYSTEM_PROMPT = "You are a test"
 MODEL_NAME = "test-model"
+OTHER_MODEL_NAME = "test-model-other"
 PROVIDER_BASE_URL = "https://provider.example.com/api"
+OTHER_PROVIDER_BASE_URL = "https://other-provider.example.com/api"
 PROVIDER_KEY_ENVVAR = "TEST_API_KEY"
 PROVIDER_KEY_VALUE = "DEADBEEF"
 OLLAMA_BASE_URL = "https://example.com:12345"
@@ -368,6 +371,17 @@ W_PROMPT_FILE_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 system_prompt: ./prompt.txt
 model_name: "{MODEL_NAME}"
+"""
+
+W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    _template_id=TEMPLATE_AGENT_ID,
+    _system_prompt_path="./prompt.txt",
+)
+W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+template_id: "{TEMPLATE_AGENT_ID}"
+system_prompt: ./prompt.txt
 """
 
 WO_CONFIG_PYTHON_AGENT_CONFIG_KW = dict(
@@ -1926,6 +1940,10 @@ def test_agentconfig_ctor(installation_config, kw):
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
             W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
         ),
+        (
+            W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_YAML,
+            W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW.copy(),
+        ),
     ],
 )
 def test_agentconfig_from_yaml(
@@ -1948,12 +1966,22 @@ def test_agentconfig_from_yaml(
                 config_dict,
             )
     else:
-        expected = config.AgentConfig(**expected_kw)
+        template_id = config_dict.get("template_id")
 
-        expected = dataclasses.replace(
-            expected,
+        if template_id is not None:
+            template_kw = {
+                "model_name": OTHER_MODEL_NAME,
+                "provider_base_url": OTHER_PROVIDER_BASE_URL,
+            }
+            installation_config.agent_configs = [
+                config.AgentConfig(id=template_id, **template_kw),
+            ]
+            expected_kw = template_kw | expected_kw
+
+        expected = config.AgentConfig(
             _installation_config=installation_config,
             _config_path=yaml_file,
+            **expected_kw,
         )
 
         found = config.AgentConfig.from_yaml(
