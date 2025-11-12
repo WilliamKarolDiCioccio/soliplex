@@ -176,7 +176,10 @@ def serve(
         reload_includes.append("*.yaml")
 
     if reload in (ReloadOption.CONFIG, ReloadOption.BOTH):
-        reload_dirs.append(str(installation_path))
+        if installation_path.is_dir():
+            reload_dirs.append(str(installation_path))
+        else:
+            reload_dirs.append(str(installation_path.parent))
         reload_includes.append("*.yaml")
         reload_includes.append("*.yml")
         reload_includes.append("*.txt")
