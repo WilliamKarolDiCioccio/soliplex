@@ -90,14 +90,14 @@ reload_option: ReloadOption = typer.Option(
 
 
 reload_dirs_option: list[pathlib.Path] = typer.Option(
-    None,
+    [],
     "--reload-dirs",
     help="Additional directories to be monitored for reload",
 )
 
 
 reload_includes_option: list[str] = typer.Option(
-    None,
+    [],
     "--reload-includes",
     help="Additional glob patterns for files to be montored for reload",
 )
