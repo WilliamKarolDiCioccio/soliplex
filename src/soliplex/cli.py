@@ -89,6 +89,20 @@ reload_option: ReloadOption = typer.Option(
 )
 
 
+reload_dirs_option: list[pathlib.Path] = typer.Option(
+    None,
+    "--reload-dirs",
+    help="Additional directories to be monitored for reload",
+)
+
+
+reload_includes_option: list[str] = typer.Option(
+    None,
+    "--reload-includes",
+    help="Additional glob patterns for files to be montored for reload",
+)
+
+
 log_config_option: pathlib.Path = typer.Option(
     None,
     "--log-config",
@@ -135,6 +149,8 @@ def serve(
         help="Bind to socket from this file descriptor",
     ),
     reload: ReloadOption = reload_option,
+    reload_dirs: list[pathlib.Path] = reload_dirs_option,
+    reload_includes: list[str] = reload_includes_option,
     workers: int = typer.Option(
         None,
         "--workers",
@@ -168,18 +184,15 @@ def serve(
     ),
 ):
     """Run the Soliplex server"""
-    reload_dirs = []
-    reload_includes = []
-
     if reload in (ReloadOption.PYTHON, ReloadOption.BOTH):
         reload_dirs.extend(soliplex.__path__)
-        reload_includes.append("*.yaml")
 
     if reload in (ReloadOption.CONFIG, ReloadOption.BOTH):
         if installation_path.is_dir():
-            reload_dirs.append(str(installation_path))
+            reload_dirs.append(installation_path)
         else:
-            reload_dirs.append(str(installation_path.parent))
+            reload_dirs.append(installation_path.parent)
+
         reload_includes.append("*.yaml")
         reload_includes.append("*.yml")
         reload_includes.append("*.txt")
@@ -212,6 +225,8 @@ def serve(
 
     if forwarded_allow_ips is not None:
         uvicorn_kw["forwarded_allow_ips"] = forwarded_allow_ips
+
+    reload_dirs = [str(rd) for rd in reload_dirs]
 
     if reload or workers:
         os.environ["SOLIPLEX_INSTALLATION_PATH"] = str(installation_path)
