@@ -78,7 +78,8 @@ See: `docs/rag.md` for more options.
 ### Run Soliplex backend server
 
 ```bash
-OLLAMA_BASE_URL="http://localhost:11431" soliplex-cli serve example/minimal.yaml --no-auth-mode
+export OLLAMA_BASE_URL=<your Ollama server / port>
+soliplex-cli serve example/minimal.yaml --no-auth-mode
 ```
 
 ### Frontend
