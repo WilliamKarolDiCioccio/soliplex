@@ -84,7 +84,7 @@ meta:
 # Secrets
 #==========================================================================
 #
-# Kept in an external store, such as ASW secret store, Github secrets,
+# Kept in an external store, such as ASW secret store, GitHub secrets,
 # files created by the 'docker compose' 'secrets:' configuration, or
 # the secrets store managed by `devenv`'s `secrets` script, secrets are
 # expected to be injected into the environment separately.
@@ -305,7 +305,7 @@ agent_configs:
 
 
 #==========================================================================
-# Quizes configuration
+# Quizzes configuration
 #==========================================================================
 # Specify one or more filesystem paths to search for quiz question files.
 #
