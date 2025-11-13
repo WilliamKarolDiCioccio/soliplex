@@ -33,27 +33,6 @@ MODEL_RESPONSE = "Now you're talking!"
 ANOTHER_USER_PROMPT = "Which way is up?"
 ANOTHER_MODEL_RESPONSE = "The other way from down"
 
-OLD_AGUI_MESSAGES = [
-    agui_core.UserMessage(
-        id="1",
-        content=SYSTEM_PROMPT,
-    ),
-    agui_core.SystemMessage(
-        id="2",
-        content=MODEL_RESPONSE,
-    ),
-]
-NEW_AGUI_MESSAGES = [
-    agui_core.UserMessage(
-        id="3",
-        content=ANOTHER_USER_PROMPT,
-    ),
-    agui_core.SystemMessage(
-        id="4",
-        content=ANOTHER_MODEL_RESPONSE,
-    ),
-]
-
 TEST_THREAD_UUID = uuid.uuid4()
 TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
@@ -61,7 +40,6 @@ TEST_THREAD = agui.Thread(
     thread_uuid=TEST_THREAD_UUID,
     name=TEST_THREAD_NAME,
     room_id=TEST_THREAD_ROOMID,
-    message_history=OLD_AGUI_MESSAGES,
 )
 TEST_THREADS = {
     TEST_THREAD_UUID: TEST_THREAD,
@@ -153,55 +131,11 @@ async def test_threads_new_thread(w_user, w_existing):
             "testing",
             TEST_THREAD_ROOMID,
             TEST_THREAD_NAME,
-            OLD_AGUI_MESSAGES,
         )
 
     assert isinstance(found.thread_uuid, uuid.UUID)
     assert found.name == TEST_THREAD_NAME
     assert found.room_id == TEST_THREAD_ROOMID
-
-    for f_msg, e_msg in zip(
-        found.message_history,
-        OLD_AGUI_MESSAGES,
-        strict=True,
-    ):
-        assert f_msg == e_msg
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_threads, expectation",
-    [
-        ({}, pytest.raises(agui.UnknownThread)),
-        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
-        ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
-    ],
-)
-async def test_threads_append_to_thread(w_threads, expectation):
-    the_threads = agui.Threads()
-
-    for user_name, thread_map in list(w_threads.items()):
-        new_map = {}
-
-        for thread_uuid, thread in list(thread_map.items()):
-            new_map[thread_uuid] = dataclasses.replace(
-                thread,
-                message_history=tuple(OLD_AGUI_MESSAGES[:]),
-            )
-
-        the_threads._threads[user_name] = new_map
-
-    with expectation as expected:
-        await the_threads.append_to_thread(
-            "testing",
-            TEST_THREAD_UUID,
-            NEW_AGUI_MESSAGES,
-        )
-
-    if expected is None:
-        assert new_map[TEST_THREAD_UUID].message_history == tuple(
-            OLD_AGUI_MESSAGES + NEW_AGUI_MESSAGES
-        )
 
 
 @pytest.mark.anyio

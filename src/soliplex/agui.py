@@ -26,7 +26,6 @@ class Thread:
     """AG/UI thread w/ message history for a user / room."""
 
     room_id: str
-    message_history: tuple[agui_core.BaseMessage]
     name: str | None
     thread_uuid: uuid.UUID = dataclasses.field(
         default_factory=uuid.uuid4,
@@ -99,13 +98,11 @@ class Threads:
         user_name: str,
         room_id: str,
         thread_name: str,
-        new_messages: list[agui_core.BaseMessage] = (),
     ) -> Thread:
         """Create a new thread"""
         thread = Thread(
             name=thread_name,
             room_id=room_id,
-            message_history=tuple(new_messages),
         )
 
         async with self._lock:
@@ -113,28 +110,6 @@ class Threads:
             user_threads[thread.thread_uuid] = thread
 
         return thread
-
-    async def append_to_thread(
-        self,
-        user_name: str,
-        thread_uuid: str,
-        new_messages: list[agui_core.BaseMessage],
-    ) -> None:
-        """Append messsages to history for a thread"""
-        async with self._lock:
-            user_threads = self._threads.setdefault(user_name, {})
-            thread = user_threads.get(thread_uuid)
-
-            if thread is None:
-                raise UnknownThread(user_name, thread_uuid)
-
-            history = list(thread.message_history)
-            history.extend(new_messages)
-
-            user_threads[thread.thread_uuid] = dataclasses.replace(
-                thread,
-                message_history=tuple(history),
-            )
 
     async def delete_thread(
         self,
