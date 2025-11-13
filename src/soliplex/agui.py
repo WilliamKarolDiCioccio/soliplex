@@ -27,8 +27,6 @@ def _make_thread_id() -> str:
 
 @dataclasses.dataclass(frozen=True)
 class Thread:
-    """AG/UI thread w/ message history for a user / room."""
-
     thread_id: str = dataclasses.field(default_factory=_make_thread_id)
     room_id: str = dataclasses.field(kw_only=True)
     name: str | None = dataclasses.field(default=None, kw_only=True)
