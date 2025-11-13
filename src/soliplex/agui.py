@@ -21,38 +21,40 @@ RESPONSE_CONTEXT_PARTS = ("text",)
 # =============================================================================
 
 
+def _make_thread_id() -> str:
+    return str(uuid.uuid4())
+
+
 @dataclasses.dataclass(frozen=True)
 class Thread:
     """AG/UI thread w/ message history for a user / room."""
 
-    room_id: str
-    name: str | None
-    thread_uuid: uuid.UUID = dataclasses.field(
-        default_factory=uuid.uuid4,
-    )
+    thread_id: str = dataclasses.field(default_factory=_make_thread_id)
+    room_id: str = dataclasses.field(kw_only=True)
+    name: str | None = dataclasses.field(default=None, kw_only=True)
 
 
-ThreadsByUUID = dict[str, Thread]
+ThreadsByID = dict[str, Thread]
 
 
 class UnknownThread(fastapi.HTTPException):
-    def __init__(self, user_name: str, thread_uuid: str):
+    def __init__(self, user_name: str, thread_id: str):
         self.user_name = user_name
-        self.thread_uuid = thread_uuid
-        message = f"Unknown thread: UUID {thread_uuid} for user {user_name}"
+        self.thread_id = thread_id
+        message = f"Unknown thread: UUID {thread_id} for user {user_name}"
         super().__init__(status_code=404, detail=message)
 
 
 class Threads:
     def __init__(self):
         self._lock = asyncio.Lock()
-        # {user_name -> {thread_uuid: Thread}}
+        # {user_name -> {thread_id: Thread}}
         self._threads = {}
 
     async def _find_user_threads(
         self,
         user_name: str,
-    ) -> ThreadsByUUID:
+    ) -> ThreadsByID:
         user_threads = self._threads.get(user_name)
 
         if user_threads is None:
@@ -63,35 +65,35 @@ class Threads:
     async def _find_thread(
         self,
         user_name: str,
-        thread_uuid: str,
+        thread_id: str,
     ) -> Thread:
         user_threads = self._threads.get(user_name)
 
         if user_threads is None:
-            raise UnknownThread(user_name, thread_uuid)
+            raise UnknownThread(user_name, thread_id)
 
-        thread = user_threads.get(thread_uuid)
+        thread = user_threads.get(thread_id)
 
         if thread is None:
-            raise UnknownThread(user_name, thread_uuid)
+            raise UnknownThread(user_name, thread_id)
 
         return thread
 
-    async def user_threads(self, user_name: str) -> ThreadsByUUID:
+    async def user_threads(self, user_name: str) -> ThreadsByID:
         async with self._lock:
             return await self._find_user_threads(user_name)
 
     async def get_thread(
         self,
         user_name: str,
-        thread_uuid: str,
+        thread_id: str,
     ) -> Thread:
         """Return the actual thread instance
 
         N.B.:  caller must treat the instance as read-only!
         """
         async with self._lock:
-            return await self._find_thread(user_name, thread_uuid)
+            return await self._find_thread(user_name, thread_id)
 
     async def new_thread(
         self,
@@ -107,23 +109,23 @@ class Threads:
 
         async with self._lock:
             user_threads = self._threads.setdefault(user_name, {})
-            user_threads[thread.thread_uuid] = thread
+            user_threads[thread.thread_id] = thread
 
         return thread
 
     async def delete_thread(
         self,
         user_name: str,
-        thread_uuid: uuid.UUID,
+        thread_id: str,
     ) -> None:
         """Remove a thread"""
         async with self._lock:
             threads = await self._find_user_threads(user_name)
 
             try:
-                del threads[thread_uuid]
+                del threads[thread_id]
             except KeyError:
-                raise UnknownThread(user_name, thread_uuid) from None
+                raise UnknownThread(user_name, thread_id) from None
 
             self._threads[user_name] = threads
 

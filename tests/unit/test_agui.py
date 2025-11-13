@@ -33,19 +33,20 @@ MODEL_RESPONSE = "Now you're talking!"
 ANOTHER_USER_PROMPT = "Which way is up?"
 ANOTHER_MODEL_RESPONSE = "The other way from down"
 
-TEST_THREAD_UUID = uuid.uuid4()
+UUID4 = uuid.uuid4()
+TEST_THREAD_ID = str(UUID4)
 TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
 TEST_THREAD = agui.Thread(
-    thread_uuid=TEST_THREAD_UUID,
+    thread_id=TEST_THREAD_ID,
     name=TEST_THREAD_NAME,
     room_id=TEST_THREAD_ROOMID,
 )
 TEST_THREADS = {
-    TEST_THREAD_UUID: TEST_THREAD,
+    TEST_THREAD_ID: TEST_THREAD,
 }
 
-TEST_RUN_UUID = uuid.uuid4()
+TEST_RUN_UUID = str(uuid.uuid4())
 
 timestamp = datetime.datetime.now(datetime.UTC)
 system_prompt_part = ai_messages.SystemPromptPart(
@@ -72,6 +73,13 @@ text_part = ai_messages.TextPart(
 )
 thinking_part = ai_messages.ThinkingPart(content=THINKING)
 tool_call_part = ai_messages.ToolCallPart(tool_name=TOOL_NAME)
+
+
+@mock.patch("uuid.uuid4")
+def test__make_thread_id(uu4):
+    uu4.return_value = UUID4
+
+    assert agui._make_thread_id() == str(UUID4)
 
 
 @pytest.mark.anyio
@@ -108,7 +116,7 @@ async def test_threads_get_thread(w_threads, expectation):
     the_threads._threads.update(w_threads)
 
     with expectation as expected:
-        found = await the_threads.get_thread("testing", TEST_THREAD_UUID)
+        found = await the_threads.get_thread("testing", TEST_THREAD_ID)
 
     if expected is TEST_THREAD:
         assert found is TEST_THREAD
@@ -117,7 +125,9 @@ async def test_threads_get_thread(w_threads, expectation):
 @pytest.mark.anyio
 @pytest.mark.parametrize("w_existing", [False, True])
 @pytest.mark.parametrize("w_user", [False, True])
-async def test_threads_new_thread(w_user, w_existing):
+@mock.patch("uuid.uuid4")
+async def test_threads_new_thread(uu4, w_user, w_existing):
+    uu4.return_value = UUID4
     the_threads = agui.Threads()
 
     kw = {}
@@ -133,7 +143,7 @@ async def test_threads_new_thread(w_user, w_existing):
             TEST_THREAD_NAME,
         )
 
-    assert isinstance(found.thread_uuid, uuid.UUID)
+    assert found.thread_id == TEST_THREAD_ID
     assert found.name == TEST_THREAD_NAME
     assert found.room_id == TEST_THREAD_ROOMID
 
@@ -153,13 +163,13 @@ async def test_threads_delete_thread(w_threads, expectation):
     for user_name, thread_map in list(w_threads.items()):
         new_map = {}
 
-        for thread_uuid, thread in list(thread_map.items()):
-            new_map[thread_uuid] = dataclasses.replace(thread)
+        for thread_id, thread in list(thread_map.items()):
+            new_map[thread_id] = dataclasses.replace(thread)
 
         the_threads._threads[user_name] = new_map
 
     with expectation as expected:
-        await the_threads.delete_thread("testing", TEST_THREAD_UUID)
+        await the_threads.delete_thread("testing", TEST_THREAD_ID)
 
     if expected is None:
         assert the_threads._threads["testing"] == {}
