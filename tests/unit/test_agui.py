@@ -35,6 +35,7 @@ ANOTHER_MODEL_RESPONSE = "The other way from down"
 
 UUID4 = uuid.uuid4()
 TEST_THREAD_ID = str(UUID4)
+OTHER_THREAD_ID = "thread-123"
 TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
 TEST_THREAD = agui.Thread(
@@ -126,27 +127,39 @@ async def test_threads_get_thread(w_threads, expectation):
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("w_existing", [False, True])
+@pytest.mark.parametrize("w_thread_id", [False, True])
 @pytest.mark.parametrize("w_user", [False, True])
 @mock.patch("uuid.uuid4")
-async def test_threads_new_thread(uu4, w_user, w_existing):
+async def test_threads_new_thread(uu4, w_user, w_thread_id):
     uu4.return_value = UUID4
     the_threads = agui.Threads()
 
-    kw = {}
+    user_threads_patch = {}
     if w_user:
-        kw["testing"] = {}
+        before = user_threads_patch["testing"] = {"already": object()}
+
+    kwargs = {}
+
+    if w_thread_id:
+        exp_thread_id = kwargs["thread_id"] = OTHER_THREAD_ID
+    else:
+        exp_thread_id = TEST_THREAD_ID
 
     with (
-        mock.patch.dict(the_threads._threads, **kw),
+        mock.patch.dict(the_threads._threads, **user_threads_patch),
     ):
         found = await the_threads.new_thread(
             user_name="testing",
             room_id=TEST_THREAD_ROOMID,
             thread_name=TEST_THREAD_NAME,
+            **kwargs,
         )
+        if w_user:
+            assert the_threads._threads["testing"] is before
 
-    assert found.thread_id == TEST_THREAD_ID
+        assert the_threads._threads["testing"][exp_thread_id] is found
+
+    assert found.thread_id == exp_thread_id
     assert found.name == TEST_THREAD_NAME
     assert found.room_id == TEST_THREAD_ROOMID
 

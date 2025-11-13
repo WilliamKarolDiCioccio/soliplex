@@ -102,9 +102,14 @@ class Threads:
         user_name: str,
         room_id: str,
         thread_name: str,
+        thread_id: str = None,
     ) -> Thread:
         """Create a new thread"""
+        if thread_id is None:
+            thread_id = _make_thread_id()
+
         thread = Thread(
+            thread_id=thread_id,
             name=thread_name,
             room_id=room_id,
         )
