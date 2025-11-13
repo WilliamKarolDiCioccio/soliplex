@@ -9,7 +9,7 @@ import pytest
 from ag_ui import core as agui_core
 from pydantic_ai import messages as ai_messages
 
-from soliplex import aguix
+from soliplex import agui
 
 SYSTEM_PROMPT = "You are a testcase"
 USER_PROMPT = "Which way is up?"
@@ -57,7 +57,7 @@ NEW_AGUI_MESSAGES = [
 TEST_THREAD_UUID = uuid.uuid4()
 TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
-TEST_THREAD = aguix.Thread(
+TEST_THREAD = agui.Thread(
     thread_uuid=TEST_THREAD_UUID,
     name=TEST_THREAD_NAME,
     room_id=TEST_THREAD_ROOMID,
@@ -112,10 +112,10 @@ tool_call_part = ai_messages.ToolCallPart(tool_name=TOOL_NAME)
         ([retry_prompt_part, user_prompt_part], False),
     ],
 )
-def test__to_aguix_message_w_request(parts, expect_none):
+def test__to_agui_message_w_request(parts, expect_none):
     msg = ai_messages.ModelRequest(parts=parts)
 
-    found = aguix._to_aguix_message(msg, TEST_RUN_UUID)
+    found = agui._to_agui_message(msg, TEST_RUN_UUID)
 
     if expect_none:
         assert found is None
@@ -137,13 +137,13 @@ def test__to_aguix_message_w_request(parts, expect_none):
         ([thinking_part, tool_call_part], True),
     ],
 )
-def test__to_aguix_message_w_response(parts, expect_none):
+def test__to_agui_message_w_response(parts, expect_none):
     msg = ai_messages.ModelResponse(
         parts=parts,
         provider_response_id=PROVIDER_RESPONSE_ID,
     )
 
-    found = aguix._to_aguix_message(msg, TEST_RUN_UUID)
+    found = agui._to_agui_message(msg, TEST_RUN_UUID)
 
     if expect_none:
         assert found is None
@@ -162,7 +162,7 @@ def test__to_aguix_message_w_response(parts, expect_none):
     ],
 )
 async def test_threads_user_threads(w_threads, expected):
-    the_threads = aguix.Threads()
+    the_threads = agui.Threads()
     the_threads._threads.update(w_threads)
 
     found = await the_threads.user_threads("testing")
@@ -174,8 +174,8 @@ async def test_threads_user_threads(w_threads, expected):
 @pytest.mark.parametrize(
     "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownThread)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
+        ({}, pytest.raises(agui.UnknownThread)),
+        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
         (
             {"testing": TEST_THREADS},
             contextlib.nullcontext(TEST_THREAD),
@@ -183,7 +183,7 @@ async def test_threads_user_threads(w_threads, expected):
     ],
 )
 async def test_threads_get_thread(w_threads, expectation):
-    the_threads = aguix.Threads()
+    the_threads = agui.Threads()
     the_threads._threads.update(w_threads)
 
     with expectation as expected:
@@ -197,7 +197,7 @@ async def test_threads_get_thread(w_threads, expectation):
 @pytest.mark.parametrize("w_existing", [False, True])
 @pytest.mark.parametrize("w_user", [False, True])
 async def test_threads_new_thread(w_user, w_existing):
-    the_threads = aguix.Threads()
+    the_threads = agui.Threads()
 
     kw = {}
     if w_user:
@@ -229,13 +229,13 @@ async def test_threads_new_thread(w_user, w_existing):
 @pytest.mark.parametrize(
     "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownThread)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
+        ({}, pytest.raises(agui.UnknownThread)),
+        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
         ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
     ],
 )
 async def test_threads_append_to_thread(w_threads, expectation):
-    the_threads = aguix.Threads()
+    the_threads = agui.Threads()
 
     for user_name, thread_map in list(w_threads.items()):
         new_map = {}
@@ -265,13 +265,13 @@ async def test_threads_append_to_thread(w_threads, expectation):
 @pytest.mark.parametrize(
     "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownThread)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
+        ({}, pytest.raises(agui.UnknownThread)),
+        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
         ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
     ],
 )
 async def test_threads_delete_thread(w_threads, expectation):
-    the_threads = aguix.Threads()
+    the_threads = agui.Threads()
 
     for user_name, thread_map in list(w_threads.items()):
         new_map = {}
@@ -294,6 +294,6 @@ async def test_get_the_threads():
     request = fastapi.Request(scope={"type": "http"})
     request.state.the_threads = expected
 
-    found = await aguix.get_the_threads(request)
+    found = await agui.get_the_threads(request)
 
     assert found is expected

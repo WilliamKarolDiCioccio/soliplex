@@ -21,7 +21,7 @@ RESPONSE_CONTEXT_PARTS = ("text",)
 # =============================================================================
 
 
-def _to_aguix_message(
+def _to_agui_message(
     m: ai_messages.ModelMessage,
     run_uuid: uuid.UUID,
 ) -> agui_core.BaseMessage | None:
