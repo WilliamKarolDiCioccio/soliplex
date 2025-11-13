@@ -36,6 +36,7 @@ ANOTHER_MODEL_RESPONSE = "The other way from down"
 UUID4 = uuid.uuid4()
 TEST_THREAD_ID = str(UUID4)
 OTHER_THREAD_ID = "thread-123"
+TEST_RUN_ID = "run-345"
 TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
 TEST_THREAD = agui.Thread(
@@ -49,12 +50,102 @@ TEST_THREADS = {
 
 TEST_RUN_UUID = str(uuid.uuid4())
 
+TEST_RUN_STARTED = agui_core.RunStartedEvent(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+)
+
+TEST_RUN_FINISHED = agui_core.RunFinishedEvent(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+)
+
+
+@pytest.fixture
+def run_input():
+    return agui_core.RunAgentInput(
+        thread_id=TEST_THREAD_ID,
+        run_id=TEST_RUN_ID,
+        state={},
+        messages=[],
+        tools=[],
+        context=[],
+        forwarded_props=None,
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "events",
+    [
+        [],
+        [TEST_RUN_STARTED],
+        [TEST_RUN_STARTED, TEST_RUN_FINISHED],
+    ],
+)
+async def test_run_stream_events(run_input, events):
+    async def ev_iter():
+        for event in events:
+            yield event
+
+    run = agui.Run(run_input=run_input)
+
+    streamed = []
+
+    async for event in run.stream_events(ev_iter()):
+        streamed.append(event)
+
+    for event, s_event, r_event in zip(
+        events,
+        streamed,
+        run.events,
+        strict=True,
+    ):
+        assert s_event is event
+        assert r_event is event
+
 
 @mock.patch("uuid.uuid4")
 def test__make_thread_id(uu4):
     uu4.return_value = UUID4
 
     assert agui._make_thread_id() == str(UUID4)
+
+
+@pytest.mark.anyio
+def test_thread_new_run_w_mismatched_thread_id(run_input):
+    thread = dataclasses.replace(TEST_THREAD, thread_id=OTHER_THREAD_ID)
+
+    with pytest.raises(agui.WrongThreadId):
+        thread.new_run(run_input)
+
+
+@pytest.mark.anyio
+def test_thread_new_run_w_duplicate_run_id(run_input):
+    thread = dataclasses.replace(TEST_THREAD, runs={TEST_RUN_ID: object()})
+
+    with pytest.raises(agui.DuplicateRunId):
+        thread.new_run(run_input)
+
+
+@pytest.mark.anyio
+def test_thread_new_run_w_missing_parent_run_id(run_input):
+    run_input.parent_run_id = "BOGUS"
+    thread = dataclasses.replace(TEST_THREAD, runs={})
+
+    with pytest.raises(agui.MissingParentRunId):
+        thread.new_run(run_input)
+
+
+@pytest.mark.anyio
+def test_thread_new_run(run_input):
+    thread = dataclasses.replace(TEST_THREAD, runs={})
+
+    run = thread.new_run(run_input)
+
+    assert run.run_input is run_input
+    assert run.events == []
+    assert thread.runs[TEST_RUN_ID] == run
 
 
 @pytest.mark.anyio
@@ -177,7 +268,6 @@ async def test_get_the_threads():
     found = await agui.get_the_threads(request)
 
     assert found is expected
-
 
 
 timestamp = datetime.datetime.now(datetime.UTC)

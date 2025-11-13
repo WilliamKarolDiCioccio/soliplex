@@ -7,6 +7,7 @@ that choice away from the rest of the system.
 import asyncio
 import dataclasses
 import uuid
+from collections import abc
 
 import fastapi
 from ag_ui import core as agui_core
@@ -20,6 +21,54 @@ RESPONSE_CONTEXT_PARTS = ("text",)
 #   In-memory storage for room-based AGUI threads.
 # =============================================================================
 
+AGUI_Events = list[agui_core.BaseEvent]
+AGUI_EventIterator = abc.AsyncIterator[agui_core.BaseEvent]
+
+
+@dataclasses.dataclass(frozen=True)
+class Run:
+    """Hold original input data and events for an AGUI run"""
+
+    run_input: agui_core.RunAgentInput
+    events: AGUI_Events = dataclasses.field(
+        default_factory=list,
+    )
+
+    async def stream_events(
+        self,
+        event_iter: AGUI_EventIterator,
+    ) -> AGUI_EventIterator:
+        """Tee stream of AGUI events to our own 'events'"""
+
+        async for event in event_iter:
+            self.events.append(event)
+
+            yield event
+
+
+class WrongThreadId(ValueError):
+    def __init__(self, thread_id: str, expected_thread_id: str):
+        self.thread_id = thread_id
+        self.expected_thread_id = expected_thread_id
+        super().__init__(
+            f"Run input thread ID {thread_id} "
+            f"does not match thread's ID {expected_thread_id}"
+        )
+
+
+class DuplicateRunId(ValueError):
+    def __init__(self, run_id: str):
+        self.run_id = run_id
+        super().__init__(f"Run input run ID {run_id} already exists in thread")
+
+
+class MissingParentRunId(ValueError):
+    def __init__(self, parent_run_id: str):
+        self.parent_run_id = parent_run_id
+        super().__init__(
+            f"Run input parent run ID {parent_run_id} does not exist in thread"
+        )
+
 
 def _make_thread_id() -> str:
     return str(uuid.uuid4())
@@ -27,9 +76,27 @@ def _make_thread_id() -> str:
 
 @dataclasses.dataclass(frozen=True)
 class Thread:
+    """Hold a set of AGUI runs sharing the same 'thread_id'"""
+
     thread_id: str = dataclasses.field(default_factory=_make_thread_id)
     room_id: str = dataclasses.field(kw_only=True)
     name: str | None = dataclasses.field(default=None, kw_only=True)
+    runs: dict[Run] = dataclasses.field(default_factory=dict)
+
+    def new_run(self, run_input: agui_core.RunAgentInput) -> Run:
+        if run_input.thread_id != self.thread_id:
+            raise WrongThreadId(run_input.thread_id, self.thread_id)
+
+        if run_input.run_id in self.runs:
+            raise DuplicateRunId(run_input.run_id)
+
+        parent_run_id = run_input.parent_run_id
+
+        if parent_run_id is not None and parent_run_id not in self.runs:
+            raise MissingParentRunId(parent_run_id)
+
+        run = self.runs[run_input.run_id] = Run(run_input)
+        return run
 
 
 ThreadsByID = dict[str, Thread]
