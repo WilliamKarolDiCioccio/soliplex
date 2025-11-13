@@ -96,63 +96,6 @@ thinking_part = ai_messages.ThinkingPart(content=THINKING)
 tool_call_part = ai_messages.ToolCallPart(tool_name=TOOL_NAME)
 
 
-@pytest.mark.parametrize(
-    "parts, expect_none",
-    [
-        ([system_prompt_part], True),
-        ([user_prompt_part], False),
-        ([tool_return_part], True),
-        ([retry_prompt_part], True),
-        ([system_prompt_part, tool_return_part], True),
-        ([system_prompt_part, retry_prompt_part], True),
-        ([tool_return_part, retry_prompt_part], True),
-        ([system_prompt_part, tool_return_part, retry_prompt_part], True),
-        ([system_prompt_part, user_prompt_part], False),
-        ([tool_return_part, user_prompt_part], False),
-        ([retry_prompt_part, user_prompt_part], False),
-    ],
-)
-def test__to_agui_message_w_request(parts, expect_none):
-    msg = ai_messages.ModelRequest(parts=parts)
-
-    found = agui._to_agui_message(msg, TEST_RUN_UUID)
-
-    if expect_none:
-        assert found is None
-    else:
-        assert isinstance(found, agui_core.UserMessage)
-        assert found.id == str(TEST_RUN_UUID)
-        assert found.content == USER_PROMPT
-
-
-@pytest.mark.parametrize(
-    "parts, expect_none",
-    [
-        ([text_part], False),
-        ([thinking_part, text_part], False),
-        ([tool_call_part, text_part], False),
-        ([thinking_part, tool_call_part, text_part], False),
-        ([thinking_part], True),
-        ([tool_call_part], True),
-        ([thinking_part, tool_call_part], True),
-    ],
-)
-def test__to_agui_message_w_response(parts, expect_none):
-    msg = ai_messages.ModelResponse(
-        parts=parts,
-        provider_response_id=PROVIDER_RESPONSE_ID,
-    )
-
-    found = agui._to_agui_message(msg, TEST_RUN_UUID)
-
-    if expect_none:
-        assert found is None
-    else:
-        assert isinstance(found, agui_core.SystemMessage)
-        assert found.content == TEXT
-        assert found.id == PROVIDER_RESPONSE_ID
-
-
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     "w_threads, expected",
@@ -297,3 +240,60 @@ async def test_get_the_threads():
     found = await agui.get_the_threads(request)
 
     assert found is expected
+
+
+@pytest.mark.parametrize(
+    "parts, expect_none",
+    [
+        ([system_prompt_part], True),
+        ([user_prompt_part], False),
+        ([tool_return_part], True),
+        ([retry_prompt_part], True),
+        ([system_prompt_part, tool_return_part], True),
+        ([system_prompt_part, retry_prompt_part], True),
+        ([tool_return_part, retry_prompt_part], True),
+        ([system_prompt_part, tool_return_part, retry_prompt_part], True),
+        ([system_prompt_part, user_prompt_part], False),
+        ([tool_return_part, user_prompt_part], False),
+        ([retry_prompt_part, user_prompt_part], False),
+    ],
+)
+def test__to_agui_message_w_request(parts, expect_none):
+    msg = ai_messages.ModelRequest(parts=parts)
+
+    found = agui._to_agui_message(msg, TEST_RUN_UUID)
+
+    if expect_none:
+        assert found is None
+    else:
+        assert isinstance(found, agui_core.UserMessage)
+        assert found.id == str(TEST_RUN_UUID)
+        assert found.content == USER_PROMPT
+
+
+@pytest.mark.parametrize(
+    "parts, expect_none",
+    [
+        ([text_part], False),
+        ([thinking_part, text_part], False),
+        ([tool_call_part, text_part], False),
+        ([thinking_part, tool_call_part, text_part], False),
+        ([thinking_part], True),
+        ([tool_call_part], True),
+        ([thinking_part, tool_call_part], True),
+    ],
+)
+def test__to_agui_message_w_response(parts, expect_none):
+    msg = ai_messages.ModelResponse(
+        parts=parts,
+        provider_response_id=PROVIDER_RESPONSE_ID,
+    )
+
+    found = agui._to_agui_message(msg, TEST_RUN_UUID)
+
+    if expect_none:
+        assert found is None
+    else:
+        assert isinstance(found, agui_core.SystemMessage)
+        assert found.content == TEXT
+        assert found.id == PROVIDER_RESPONSE_ID

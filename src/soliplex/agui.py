@@ -17,46 +17,8 @@ RESPONSE_CONTEXT_PARTS = ("text",)
 
 
 # =============================================================================
-#   In-memory storage for room-based user threads.
+#   In-memory storage for room-based AGUI threads.
 # =============================================================================
-
-
-def _to_agui_message(
-    m: ai_messages.ModelMessage,
-    run_uuid: uuid.UUID,
-) -> agui_core.BaseMessage | None:
-    for part in m.parts:
-        if isinstance(m, ai_messages.ModelRequest):
-            if isinstance(part, ai_messages.UserPromptPart):
-                assert isinstance(part.content, str)
-
-                return agui_core.UserMessage(
-                    id=str(run_uuid),
-                    content=part.content,
-                )
-
-        elif isinstance(m, ai_messages.ModelResponse):
-            if isinstance(part, ai_messages.TextPart):
-                return agui_core.SystemMessage(
-                    id=m.provider_response_id,
-                    content=part.content,
-                )
-
-            elif isinstance(part, ai_messages.ThinkingPart):
-                continue
-
-            elif isinstance(part, ai_messages.ToolCallPart):
-                continue
-
-            else:  # pragma: NO COVER suppress spurious branch miss
-                pass
-
-        else:  # pragma: NO COVER suppress spurious branch miss
-            pass
-
-    # Return None for messages with no displayable content
-    # (e.g., only ToolCallPart or ThinkingPart)
-    return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -196,3 +158,41 @@ async def get_the_threads(request: fastapi.Request) -> Threads:
 
 
 depend_the_threads = fastapi.Depends(get_the_threads)
+
+
+def _to_agui_message(
+    m: ai_messages.ModelMessage,
+    run_uuid: uuid.UUID,
+) -> agui_core.BaseMessage | None:
+    for part in m.parts:
+        if isinstance(m, ai_messages.ModelRequest):
+            if isinstance(part, ai_messages.UserPromptPart):
+                assert isinstance(part.content, str)
+
+                return agui_core.UserMessage(
+                    id=str(run_uuid),
+                    content=part.content,
+                )
+
+        elif isinstance(m, ai_messages.ModelResponse):
+            if isinstance(part, ai_messages.TextPart):
+                return agui_core.SystemMessage(
+                    id=m.provider_response_id,
+                    content=part.content,
+                )
+
+            elif isinstance(part, ai_messages.ThinkingPart):
+                continue
+
+            elif isinstance(part, ai_messages.ToolCallPart):
+                continue
+
+            else:  # pragma: NO COVER suppress spurious branch miss
+                pass
+
+        else:  # pragma: NO COVER suppress spurious branch miss
+            pass
+
+    # Return None for messages with no displayable content
+    # (e.g., only ToolCallPart or ThinkingPart)
+    return None
