@@ -79,12 +79,13 @@ class Threads:
 
         return thread
 
-    async def user_threads(self, user_name: str) -> ThreadsByID:
+    async def user_threads(self, *, user_name: str) -> ThreadsByID:
         async with self._lock:
             return await self._find_user_threads(user_name)
 
     async def get_thread(
         self,
+        *,
         user_name: str,
         thread_id: str,
     ) -> Thread:
@@ -97,6 +98,7 @@ class Threads:
 
     async def new_thread(
         self,
+        *,
         user_name: str,
         room_id: str,
         thread_name: str,
@@ -115,6 +117,7 @@ class Threads:
 
     async def delete_thread(
         self,
+        *,
         user_name: str,
         thread_id: str,
     ) -> None:

@@ -94,7 +94,7 @@ async def test_threads_user_threads(w_threads, expected):
     the_threads = agui.Threads()
     the_threads._threads.update(w_threads)
 
-    found = await the_threads.user_threads("testing")
+    found = await the_threads.user_threads(user_name="testing")
 
     assert found == expected
 
@@ -116,7 +116,10 @@ async def test_threads_get_thread(w_threads, expectation):
     the_threads._threads.update(w_threads)
 
     with expectation as expected:
-        found = await the_threads.get_thread("testing", TEST_THREAD_ID)
+        found = await the_threads.get_thread(
+            user_name="testing",
+            thread_id=TEST_THREAD_ID,
+        )
 
     if expected is TEST_THREAD:
         assert found is TEST_THREAD
@@ -138,9 +141,9 @@ async def test_threads_new_thread(uu4, w_user, w_existing):
         mock.patch.dict(the_threads._threads, **kw),
     ):
         found = await the_threads.new_thread(
-            "testing",
-            TEST_THREAD_ROOMID,
-            TEST_THREAD_NAME,
+            user_name="testing",
+            room_id=TEST_THREAD_ROOMID,
+            thread_name=TEST_THREAD_NAME,
         )
 
     assert found.thread_id == TEST_THREAD_ID
@@ -169,7 +172,10 @@ async def test_threads_delete_thread(w_threads, expectation):
         the_threads._threads[user_name] = new_map
 
     with expectation as expected:
-        await the_threads.delete_thread("testing", TEST_THREAD_ID)
+        await the_threads.delete_thread(
+            user_name="testing",
+            thread_id=TEST_THREAD_ID,
+        )
 
     if expected is None:
         assert the_threads._threads["testing"] == {}
