@@ -1992,6 +1992,9 @@ def test_agentconfig_from_yaml(
 
         assert found == expected
 
+        # See #180.
+        assert found._installation_config is installation_config
+
 
 @pytest.mark.parametrize("w_config_path", [False, True])
 @pytest.mark.parametrize(

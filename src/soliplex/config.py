@@ -1,6 +1,5 @@
 from __future__ import annotations  # forward refs in typing decls
 
-import copy
 import dataclasses
 import enum
 import functools
@@ -697,10 +696,12 @@ class AgentConfig:
                 }
 
                 template_config = ic_agent_configs_map[template_id]
-                local_config = copy.deepcopy(config)
-                local_config["_template_id"] = template_id
 
-                config = template_config.as_yaml | local_config
+                config = (
+                    template_config.as_yaml
+                    | config
+                    | {"_template_id": template_id}
+                )
 
             if "system_prompt" in config:
                 system_prompt = config.pop("system_prompt")
