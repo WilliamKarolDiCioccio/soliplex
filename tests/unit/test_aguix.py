@@ -54,17 +54,17 @@ NEW_AGUI_MESSAGES = [
     ),
 ]
 
-TEST_INTERACTION_UUID = uuid.uuid4()
-TEST_INTERACTION_NAME = "Test Interaction"
-TEST_INTERACTION_ROOMID = "test-room"
-TEST_INTERACTION = aguix.Interaction(
-    aguix_uuid=TEST_INTERACTION_UUID,
-    name=TEST_INTERACTION_NAME,
-    room_id=TEST_INTERACTION_ROOMID,
+TEST_THREAD_UUID = uuid.uuid4()
+TEST_THREAD_NAME = "Test Thread"
+TEST_THREAD_ROOMID = "test-room"
+TEST_THREAD = aguix.Thread(
+    thread_uuid=TEST_THREAD_UUID,
+    name=TEST_THREAD_NAME,
+    room_id=TEST_THREAD_ROOMID,
     message_history=OLD_AGUI_MESSAGES,
 )
-TEST_INTERACTIONS = {
-    TEST_INTERACTION_UUID: TEST_INTERACTION,
+TEST_THREADS = {
+    TEST_THREAD_UUID: TEST_THREAD,
 }
 
 TEST_RUN_UUID = uuid.uuid4()
@@ -155,69 +155,67 @@ def test__to_aguix_message_w_response(parts, expect_none):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "w_interactions, expected",
+    "w_threads, expected",
     [
         ({}, {}),
-        ({"testing": TEST_INTERACTIONS}, TEST_INTERACTIONS),
+        ({"testing": TEST_THREADS}, TEST_THREADS),
     ],
 )
-async def test_interactions_user_interactions(w_interactions, expected):
-    the_interactions = aguix.Interactions()
-    the_interactions._interactions.update(w_interactions)
+async def test_threads_user_threads(w_threads, expected):
+    the_threads = aguix.Threads()
+    the_threads._threads.update(w_threads)
 
-    found = await the_interactions.user_interactions("testing")
+    found = await the_threads.user_threads("testing")
 
     assert found == expected
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "w_interactions, expectation",
+    "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownInteraction)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownInteraction)),
+        ({}, pytest.raises(aguix.UnknownThread)),
+        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
         (
-            {"testing": TEST_INTERACTIONS},
-            contextlib.nullcontext(TEST_INTERACTION),
+            {"testing": TEST_THREADS},
+            contextlib.nullcontext(TEST_THREAD),
         ),
     ],
 )
-async def test_interactions_get_interaction(w_interactions, expectation):
-    the_interactions = aguix.Interactions()
-    the_interactions._interactions.update(w_interactions)
+async def test_threads_get_thread(w_threads, expectation):
+    the_threads = aguix.Threads()
+    the_threads._threads.update(w_threads)
 
     with expectation as expected:
-        found = await the_interactions.get_interaction(
-            "testing", TEST_INTERACTION_UUID
-        )
+        found = await the_threads.get_thread("testing", TEST_THREAD_UUID)
 
-    if expected is TEST_INTERACTION:
-        assert found is TEST_INTERACTION
+    if expected is TEST_THREAD:
+        assert found is TEST_THREAD
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("w_existing", [False, True])
 @pytest.mark.parametrize("w_user", [False, True])
-async def test_interactions_new_interaction(w_user, w_existing):
-    the_interactions = aguix.Interactions()
+async def test_threads_new_thread(w_user, w_existing):
+    the_threads = aguix.Threads()
 
     kw = {}
     if w_user:
         kw["testing"] = {}
 
     with (
-        mock.patch.dict(the_interactions._interactions, **kw),
+        mock.patch.dict(the_threads._threads, **kw),
     ):
-        found = await the_interactions.new_interaction(
+        found = await the_threads.new_thread(
             "testing",
-            TEST_INTERACTION_ROOMID,
-            TEST_INTERACTION_NAME,
+            TEST_THREAD_ROOMID,
+            TEST_THREAD_NAME,
             OLD_AGUI_MESSAGES,
         )
 
-    assert isinstance(found.aguix_uuid, uuid.UUID)
-    assert found.name == TEST_INTERACTION_NAME
-    assert found.room_id == TEST_INTERACTION_ROOMID
+    assert isinstance(found.thread_uuid, uuid.UUID)
+    assert found.name == TEST_THREAD_NAME
+    assert found.room_id == TEST_THREAD_ROOMID
 
     for f_msg, e_msg in zip(
         found.message_history,
@@ -229,75 +227,73 @@ async def test_interactions_new_interaction(w_user, w_existing):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "w_interactions, expectation",
+    "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownInteraction)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownInteraction)),
-        ({"testing": TEST_INTERACTIONS}, contextlib.nullcontext(None)),
+        ({}, pytest.raises(aguix.UnknownThread)),
+        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
+        ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
     ],
 )
-async def test_interactions_append_to_interaction(w_interactions, expectation):
-    the_interactions = aguix.Interactions()
+async def test_threads_append_to_thread(w_threads, expectation):
+    the_threads = aguix.Threads()
 
-    for user_name, interaction_map in list(w_interactions.items()):
+    for user_name, thread_map in list(w_threads.items()):
         new_map = {}
 
-        for aguix_uuid, interaction in list(interaction_map.items()):
-            new_map[aguix_uuid] = dataclasses.replace(
-                interaction,
+        for thread_uuid, thread in list(thread_map.items()):
+            new_map[thread_uuid] = dataclasses.replace(
+                thread,
                 message_history=tuple(OLD_AGUI_MESSAGES[:]),
             )
 
-        the_interactions._interactions[user_name] = new_map
+        the_threads._threads[user_name] = new_map
 
     with expectation as expected:
-        await the_interactions.append_to_interaction(
+        await the_threads.append_to_thread(
             "testing",
-            TEST_INTERACTION_UUID,
+            TEST_THREAD_UUID,
             NEW_AGUI_MESSAGES,
         )
 
     if expected is None:
-        assert new_map[TEST_INTERACTION_UUID].message_history == tuple(
+        assert new_map[TEST_THREAD_UUID].message_history == tuple(
             OLD_AGUI_MESSAGES + NEW_AGUI_MESSAGES
         )
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "w_interactions, expectation",
+    "w_threads, expectation",
     [
-        ({}, pytest.raises(aguix.UnknownInteraction)),
-        ({"testing": {}}, pytest.raises(aguix.UnknownInteraction)),
-        ({"testing": TEST_INTERACTIONS}, contextlib.nullcontext(None)),
+        ({}, pytest.raises(aguix.UnknownThread)),
+        ({"testing": {}}, pytest.raises(aguix.UnknownThread)),
+        ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
     ],
 )
-async def test_interactions_delete_interaction(w_interactions, expectation):
-    the_interactions = aguix.Interactions()
+async def test_threads_delete_thread(w_threads, expectation):
+    the_threads = aguix.Threads()
 
-    for user_name, interaction_map in list(w_interactions.items()):
+    for user_name, thread_map in list(w_threads.items()):
         new_map = {}
 
-        for aguix_uuid, interaction in list(interaction_map.items()):
-            new_map[aguix_uuid] = dataclasses.replace(interaction)
+        for thread_uuid, thread in list(thread_map.items()):
+            new_map[thread_uuid] = dataclasses.replace(thread)
 
-        the_interactions._interactions[user_name] = new_map
+        the_threads._threads[user_name] = new_map
 
     with expectation as expected:
-        await the_interactions.delete_interaction(
-            "testing", TEST_INTERACTION_UUID
-        )
+        await the_threads.delete_thread("testing", TEST_THREAD_UUID)
 
     if expected is None:
-        assert the_interactions._interactions["testing"] == {}
+        assert the_threads._threads["testing"] == {}
 
 
 @pytest.mark.anyio
-async def test_get_the_interactions():
+async def test_get_the_threads():
     expected = object()
     request = fastapi.Request(scope={"type": "http"})
-    request.state.the_interactions = expected
+    request.state.the_threads = expected
 
-    found = await aguix.get_the_interactions(request)
+    found = await aguix.get_the_threads(request)
 
     assert found is expected

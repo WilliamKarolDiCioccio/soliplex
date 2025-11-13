@@ -1,4 +1,4 @@
-"""Track AGUI interactions by user and room.
+"""Track AGUI threads by user and room.
 
 If / when we move to a "persistent" history store, this module should firewall
 that choice away from the rest of the system.
@@ -17,7 +17,7 @@ RESPONSE_CONTEXT_PARTS = ("text",)
 
 
 # =============================================================================
-#   In-memory storage for room-based user interactions.
+#   In-memory storage for room-based user threads.
 # =============================================================================
 
 
@@ -60,141 +60,139 @@ def _to_aguix_message(
 
 
 @dataclasses.dataclass(frozen=True)
-class Interaction:
-    """AG/UI interaction w/ message history for a user / room."""
+class Thread:
+    """AG/UI thread w/ message history for a user / room."""
 
     room_id: str
     message_history: tuple[agui_core.BaseMessage]
     name: str | None
-    aguix_uuid: uuid.UUID = dataclasses.field(
+    thread_uuid: uuid.UUID = dataclasses.field(
         default_factory=uuid.uuid4,
     )
 
 
-InteractionsByUUID = dict[str, Interaction]
+ThreadsByUUID = dict[str, Thread]
 
 
-class UnknownInteraction(fastapi.HTTPException):
-    def __init__(self, user_name: str, aguix_uuid: str):
+class UnknownThread(fastapi.HTTPException):
+    def __init__(self, user_name: str, thread_uuid: str):
         self.user_name = user_name
-        self.aguix_uuid = aguix_uuid
-        message = (
-            f"Unknown interaction: UUID {aguix_uuid} for user {user_name}"
-        )
+        self.thread_uuid = thread_uuid
+        message = f"Unknown thread: UUID {thread_uuid} for user {user_name}"
         super().__init__(status_code=404, detail=message)
 
 
-class Interactions:
+class Threads:
     def __init__(self):
         self._lock = asyncio.Lock()
-        # {user_name -> {aguix_uuid: Interaction}}
-        self._interactions = {}
+        # {user_name -> {thread_uuid: Thread}}
+        self._threads = {}
 
-    async def _find_user_interactions(
+    async def _find_user_threads(
         self,
         user_name: str,
-    ) -> InteractionsByUUID:
-        user_interactions = self._interactions.get(user_name)
+    ) -> ThreadsByUUID:
+        user_threads = self._threads.get(user_name)
 
-        if user_interactions is None:
+        if user_threads is None:
             return {}
 
-        return user_interactions.copy()
+        return user_threads.copy()
 
-    async def _find_interaction(
+    async def _find_thread(
         self,
         user_name: str,
-        aguix_uuid: str,
-    ) -> Interaction:
-        user_interactions = self._interactions.get(user_name)
+        thread_uuid: str,
+    ) -> Thread:
+        user_threads = self._threads.get(user_name)
 
-        if user_interactions is None:
-            raise UnknownInteraction(user_name, aguix_uuid)
+        if user_threads is None:
+            raise UnknownThread(user_name, thread_uuid)
 
-        interaction = user_interactions.get(aguix_uuid)
+        thread = user_threads.get(thread_uuid)
 
-        if interaction is None:
-            raise UnknownInteraction(user_name, aguix_uuid)
+        if thread is None:
+            raise UnknownThread(user_name, thread_uuid)
 
-        return interaction
+        return thread
 
-    async def user_interactions(self, user_name: str) -> InteractionsByUUID:
+    async def user_threads(self, user_name: str) -> ThreadsByUUID:
         async with self._lock:
-            return await self._find_user_interactions(user_name)
+            return await self._find_user_threads(user_name)
 
-    async def get_interaction(
+    async def get_thread(
         self,
         user_name: str,
-        aguix_uuid: str,
-    ) -> Interaction:
-        """Return the actual interaction instance
+        thread_uuid: str,
+    ) -> Thread:
+        """Return the actual thread instance
 
         N.B.:  caller must treat the instance as read-only!
         """
         async with self._lock:
-            return await self._find_interaction(user_name, aguix_uuid)
+            return await self._find_thread(user_name, thread_uuid)
 
-    async def new_interaction(
+    async def new_thread(
         self,
         user_name: str,
         room_id: str,
-        interaction_name: str,
+        thread_name: str,
         new_messages: list[agui_core.BaseMessage] = (),
-    ) -> Interaction:
-        """Create a new interaction"""
-        interaction = Interaction(
-            name=interaction_name,
+    ) -> Thread:
+        """Create a new thread"""
+        thread = Thread(
+            name=thread_name,
             room_id=room_id,
             message_history=tuple(new_messages),
         )
 
         async with self._lock:
-            user_interactions = self._interactions.setdefault(user_name, {})
-            user_interactions[interaction.aguix_uuid] = interaction
+            user_threads = self._threads.setdefault(user_name, {})
+            user_threads[thread.thread_uuid] = thread
 
-        return interaction
+        return thread
 
-    async def append_to_interaction(
+    async def append_to_thread(
         self,
         user_name: str,
-        aguix_uuid: str,
+        thread_uuid: str,
         new_messages: list[agui_core.BaseMessage],
     ) -> None:
-        """Append messsages to history for a interaction"""
+        """Append messsages to history for a thread"""
         async with self._lock:
-            user_interactions = self._interactions.setdefault(user_name, {})
-            interaction = user_interactions.get(aguix_uuid)
+            user_threads = self._threads.setdefault(user_name, {})
+            thread = user_threads.get(thread_uuid)
 
-            if interaction is None:
-                raise UnknownInteraction(user_name, aguix_uuid)
+            if thread is None:
+                raise UnknownThread(user_name, thread_uuid)
 
-            history = list(interaction.message_history)
+            history = list(thread.message_history)
             history.extend(new_messages)
 
-            user_interactions[interaction.aguix_uuid] = dataclasses.replace(
-                interaction,
+            user_threads[thread.thread_uuid] = dataclasses.replace(
+                thread,
                 message_history=tuple(history),
             )
 
-    async def delete_interaction(
+    async def delete_thread(
         self,
         user_name: str,
-        aguix_uuid: uuid.UUID,
+        thread_uuid: uuid.UUID,
     ) -> None:
-        """Remove a interaction"""
+        """Remove a thread"""
         async with self._lock:
-            interactions = await self._find_user_interactions(user_name)
+            threads = await self._find_user_threads(user_name)
 
             try:
-                del interactions[aguix_uuid]
+                del threads[thread_uuid]
             except KeyError:
-                raise UnknownInteraction(user_name, aguix_uuid) from None
+                raise UnknownThread(user_name, thread_uuid) from None
 
-            self._interactions[user_name] = interactions
-
-
-async def get_the_interactions(request: fastapi.Request) -> Interactions:
-    return request.state.the_interactions
+            self._threads[user_name] = threads
 
 
-depend_the_interactions = fastapi.Depends(get_the_interactions)
+async def get_the_threads(request: fastapi.Request) -> Threads:
+    return request.state.the_threads
+
+
+depend_the_threads = fastapi.Depends(get_the_threads)
