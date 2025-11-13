@@ -49,32 +49,6 @@ TEST_THREADS = {
 
 TEST_RUN_UUID = str(uuid.uuid4())
 
-timestamp = datetime.datetime.now(datetime.UTC)
-system_prompt_part = ai_messages.SystemPromptPart(
-    content=SYSTEM_PROMPT,
-    timestamp=timestamp,
-)
-user_prompt_part = ai_messages.UserPromptPart(
-    content=USER_PROMPT,
-    timestamp=timestamp,
-)
-tool_return_part = ai_messages.ToolReturnPart(
-    content=TOOL_RETURN,
-    tool_call_id=TOOL_CALL_ID,
-    tool_name=TOOL_NAME,
-)
-retry_prompt_part = ai_messages.RetryPromptPart(
-    RETRY_PROMPT,
-    timestamp=timestamp,
-)
-
-PROVIDER_RESPONSE_ID = "provider-test"
-text_part = ai_messages.TextPart(
-    content=TEXT,
-)
-thinking_part = ai_messages.ThinkingPart(content=THINKING)
-tool_call_part = ai_messages.ToolCallPart(tool_name=TOOL_NAME)
-
 
 @mock.patch("uuid.uuid4")
 def test__make_thread_id(uu4):
@@ -203,6 +177,34 @@ async def test_get_the_threads():
     found = await agui.get_the_threads(request)
 
     assert found is expected
+
+
+
+timestamp = datetime.datetime.now(datetime.UTC)
+system_prompt_part = ai_messages.SystemPromptPart(
+    content=SYSTEM_PROMPT,
+    timestamp=timestamp,
+)
+user_prompt_part = ai_messages.UserPromptPart(
+    content=USER_PROMPT,
+    timestamp=timestamp,
+)
+tool_return_part = ai_messages.ToolReturnPart(
+    content=TOOL_RETURN,
+    tool_call_id=TOOL_CALL_ID,
+    tool_name=TOOL_NAME,
+)
+retry_prompt_part = ai_messages.RetryPromptPart(
+    RETRY_PROMPT,
+    timestamp=timestamp,
+)
+
+PROVIDER_RESPONSE_ID = "provider-test"
+text_part = ai_messages.TextPart(
+    content=TEXT,
+)
+thinking_part = ai_messages.ThinkingPart(content=THINKING)
+tool_call_part = ai_messages.ToolCallPart(tool_name=TOOL_NAME)
 
 
 @pytest.mark.parametrize(
