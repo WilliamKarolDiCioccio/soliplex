@@ -203,6 +203,13 @@ E_TEXT_MESSAGE_END = agui_core.TextMessageEndEvent(
     message_id=TEXT_REPLY_MESSAGE_ID,
 )
 
+TOOL_CALL_PARENT_MESSAGE_ID = "tool-call-message"
+
+TOOL_CALL_PARENT_MESSAGE = agui_core.AssistantMessage(
+    id=TOOL_CALL_PARENT_MESSAGE_ID,
+    tool_calls=[],
+)
+
 TOOL_CALL_NAME = "test_tool"
 TOOL_CALL_ARG_DELTA = ",bar=2"
 
@@ -212,7 +219,7 @@ E_TOOL_CALL_START = agui_core.ToolCallStartEvent(
 )
 
 W_PARENT_E_TOOL_CALL_START = agui_core.ToolCallStartEvent(
-    parent_message_id=TEXT_REPLY_MESSAGE_ID,
+    parent_message_id=TOOL_CALL_PARENT_MESSAGE_ID,
     tool_call_id=TOOL_CALL_ID,
     tool_call_name=TOOL_CALL_NAME,
 )
@@ -789,7 +796,7 @@ tool_call_nonesuch = pytest.raises(agui.ToolCallDoesNotExist)
         ),
         (
             RUNNING,
-            [TEXT_REPLY_MESSAGE],
+            [TOOL_CALL_PARENT_MESSAGE.model_copy(deep=True)],
             {},
             W_PARENT_E_TOOL_CALL_START,
             no_error(None),
@@ -892,7 +899,20 @@ def test_esp_call_w_tool_call_args(
         (INITIALIZED, {}, E_TOOL_CALL_END, not_running),
         (
             RUNNING,
-            {TOOL_CALL_ID: (TOOL_CALL, None)},
+            {
+                TOOL_CALL_ID: (TOOL_CALL, None),
+            },
+            E_TOOL_CALL_END,
+            no_error(None),
+        ),
+        (
+            RUNNING,
+            {
+                TOOL_CALL_ID: (
+                    TOOL_CALL,
+                    TOOL_CALL_PARENT_MESSAGE.model_copy(deep=True),
+                )
+            },
             E_TOOL_CALL_END,
             no_error(None),
         ),
@@ -921,7 +941,12 @@ def test_esp_call_w_tool_call_end(status, tool_calls, event, expectation):
         esp(event)
 
     if expected is None:
-        assert len(esp.tool_calls_by_id) == len(tool_calls)
+        tool_call, parent = tool_calls[event.tool_call_id]
+
+        if parent is not None:
+            assert parent.tool_calls[-1] == tool_call
+
+        assert len(esp.tool_calls_by_id) == len(tool_calls) - 1
 
 
 @pytest.mark.parametrize(

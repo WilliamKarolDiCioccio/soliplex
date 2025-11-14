@@ -474,6 +474,13 @@ class EventStreamParser:
                 if event.tool_call_id not in self.tool_calls_by_id:
                     raise ToolCallDoesNotExist(event.tool_call_id)
 
+                tool_call, parent = self.tool_calls_by_id.pop(
+                    event.tool_call_id,
+                )
+
+                if parent is not None:
+                    parent.tool_calls.append(tool_call)
+
             case agui_core.EventType.TOOL_CALL_RESULT:
                 self._assert_running()
 
