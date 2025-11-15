@@ -416,6 +416,8 @@ class EventStreamParser:
         default_factory=set,
     )
 
+    event_log: list[agui_core.BaseEvent] = None
+
     def __post_init__(self, run_agent_input=None):
         if run_agent_input is not None:
             self.run_input = run_agent_input
@@ -455,7 +457,13 @@ class EventStreamParser:
         self.messages.append(message)
         self.messages_by_id[message.id] = message
 
+    def _log_event(self, event: agui_core.BaseEvent):
+        if self.event_log is not None:
+            self.event_log.append(event)
+
     def __call__(self, event: agui_core.BaseEvent):
+        self._log_event(event)
+
         match event.type:
             #
             #   Lifecycle events

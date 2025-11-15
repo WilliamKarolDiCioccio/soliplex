@@ -594,6 +594,21 @@ step_already = pytest.raises(agui.StepAlreadyStarted)
 step_not_started = pytest.raises(agui.StepNotStarted)
 
 
+@pytest.fixture(params=[None, False, True])
+def event_kept(request):
+    kw = {}
+    event_log = [] if request.param else None
+
+    if request.param is not None:
+        kw["event_log"] = event_log
+
+    def check_log(event):
+        if request.param:
+            assert event_log[-1] == event
+
+    return kw, check_log
+
+
 #
 #   Lifecycle events
 #
@@ -609,8 +624,16 @@ step_not_started = pytest.raises(agui.StepNotStarted)
         (ERROR, E_RUN_STARTED, inv_status, None),
     ],
 )
-def test_esp_call_w_run_start(status, event, expectation, sets_input):
-    esp = agui.EventStreamParser(run_status=status)
+def test_esp_call_w_run_start(
+    event_kept,
+    status,
+    event,
+    expectation,
+    sets_input,
+):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
@@ -620,6 +643,8 @@ def test_esp_call_w_run_start(status, event, expectation, sets_input):
 
         if sets_input:
             assert esp.run_input is event.input
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -632,8 +657,10 @@ def test_esp_call_w_run_start(status, event, expectation, sets_input):
         (ERROR, E_RUN_FINISHED, inv_status),
     ],
 )
-def test_esp_call_w_run_finished(status, event, expectation):
-    esp = agui.EventStreamParser(run_status=status)
+def test_esp_call_w_run_finished(event_kept, status, event, expectation):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
@@ -641,6 +668,8 @@ def test_esp_call_w_run_finished(status, event, expectation):
     if isinstance(expected, agui.RunStatus):
         assert esp.run_status == expected
         assert esp.result is event.result
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -652,8 +681,10 @@ def test_esp_call_w_run_finished(status, event, expectation):
         (ERROR, E_RUN_ERROR, inv_status),
     ],
 )
-def test_esp_call_w_run_error(status, event, expectation):
-    esp = agui.EventStreamParser(run_status=status)
+def test_esp_call_w_run_error(event_kept, status, event, expectation):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
@@ -662,6 +693,8 @@ def test_esp_call_w_run_error(status, event, expectation):
         assert esp.run_status == expected
         assert esp.error_message is event.message
         assert esp.error_code is event.code
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -674,14 +707,20 @@ def test_esp_call_w_run_error(status, event, expectation):
         (ERROR, NO_STEPS, E_STEP_STARTED, not_running),
     ],
 )
-def test_esp_call_w_step_start(status, steps, event, expectation):
-    esp = agui.EventStreamParser(run_status=status, active_steps=steps.copy())
+def test_esp_call_w_step_start(event_kept, status, steps, event, expectation):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(
+        run_status=status, active_steps=steps.copy(), **kw
+    )
 
     with expectation as expected:
         esp(event)
 
     if isinstance(expected, set):
         assert esp.active_steps == expected
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -694,14 +733,22 @@ def test_esp_call_w_step_start(status, steps, event, expectation):
         (ERROR, NO_STEPS, E_STEP_FINISHED, not_running),
     ],
 )
-def test_esp_call_w_step_finished(status, steps, event, expectation):
-    esp = agui.EventStreamParser(run_status=status, active_steps=steps.copy())
+def test_esp_call_w_step_finished(
+    event_kept, status, steps, event, expectation
+):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(
+        run_status=status, active_steps=steps.copy(), **kw
+    )
 
     with expectation as expected:
         esp(event)
 
     if isinstance(expected, set):
         assert esp.active_steps == expected
+
+    check_log(event)
 
 
 #
@@ -721,13 +768,18 @@ message_nonesuch = pytest.raises(agui.MessageDoesNotExist)
         (ERROR, [], E_TEXT_MESSAGE_START, not_running),
     ],
 )
-def test_esp_call_w_text_message_start(status, messages, event, expectation):
+def test_esp_call_w_text_message_start(
+    event_kept, status, messages, event, expectation
+):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
     esp = agui.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
+        **kw,
     )
 
     with expectation as expected:
@@ -737,6 +789,8 @@ def test_esp_call_w_text_message_start(status, messages, event, expectation):
         assert len(esp.messages) == len(messages) + 1
         assert esp.messages[-1].id == event.message_id
         assert esp.messages[-1].content == ""
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -754,13 +808,18 @@ def test_esp_call_w_text_message_start(status, messages, event, expectation):
         (ERROR, [], E_TEXT_MESSAGE_CONTENT, not_running),
     ],
 )
-def test_esp_call_w_text_message_content(status, messages, event, expectation):
+def test_esp_call_w_text_message_content(
+    event_kept, status, messages, event, expectation
+):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
     esp = agui.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
+        **kw,
     )
 
     with expectation as expected:
@@ -770,6 +829,8 @@ def test_esp_call_w_text_message_content(status, messages, event, expectation):
         assert len(esp.messages) == len(messages)
         assert esp.messages[-1].id == event.message_id
         assert esp.messages[-1].content == messages[-1].content + TEXT_DELTA
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -787,13 +848,18 @@ def test_esp_call_w_text_message_content(status, messages, event, expectation):
         (ERROR, [], E_TEXT_MESSAGE_END, not_running),
     ],
 )
-def test_esp_call_w_text_message_end(status, messages, event, expectation):
+def test_esp_call_w_text_message_end(
+    event_kept, status, messages, event, expectation
+):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
     esp = agui.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
+        **kw,
     )
 
     with expectation as expected:
@@ -803,6 +869,8 @@ def test_esp_call_w_text_message_end(status, messages, event, expectation):
         assert len(esp.messages) == len(messages)
         assert esp.messages[-1].id == event.message_id
         assert esp.messages[-1].content == messages[-1].content
+
+    check_log(event)
 
 
 #
@@ -837,12 +905,15 @@ tool_call_nonesuch = pytest.raises(agui.ToolCallDoesNotExist)
     ],
 )
 def test_esp_call_w_tool_call_start(
+    event_kept,
     status,
     messages,
     active_tcs,
     event,
     expectation,
 ):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
@@ -854,6 +925,7 @@ def test_esp_call_w_tool_call_start(
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
         active_tool_calls=esp_tool_calls_by_id,
+        **kw,
     )
 
     with expectation as expected:
@@ -871,6 +943,8 @@ def test_esp_call_w_tool_call_start(
             assert parent is None
         else:
             assert parent is esp_messages[0]
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -894,11 +968,14 @@ def test_esp_call_w_tool_call_start(
     ],
 )
 def test_esp_call_w_tool_call_args(
+    event_kept,
     status,
     active_tcs,
     event,
     expectation,
 ):
+    kw, check_log = event_kept
+
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
         for key, value in active_tcs.items()
@@ -908,6 +985,7 @@ def test_esp_call_w_tool_call_args(
     esp = agui.EventStreamParser(
         run_status=status,
         active_tool_calls=esp_tool_calls_by_id,
+        **kw,
     )
 
     with expectation as expected:
@@ -921,6 +999,8 @@ def test_esp_call_w_tool_call_args(
         assert tool_call.function.arguments == (
             before.function.arguments + event.delta
         )
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -956,7 +1036,11 @@ def test_esp_call_w_tool_call_args(
         (ERROR, {}, E_TOOL_CALL_END, not_running),
     ],
 )
-def test_esp_call_w_tool_call_end(status, active_tcs, event, expectation):
+def test_esp_call_w_tool_call_end(
+    event_kept, status, active_tcs, event, expectation
+):
+    kw, check_log = event_kept
+
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
         for key, value in active_tcs.items()
@@ -965,6 +1049,7 @@ def test_esp_call_w_tool_call_end(status, active_tcs, event, expectation):
     esp = agui.EventStreamParser(
         run_status=status,
         active_tool_calls=esp_tool_calls_by_id,
+        **kw,
     )
 
     with expectation as expected:
@@ -979,6 +1064,8 @@ def test_esp_call_w_tool_call_end(status, active_tcs, event, expectation):
         assert len(esp.active_tool_calls) == len(active_tcs) - 1
 
         assert event.tool_call_id in esp.completed_tool_calls
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -1004,15 +1091,19 @@ def test_esp_call_w_tool_call_end(status, active_tcs, event, expectation):
     ],
 )
 def test_esp_call_w_tool_call_result(
+    event_kept,
     status,
     messages,
     completed_tcs,
     event,
     expectation,
 ):
+    kw, check_log = event_kept
+
     esp = agui.EventStreamParser(
         run_status=status,
         completed_tool_calls=set(completed_tcs),
+        **kw,
     )
 
     with expectation as expected:
@@ -1024,6 +1115,8 @@ def test_esp_call_w_tool_call_result(
         assert added is esp.messages_by_id[event.message_id]
         assert added.tool_call_id == event.tool_call_id
         assert added.content == event.content
+
+    check_log(event)
 
 
 #
@@ -1049,14 +1142,18 @@ patch_failed = pytest.raises(jsonpatch.JsonPatchException)
         (ERROR, {}, E_STATE_DELTA, not_running),
     ],
 )
-def test_esp_call_w_state_delta(status, state, event, expectation):
-    esp = agui.EventStreamParser(run_status=status, state=state.copy())
+def test_esp_call_w_state_delta(event_kept, status, state, event, expectation):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, state=state.copy(), **kw)
 
     with expectation as expected:
         esp(event)
 
     if isinstance(expected, dict):
         assert esp.state == expected
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -1069,14 +1166,20 @@ def test_esp_call_w_state_delta(status, state, event, expectation):
         (ERROR, {}, E_STATE_SNAPSHOT, not_running),
     ],
 )
-def test_esp_call_w_state_snapshot(status, state, event, expectation):
-    esp = agui.EventStreamParser(run_status=status, state=state.copy())
+def test_esp_call_w_state_snapshot(
+    event_kept, status, state, event, expectation
+):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, state=state.copy(), **kw)
 
     with expectation as expected:
         esp(event)
 
     if isinstance(expected, dict):
         assert esp.state == expected
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -1098,14 +1201,20 @@ def test_esp_call_w_state_snapshot(status, state, event, expectation):
         (ERROR, [], E_MESSAGES_SNAPSHOT, not_running),
     ],
 )
-def test_esp_call_w_messages_snapshot(status, messages, event, expectation):
-    esp = agui.EventStreamParser(run_status=status, messages=messages)
+def test_esp_call_w_messages_snapshot(
+    event_kept, status, messages, event, expectation
+):
+    kw, check_log = event_kept
+
+    esp = agui.EventStreamParser(run_status=status, messages=messages, **kw)
 
     with expectation as expected:
         esp(event)
 
     if isinstance(expected, list):
         assert esp.messages == expected
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -1136,11 +1245,14 @@ def test_esp_call_w_messages_snapshot(status, messages, event, expectation):
     ],
 )
 def test_esp_call_w_activity_message_delta(
+    event_kept,
     status,
     messages,
     event,
     expectation,
 ):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
     esp_messages_by_id = {
         msg.id: msg.model_copy(deep=True) for msg in messages
@@ -1149,6 +1261,7 @@ def test_esp_call_w_activity_message_delta(
         run_status=status,
         messages=esp_messages,
         messages_by_id=esp_messages_by_id,
+        **kw,
     )
 
     with expectation as expected:
@@ -1158,6 +1271,8 @@ def test_esp_call_w_activity_message_delta(
         activity_message = esp.messages_by_id[ACTIVITY_MESSAGE_ID]
         assert activity_message.activity_type == event.activity_type
         assert activity_message.content == expected
+
+    check_log(event)
 
 
 @pytest.mark.parametrize(
@@ -1193,11 +1308,14 @@ def test_esp_call_w_activity_message_delta(
     ],
 )
 def test_esp_call_w_activity_message_snapshot(
+    event_kept,
     status,
     messages,
     event,
     expectation,
 ):
+    kw, check_log = event_kept
+
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
     esp_messages_by_id = {
         msg.id: msg.model_copy(deep=True) for msg in messages
@@ -1206,6 +1324,7 @@ def test_esp_call_w_activity_message_snapshot(
         run_status=status,
         messages=esp_messages,
         messages_by_id=esp_messages_by_id,
+        **kw,
     )
 
     with expectation as expected:
@@ -1215,6 +1334,8 @@ def test_esp_call_w_activity_message_snapshot(
         activity_message = esp.messages_by_id[ACTIVITY_MESSAGE_ID]
         assert activity_message.activity_type == event.activity_type
         assert activity_message.content == expected
+
+    check_log(event)
 
 
 @pytest.mark.anyio
@@ -1233,9 +1354,9 @@ async def test_esp_parse_stream(run_input, events):
         for event in events:
             yield event
 
-    eps = agui.EventStreamParser(run_input)
+    esp = agui.EventStreamParser(run_input)
 
-    found = [event async for event in eps.parse_stream(stream())]
+    found = [event async for event in esp.parse_stream(stream())]
 
     assert len(found) == len(events)
 
@@ -1262,18 +1383,18 @@ async def test_esp_parse_json_stream(run_input, json_dicts, events):
         for json_dict in json_dicts:
             yield json_dict
 
-    eps = agui.EventStreamParser(run_input)
+    esp = agui.EventStreamParser(run_input)
 
-    found = [event async for event in eps.parse_json_stream(stream())]
+    found = [event async for event in esp.parse_json_stream(stream())]
 
     assert found == events
 
 
 def test_esp_as_run_agent_input_wo_run_input():
-    eps = agui.EventStreamParser()
+    esp = agui.EventStreamParser()
 
     with pytest.raises(agui.NoRunInput):
-        _ = eps.as_run_agent_input
+        _ = esp.as_run_agent_input
 
 
 @pytest.mark.parametrize(
@@ -1291,21 +1412,21 @@ def test_esp_as_run_agent_input_wo_run_input():
     ],
 )
 def test_esp_as_run_agent_input_w_run_input(run_input, messages, state):
-    eps = agui.EventStreamParser(run_input)
+    esp = agui.EventStreamParser(run_input)
 
     if messages is not None:
-        exp_messages = eps.messages = [
+        exp_messages = esp.messages = [
             msg.model_copy(deep=True) for msg in messages
         ]
     else:
         exp_messages = run_input.messages[:]
 
     if state is not None:
-        exp_state = eps.state = state.copy()
+        exp_state = esp.state = state.copy()
     else:
         exp_state = run_input.state.copy()
 
-    found = eps.as_run_agent_input
+    found = esp.as_run_agent_input
 
     assert found.messages == exp_messages
     assert found.state == exp_state
