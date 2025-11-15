@@ -214,3 +214,11 @@ class SoliplexTUI(t_app.App):
         new_run_agent_input = esp.as_run_agent_input
 
         self.run_agent_input = new_run_agent_input
+
+        print(f"Streamed {len(event_log)} events:")
+        for event in event_log:
+            pprint.pprint(event.model_dump())
+
+        print(f"Retained {len(new_run_agent_input.messages)} messages")
+        for message in new_run_agent_input.messages:
+            pprint.pprint(message.model_dump())
