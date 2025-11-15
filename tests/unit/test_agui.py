@@ -544,7 +544,8 @@ def test_esp_ctor_wo_run_input():
     assert esp.state == {}
     assert esp.messages == []
     assert esp.messages_by_id == {}
-    assert esp.tool_calls_by_id == {}
+    assert esp.active_tool_calls == {}
+    assert esp.completed_tool_calls == set()
 
 
 @pytest.mark.parametrize(
@@ -568,7 +569,8 @@ def test_esp_ctor_w_run_input(run_input):
     assert esp.state == run_input.state
     assert esp.messages == run_input.messages
     assert esp.messages_by_id == {msg.id: msg for msg in run_input.messages}
-    assert esp.tool_calls_by_id == {}
+    assert esp.active_tool_calls == {}
+    assert esp.completed_tool_calls == set()
 
 
 def test_esp_run_input_setter_w_already():
@@ -811,7 +813,7 @@ tool_call_nonesuch = pytest.raises(agui.ToolCallDoesNotExist)
 
 
 @pytest.mark.parametrize(
-    "status, messages, tool_calls, event, expectation",
+    "status, messages, active_tcs, event, expectation",
     [
         (INITIALIZED, [], {}, E_TOOL_CALL_START, not_running),
         (RUNNING, [], {}, E_TOOL_CALL_START, no_error(None)),
@@ -837,29 +839,29 @@ tool_call_nonesuch = pytest.raises(agui.ToolCallDoesNotExist)
 def test_esp_call_w_tool_call_start(
     status,
     messages,
-    tool_calls,
+    active_tcs,
     event,
     expectation,
 ):
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
-        for key, value in tool_calls.items()
+        for key, value in active_tcs.items()
     }
 
     esp = agui.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
-        tool_calls_by_id=esp_tool_calls_by_id,
+        active_tool_calls=esp_tool_calls_by_id,
     )
 
     with expectation as expected:
         esp(event)
 
     if expected is None:
-        assert len(esp.tool_calls_by_id) == len(tool_calls) + 1
-        tool_call, parent = esp.tool_calls_by_id[event.tool_call_id]
+        assert len(esp.active_tool_calls) == len(active_tcs) + 1
+        tool_call, parent = esp.active_tool_calls[event.tool_call_id]
 
         assert tool_call.id == event.tool_call_id
         assert tool_call.function.name == event.tool_call_name
@@ -872,7 +874,7 @@ def test_esp_call_w_tool_call_start(
 
 
 @pytest.mark.parametrize(
-    "status, tool_calls, event, expectation",
+    "status, active_tcs, event, expectation",
     [
         (INITIALIZED, {}, E_TOOL_CALL_ARGS, not_running),
         (
@@ -893,27 +895,27 @@ def test_esp_call_w_tool_call_start(
 )
 def test_esp_call_w_tool_call_args(
     status,
-    tool_calls,
+    active_tcs,
     event,
     expectation,
 ):
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
-        for key, value in tool_calls.items()
+        for key, value in active_tcs.items()
     }
-    before, _ = tool_calls.get(event.tool_call_id, (None, None))
+    before, _ = active_tcs.get(event.tool_call_id, (None, None))
 
     esp = agui.EventStreamParser(
         run_status=status,
-        tool_calls_by_id=esp_tool_calls_by_id,
+        active_tool_calls=esp_tool_calls_by_id,
     )
 
     with expectation as expected:
         esp(event)
 
     if expected is None:
-        assert len(esp.tool_calls_by_id) == len(tool_calls)
-        tool_call, parent = esp.tool_calls_by_id[event.tool_call_id]
+        assert len(esp.active_tool_calls) == len(active_tcs)
+        tool_call, parent = esp.active_tool_calls[event.tool_call_id]
 
         assert tool_call.id == event.tool_call_id
         assert tool_call.function.arguments == (
@@ -922,7 +924,7 @@ def test_esp_call_w_tool_call_args(
 
 
 @pytest.mark.parametrize(
-    "status, tool_calls, event, expectation",
+    "status, active_tcs, event, expectation",
     [
         (INITIALIZED, {}, E_TOOL_CALL_END, not_running),
         (
@@ -954,66 +956,63 @@ def test_esp_call_w_tool_call_args(
         (ERROR, {}, E_TOOL_CALL_END, not_running),
     ],
 )
-def test_esp_call_w_tool_call_end(status, tool_calls, event, expectation):
+def test_esp_call_w_tool_call_end(status, active_tcs, event, expectation):
     esp_tool_calls_by_id = {
         key: (value[0].model_copy(deep=True), value[1])
-        for key, value in tool_calls.items()
+        for key, value in active_tcs.items()
     }
 
     esp = agui.EventStreamParser(
         run_status=status,
-        tool_calls_by_id=esp_tool_calls_by_id,
+        active_tool_calls=esp_tool_calls_by_id,
     )
 
     with expectation as expected:
         esp(event)
 
     if expected is None:
-        tool_call, parent = tool_calls[event.tool_call_id]
+        tool_call, parent = active_tcs[event.tool_call_id]
 
         if parent is not None:
             assert parent.tool_calls[-1] == tool_call
 
-        assert len(esp.tool_calls_by_id) == len(tool_calls) - 1
+        assert len(esp.active_tool_calls) == len(active_tcs) - 1
+
+        assert event.tool_call_id in esp.completed_tool_calls
 
 
 @pytest.mark.parametrize(
-    "status, messages, tool_calls, event, expectation",
+    "status, messages, completed_tcs, event, expectation",
     [
-        (INITIALIZED, [], {}, E_TOOL_CALL_RESULT, not_running),
+        (INITIALIZED, [], set(), E_TOOL_CALL_RESULT, not_running),
         (
             RUNNING,
             [],
-            {TOOL_CALL_ID: (TOOL_CALL, None)},
+            set([TOOL_CALL_ID]),
             E_TOOL_CALL_RESULT,
             no_error(None),
         ),
         (
             RUNNING,
             [],
-            {},
+            set(),
             E_TOOL_CALL_RESULT,
             tool_call_nonesuch,
         ),
-        (FINISHED, [], {}, E_TOOL_CALL_RESULT, not_running),
-        (ERROR, [], {}, E_TOOL_CALL_RESULT, not_running),
+        (FINISHED, [], set(), E_TOOL_CALL_RESULT, not_running),
+        (ERROR, [], set(), E_TOOL_CALL_RESULT, not_running),
     ],
 )
 def test_esp_call_w_tool_call_result(
     status,
     messages,
-    tool_calls,
+    completed_tcs,
     event,
     expectation,
 ):
-    esp_tool_calls_by_id = {
-        key: (value[0].model_copy(deep=True), value[1])
-        for key, value in tool_calls.items()
-    }
-
     esp = agui.EventStreamParser(
         run_status=status,
-        tool_calls_by_id=esp_tool_calls_by_id,
+        completed_tool_calls=set(completed_tcs),
     )
 
     with expectation as expected:

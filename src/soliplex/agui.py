@@ -386,8 +386,9 @@ class RunStatus(enum.Enum):
 
 Messages = list[agui_core.Message]
 MessagesByID = dict[str, agui_core.Message]
-ToolCallInfo = tuple[agui_core.ToolCall, agui_core.Message | None]
-ToolCallsByID = dict[str, ToolCallInfo]
+ActiveToolCall = tuple[agui_core.ToolCall, agui_core.Message | None]
+ActiveToolCalls = dict[str, ActiveToolCall]
+CompletedToolCalls = set[str]
 
 
 @dataclasses.dataclass
@@ -408,7 +409,12 @@ class EventStreamParser:
     messages: Messages = dataclasses.field(default_factory=list)
 
     messages_by_id: MessagesByID = dataclasses.field(default_factory=dict)
-    tool_calls_by_id: ToolCallsByID = dataclasses.field(default_factory=dict)
+    active_tool_calls: ActiveToolCalls = dataclasses.field(
+        default_factory=dict,
+    )
+    completed_tool_calls: CompletedToolCalls = dataclasses.field(
+        default_factory=set,
+    )
 
     def __post_init__(self, run_agent_input=None):
         if run_agent_input is not None:
@@ -540,23 +546,25 @@ class EventStreamParser:
             case agui_core.EventType.TOOL_CALL_START:
                 self._assert_running(event)
 
-                if event.tool_call_id in self.tool_calls_by_id:
+                if event.tool_call_id in self.active_tool_calls:
                     raise ToolCallAlreadyExists(event.tool_call_id, event)
 
                 parent_id = event.parent_message_id
+
                 if parent_id is not None:
                     parent_message = self.messages_by_id.get(parent_id)
 
                     if parent_message is None:
                         parent_message = agui_core.AssistantMessage(
                             id=parent_id,
+                            tool_calls=[],
                         )
                         self._add_message(parent_message)
 
                 else:
                     parent_message = None
 
-                self.tool_calls_by_id[event.tool_call_id] = (
+                self.active_tool_calls[event.tool_call_id] = (
                     agui_core.ToolCall(
                         id=event.tool_call_id,
                         function=agui_core.FunctionCall(
@@ -570,22 +578,24 @@ class EventStreamParser:
             case agui_core.EventType.TOOL_CALL_ARGS:
                 self._assert_running(event)
 
-                if event.tool_call_id not in self.tool_calls_by_id:
+                if event.tool_call_id not in self.active_tool_calls:
                     raise ToolCallDoesNotExist(event.tool_call_id, event)
 
-                tool_call, _ = self.tool_calls_by_id[event.tool_call_id]
+                tool_call, _ = self.active_tool_calls[event.tool_call_id]
 
                 tool_call.function.arguments += event.delta
 
             case agui_core.EventType.TOOL_CALL_END:
                 self._assert_running(event)
 
-                if event.tool_call_id not in self.tool_calls_by_id:
+                if event.tool_call_id not in self.active_tool_calls:
                     raise ToolCallDoesNotExist(event.tool_call_id, event)
 
-                tool_call, parent = self.tool_calls_by_id.pop(
+                tool_call, parent = self.active_tool_calls.pop(
                     event.tool_call_id,
                 )
+
+                self.completed_tool_calls.add(event.tool_call_id)
 
                 if parent is not None:
                     parent.tool_calls.append(tool_call)
@@ -593,7 +603,7 @@ class EventStreamParser:
             case agui_core.EventType.TOOL_CALL_RESULT:
                 self._assert_running(event)
 
-                if event.tool_call_id not in self.tool_calls_by_id:
+                if event.tool_call_id not in self.completed_tool_calls:
                     raise ToolCallDoesNotExist(event.tool_call_id, event)
 
                 new_message = agui_core.ToolMessage(
