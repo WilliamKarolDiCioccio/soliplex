@@ -162,4 +162,9 @@ class SoliplexTUI(t_app.App):
                 elif chunk["type"] == "RUN_FINISHED":
                     response_content += "\n\n** done **"
 
+                elif chunk["type"] == "RUN_ERROR":
+                    response_content += (
+                        f"\n\n** error **\n\n{chunk['message']}"
+                    )
+
                 self.call_from_thread(response.update, response_content)
