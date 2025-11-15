@@ -505,6 +505,32 @@ async def test_get_the_threads():
     assert found is expected
 
 
+@pytest.mark.parametrize(
+    "json_dict, expectaton",
+    [
+        ({}, pytest.raises(agui.InvalidJSONEvent)),
+        ({"type": "bogus"}, pytest.raises(agui.UnknownJSONEventType)),
+        (
+            {"type": agui_core.EventType.THINKING_START},
+            no_error(agui_core.ThinkingStartEvent()),
+        ),
+        (
+            {
+                "type": agui_core.EventType.THINKING_START,
+                "title": "I'm Thinking",
+            },
+            no_error(agui_core.ThinkingStartEvent(title="I'm Thinking")),
+        ),
+    ],
+)
+def test_agui_event_from_json(json_dict, expectaton):
+    with expectaton as expected:
+        found = agui.agui_event_from_json(json_dict)
+
+    if isinstance(expected, agui_core.BaseEvent):
+        assert found == expected
+
+
 def test_esp_ctor_wo_run_input():
     esp = agui.EventStreamParser()
 
@@ -1213,6 +1239,35 @@ async def test_esp_parse_stream(run_input, events):
     found = [event async for event in eps.parse_stream(stream())]
 
     assert len(found) == len(events)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "json_dicts, events",
+    [
+        ([], []),
+        (
+            [
+                TEST_RUN_STARTED.model_dump(),
+                TEST_RUN_FINISHED.model_dump(),
+            ],
+            [
+                TEST_RUN_STARTED,
+                TEST_RUN_FINISHED,
+            ],
+        ),
+    ],
+)
+async def test_esp_parse_json_stream(run_input, json_dicts, events):
+    async def stream() -> agui.AGUI_EventIterator:
+        for json_dict in json_dicts:
+            yield json_dict
+
+    eps = agui.EventStreamParser(run_input)
+
+    found = [event async for event in eps.parse_json_stream(stream())]
+
+    assert found == events
 
 
 def test_esp_as_run_agent_input_wo_run_input():

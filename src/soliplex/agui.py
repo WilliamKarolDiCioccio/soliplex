@@ -217,8 +217,69 @@ depend_the_threads = fastapi.Depends(get_the_threads)
 # =============================================================================
 
 
+AGUI_EVENT_CLASSES_BY_TYPE = {
+    "TEXT_MESSAGE_START": agui_core.TextMessageStartEvent,
+    "TEXT_MESSAGE_CONTENT": agui_core.TextMessageContentEvent,
+    "TEXT_MESSAGE_END": agui_core.TextMessageEndEvent,
+    "TEXT_MESSAGE_CHUNK": agui_core.TextMessageChunkEvent,
+    "THINKING_TEXT_MESSAGE_START": agui_core.ThinkingTextMessageStartEvent,
+    "THINKING_TEXT_MESSAGE_CONTENT": agui_core.ThinkingTextMessageContentEvent,
+    "THINKING_TEXT_MESSAGE_END": agui_core.ThinkingTextMessageEndEvent,
+    "TOOL_CALL_START": agui_core.ToolCallStartEvent,
+    "TOOL_CALL_ARGS": agui_core.ToolCallArgsEvent,
+    "TOOL_CALL_END": agui_core.ToolCallEndEvent,
+    "TOOL_CALL_CHUNK": agui_core.ToolCallChunkEvent,
+    "TOOL_CALL_RESULT": agui_core.ToolCallResultEvent,
+    "THINKING_START": agui_core.ThinkingStartEvent,
+    "THINKING_END": agui_core.ThinkingEndEvent,
+    "STATE_SNAPSHOT": agui_core.StateSnapshotEvent,
+    "STATE_DELTA": agui_core.StateDeltaEvent,
+    "MESSAGES_SNAPSHOT": agui_core.MessagesSnapshotEvent,
+    "ACTIVITY_SNAPSHOT": agui_core.ActivitySnapshotEvent,
+    "ACTIVITY_DELTA": agui_core.ActivityDeltaEvent,
+    "RAW": agui_core.RawEvent,
+    "CUSTOM": agui_core.CustomEvent,
+    "RUN_STARTED": agui_core.RunStartedEvent,
+    "RUN_FINISHED": agui_core.RunFinishedEvent,
+    "RUN_ERROR": agui_core.RunErrorEvent,
+    "STEP_STARTED": agui_core.StepStartedEvent,
+    "STEP_FINISHED": agui_core.StepFinishedEvent,
+}
+
+
+JSON_Event = dict[str, typing.Any]
+JSON_EventIterator = abc.AsyncIterator[JSON_Event]
+
+
 class EPSError(ValueError):
     pass
+
+
+class InvalidJSONEvent(EPSError):
+    def __init__(self, json_event: JSON_Event):
+        self.json_event = json_event
+        super().__init__(f"Invalid JSON event: {json_event}")
+
+
+class UnknownJSONEventType(EPSError):
+    def __init__(self, json_event: JSON_Event):
+        self.json_event = json_event
+        event_type = json_event.get("type")
+        super().__init__(f"Unknown JSON event type: {event_type}")
+
+
+def agui_event_from_json(json_dict) -> agui_core.BaseEvent:
+    try:
+        type_ = json_dict["type"]
+    except KeyError as exc:
+        raise InvalidJSONEvent(json_dict) from exc
+
+    try:
+        klass = AGUI_EVENT_CLASSES_BY_TYPE[type_]
+    except KeyError as exc:
+        raise UnknownJSONEventType(json_dict) from exc
+
+    return klass.model_validate(json_dict)
 
 
 class RunInputAlreadySet(EPSError):
@@ -611,6 +672,15 @@ class EventStreamParser:
         stream: AGUI_EventIterator,
     ) -> AGUI_EventIterator:
         async for event in stream:
+            self(event)
+            yield event
+
+    async def parse_json_stream(
+        self,
+        stream: JSON_EventIterator,
+    ) -> AGUI_EventIterator:
+        async for json_dict in stream:
+            event = agui_event_from_json(json_dict)
             self(event)
             yield event
 
