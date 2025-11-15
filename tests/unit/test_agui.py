@@ -301,6 +301,9 @@ WO_REPLACE_E_ACTIVITY_MESSAGE_SNAPSHOT = agui_core.ActivitySnapshotEvent(
 )
 
 
+no_error = contextlib.nullcontext
+
+
 @pytest.fixture
 def run_input():
     return EMPTY_AGUI_RUN_INPUT.model_copy(deep=True)
@@ -557,7 +560,6 @@ ERROR = agui.RunStatus.ERROR
 NO_STEPS = set()
 W_TEST_STEP = set([TEST_STEP_NAME])
 
-no_error = contextlib.nullcontext
 inv_status = pytest.raises(agui.InvalidRunStatusWithTarget)
 not_running = pytest.raises(agui.NotRunning)
 step_already = pytest.raises(agui.StepAlreadyStarted)

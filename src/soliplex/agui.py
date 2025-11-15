@@ -212,6 +212,11 @@ async def get_the_threads(request: fastapi.Request) -> Threads:
 depend_the_threads = fastapi.Depends(get_the_threads)
 
 
+# =============================================================================
+#   Parser for AGUI events (and their JSON equivalents
+# =============================================================================
+
+
 class EPSError(ValueError):
     pass
 
@@ -221,61 +226,94 @@ class RunInputAlreadySet(EPSError):
         super().__init__("'run_input' already set, cannot be replaced")
 
 
+class NoRunInput(EPSError):
+    def __init__(self):
+        super().__init__("Parser does not have a base 'run_input' assigned")
+
+
 class NotRunning(EPSError):
-    def __init__(self, current_status):
+    def __init__(self, current_status, event: agui_core.BaseEvent):
         self.current_status = current_status
-        super().__init__(f"Parser not in RUNNING state: {current_status}: ")
+        super().__init__(
+            f"Parser not in RUNNING state: {current_status}: ",
+            event,
+        )
 
 
-class InvalidRunStatusWithTarget(EPSError):
-    def __init__(self, current_status, target_status):
+class EPSEventError(EPSError):
+    def __init__(self, msg, event: agui_core.BaseEvent):
+        self.event = event
+        super().__init__(msg)
+
+
+class InvalidRunStatusWithTarget(EPSEventError):
+    def __init__(
+        self,
+        current_status,
+        target_status,
+        event: agui_core.BaseEvent,
+    ):
         self.current_status = current_status
         self.target_status = target_status
         super().__init__(
             f"Invalid run status {current_status} "
-            f"for transition to target status {target_status}"
+            f"for transition to target status {target_status}",
+            event,
         )
 
 
-class StepAlreadyStarted(EPSError):
-    def __init__(self, step_name):
+class StepAlreadyStarted(EPSEventError):
+    def __init__(self, step_name, event: agui_core.BaseEvent):
         self.step_name = step_name
-        super().__init__(f"Step {step_name} already started")
+        super().__init__(
+            f"Step {step_name} already started",
+            event,
+        )
 
 
-class StepNotStarted(EPSError):
-    def __init__(self, step_name):
+class StepNotStarted(EPSEventError):
+    def __init__(self, step_name, event: agui_core.BaseEvent):
         self.step_name = step_name
-        super().__init__(f"Step {step_name} not yet started")
+        super().__init__(
+            f"Step {step_name} not yet started",
+            event,
+        )
 
 
-class MessageAlreadyExists(EPSError):
-    def __init__(self, message_id):
+class MessageAlreadyExists(EPSEventError):
+    def __init__(self, message_id, event: agui_core.BaseEvent):
         self.message_id = message_id
-        super().__init__(f"Message w/ ID {message_id} already exists")
+        super().__init__(
+            f"Message w/ ID {message_id} already exists",
+            event,
+        )
 
 
-class ToolCallDoesNotExist(EPSError):
-    def __init__(self, tool_call_id):
+class ToolCallDoesNotExist(EPSEventError):
+    def __init__(self, tool_call_id, event: agui_core.BaseEvent):
         self.tool_call_id = tool_call_id
-        super().__init__(f"Tool call w/ ID {tool_call_id} does not exist")
+        super().__init__(
+            f"Tool call w/ ID {tool_call_id} does not exist",
+            event,
+        )
 
 
-class ToolCallAlreadyExists(EPSError):
-    def __init__(self, tool_call_id):
+class ToolCallAlreadyExists(EPSEventError):
+    def __init__(self, tool_call_id, event: agui_core.BaseEvent):
         self.tool_call_id = tool_call_id
-        super().__init__(f"Tool call w/ ID {tool_call_id} already exists")
+        super().__init__(
+            f"Tool call w/ ID {tool_call_id} already exists",
+            event,
+        )
 
 
-class MessageDoesNotExist(EPSError):
-    def __init__(self, message_id):
+class MessageDoesNotExist(EPSEventError):
+    def __init__(self, message_id, event: agui_core.BaseEvent):
         self.message_id = message_id
-        super().__init__(f"Message w/ ID {message_id} does not exist")
-
-
-class NoRunInput(EPSError):
-    def __init__(self):
-        super().__init__("Parser does not have a base 'run_input' assigned")
+        super().__init__(
+            f"Message w/ ID {message_id} does not exist",
+            event,
+        )
 
 
 class RunStatus(enum.Enum):
@@ -329,15 +367,21 @@ class EventStreamParser:
         self.messages[:] = value.messages
         self.messages_by_id = {msg.id: msg for msg in value.messages}
 
-    def _assert_running(self):
+    def _assert_running(self, event):
         if self.run_status != RunStatus.RUNNING:
-            raise NotRunning(self.run_status)
+            raise NotRunning(self.run_status, event)
 
-    def _assert_run_status_for_target(self, expected, target):
+    def _assert_run_status_for_target(
+        self,
+        expected: RunStatus,
+        target: RunStatus,
+        event: agui_core.BaseEvent,
+    ):
         if self.run_status != expected:
             raise InvalidRunStatusWithTarget(
                 self.run_status,
                 target,
+                event,
             )
 
     def _add_message(self, message: agui_core.BaseMessage):
@@ -351,7 +395,9 @@ class EventStreamParser:
             #
             case agui_core.EventType.RUN_STARTED:
                 self._assert_run_status_for_target(
-                    RunStatus.INITIALIZED, RunStatus.RUNNING
+                    RunStatus.INITIALIZED,
+                    RunStatus.RUNNING,
+                    event,
                 )
 
                 self.run_status = RunStatus.RUNNING
@@ -363,6 +409,7 @@ class EventStreamParser:
                 self._assert_run_status_for_target(
                     RunStatus.RUNNING,
                     RunStatus.FINISHED,
+                    event,
                 )
 
                 self.run_status = RunStatus.FINISHED
@@ -372,6 +419,7 @@ class EventStreamParser:
                 self._assert_run_status_for_target(
                     RunStatus.RUNNING,
                     RunStatus.ERROR,
+                    event,
                 )
 
                 self.run_status = RunStatus.ERROR
@@ -379,18 +427,18 @@ class EventStreamParser:
                 self.error_code = event.code
 
             case agui_core.EventType.STEP_STARTED:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.step_name in self.active_steps:
-                    raise StepAlreadyStarted(event.step_name)
+                    raise StepAlreadyStarted(event.step_name, event)
 
                 self.active_steps.add(event.step_name)
 
             case agui_core.EventType.STEP_FINISHED:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.step_name not in self.active_steps:
-                    raise StepNotStarted(event.step_name)
+                    raise StepNotStarted(event.step_name, event)
 
                 self.active_steps.remove(event.step_name)
 
@@ -398,10 +446,10 @@ class EventStreamParser:
             #   Text message events
             #
             case agui_core.EventType.TEXT_MESSAGE_START:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.message_id in self.messages_by_id:
-                    raise MessageAlreadyExists(event.message_id)
+                    raise MessageAlreadyExists(event.message_id, event)
 
                 self._add_message(
                     agui_core.AssistantMessage(
@@ -411,28 +459,28 @@ class EventStreamParser:
                 )
 
             case agui_core.EventType.TEXT_MESSAGE_CONTENT:
-                self._assert_running()
+                self._assert_running(event)
 
                 to_update = self.messages_by_id.get(event.message_id)
                 if to_update is None:
-                    raise MessageDoesNotExist(event.message_id)
+                    raise MessageDoesNotExist(event.message_id, event)
 
                 to_update.content += event.delta
 
             case agui_core.EventType.TEXT_MESSAGE_END:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.message_id not in self.messages_by_id:
-                    raise MessageDoesNotExist(event.message_id)
+                    raise MessageDoesNotExist(event.message_id, event)
 
             #
             #   Tool call events
             #
             case agui_core.EventType.TOOL_CALL_START:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.tool_call_id in self.tool_calls_by_id:
-                    raise ToolCallAlreadyExists(event.tool_call_id)
+                    raise ToolCallAlreadyExists(event.tool_call_id, event)
 
                 parent_id = event.parent_message_id
                 if parent_id is not None:
@@ -459,20 +507,20 @@ class EventStreamParser:
                 )
 
             case agui_core.EventType.TOOL_CALL_ARGS:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.tool_call_id not in self.tool_calls_by_id:
-                    raise ToolCallDoesNotExist(event.tool_call_id)
+                    raise ToolCallDoesNotExist(event.tool_call_id, event)
 
                 tool_call, _ = self.tool_calls_by_id[event.tool_call_id]
 
                 tool_call.function.arguments += event.delta
 
             case agui_core.EventType.TOOL_CALL_END:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.tool_call_id not in self.tool_calls_by_id:
-                    raise ToolCallDoesNotExist(event.tool_call_id)
+                    raise ToolCallDoesNotExist(event.tool_call_id, event)
 
                 tool_call, parent = self.tool_calls_by_id.pop(
                     event.tool_call_id,
@@ -482,10 +530,10 @@ class EventStreamParser:
                     parent.tool_calls.append(tool_call)
 
             case agui_core.EventType.TOOL_CALL_RESULT:
-                self._assert_running()
+                self._assert_running(event)
 
                 if event.tool_call_id not in self.tool_calls_by_id:
-                    raise ToolCallDoesNotExist(event.tool_call_id)
+                    raise ToolCallDoesNotExist(event.tool_call_id, event)
 
                 new_message = agui_core.ToolMessage(
                     id=event.message_id,
@@ -498,24 +546,24 @@ class EventStreamParser:
             #   State management events
             #
             case agui_core.EventType.STATE_DELTA:
-                self._assert_running()
+                self._assert_running(event)
 
                 new_state = jsonpatch.apply_patch(self.state, event.delta)
 
                 self.state = new_state
 
             case agui_core.EventType.STATE_SNAPSHOT:
-                self._assert_running()
+                self._assert_running(event)
 
                 self.state = event.snapshot
 
             case agui_core.EventType.MESSAGES_SNAPSHOT:
-                self._assert_running()
+                self._assert_running(event)
 
                 self.messages = event.messages
 
             case agui_core.EventType.ACTIVITY_DELTA:
-                self._assert_running()
+                self._assert_running(event)
 
                 message = self.messages_by_id.get(event.message_id)
 
@@ -536,7 +584,7 @@ class EventStreamParser:
                     message.content = new_state
 
             case agui_core.EventType.ACTIVITY_SNAPSHOT:
-                self._assert_running()
+                self._assert_running(event)
 
                 message = self.messages_by_id.get(event.message_id)
 
@@ -550,7 +598,7 @@ class EventStreamParser:
 
                 else:
                     if not event.replace:
-                        raise MessageAlreadyExists(event.message_id)
+                        raise MessageAlreadyExists(event.message_id, event)
 
                     message.activity_type = event.activity_type
                     message.content = event.content
