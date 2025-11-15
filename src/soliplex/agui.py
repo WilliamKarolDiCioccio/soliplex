@@ -390,6 +390,18 @@ ActiveToolCall = tuple[agui_core.ToolCall, agui_core.Message | None]
 ActiveToolCalls = dict[str, ActiveToolCall]
 CompletedToolCalls = set[str]
 
+IgnorableEventTypes = frozenset[agui_core.EventType]
+
+DEFAULT_IGNORE_EVENTS: IgnorableEventTypes = frozenset(
+    [
+        agui_core.EventType.THINKING_TEXT_MESSAGE_START,
+        agui_core.EventType.THINKING_TEXT_MESSAGE_CONTENT,
+        agui_core.EventType.THINKING_TEXT_MESSAGE_END,
+        agui_core.EventType.RAW,
+        agui_core.EventType.CUSTOM,
+    ]
+)
+
 
 @dataclasses.dataclass
 class EventStreamParser:
@@ -417,6 +429,7 @@ class EventStreamParser:
     )
 
     event_log: list[agui_core.BaseEvent] = None
+    ignore_event_types: IgnorableEventTypes = DEFAULT_IGNORE_EVENTS
 
     def __post_init__(self, run_agent_input=None):
         if run_agent_input is not None:
@@ -458,7 +471,10 @@ class EventStreamParser:
         self.messages_by_id[message.id] = message
 
     def _log_event(self, event: agui_core.BaseEvent):
-        if self.event_log is not None:
+        if (
+            self.event_log is not None
+            and event.type not in self.ignore_event_types
+        ):
             self.event_log.append(event)
 
     def __call__(self, event: agui_core.BaseEvent):

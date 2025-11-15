@@ -1338,6 +1338,27 @@ def test_esp_call_w_activity_message_snapshot(
     check_log(event)
 
 
+@pytest.mark.parametrize(
+    "event",
+    [
+        agui_core.ThinkingTextMessageStartEvent(),
+        agui_core.ThinkingTextMessageContentEvent(delta=" "),
+        agui_core.ThinkingTextMessageEndEvent(),
+        agui_core.RawEvent(event=object()),
+        agui_core.CustomEvent(name="custom", value=object()),
+    ],
+)
+def test_esp_call_w_ignored_event_types(
+    event,
+):
+    event_log = []
+    esp = agui.EventStreamParser(event_log=event_log)
+
+    esp(event)
+
+    assert event_log == []
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize(
     "events",
