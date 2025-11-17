@@ -387,6 +387,7 @@ MessagesByID = dict[str, agui_core.Message]
 ActiveToolCall = tuple[agui_core.ToolCall, agui_core.Message | None]
 ActiveToolCalls = dict[str, ActiveToolCall]
 CompletedToolCalls = set[str]
+Events = list[agui_core.BaseEvent]
 
 IgnorableEventTypes = frozenset[agui_core.EventType]
 
@@ -404,10 +405,12 @@ DEFAULT_IGNORE_EVENTS: IgnorableEventTypes = frozenset(
 @dataclasses.dataclass
 class EventStreamParser:
     run_agent_input: dataclasses.InitVar[agui_core.RunAgentInput] = None
+    run: dataclasses.InitVar[Run] = None
 
     _ = dataclasses.KW_ONLY
 
     _run_input: agui_core.RunAgentInput = None
+    _the_run: Run = None
 
     run_status: RunStatus = RunStatus.INITIALIZED
     active_steps: set[str] = dataclasses.field(default_factory=set)
@@ -426,12 +429,15 @@ class EventStreamParser:
         default_factory=set,
     )
 
-    event_log: list[agui_core.BaseEvent] = None
+    event_log: Events | None = None
     ignore_event_types: IgnorableEventTypes = DEFAULT_IGNORE_EVENTS
 
-    def __post_init__(self, run_agent_input=None):
+    def __post_init__(self, run_agent_input=None, run=None):
         if run_agent_input is not None:
             self.run_input = run_agent_input
+
+        if run is not None:
+            self._the_run = run
 
     @property
     def run_input(self) -> agui_core.RunAgentInput:
@@ -446,6 +452,10 @@ class EventStreamParser:
         self.state = value.state
         self.messages[:] = value.messages
         self.messages_by_id = {msg.id: msg for msg in value.messages}
+
+    @property
+    def the_run(self) -> agui_core.RunAgentInput:
+        return self._the_run
 
     def _assert_running(self, event):
         if self.run_status != RunStatus.RUNNING:
@@ -699,6 +709,10 @@ class EventStreamParser:
             case _:  # pragma: NO COVER
                 pass
 
+    async def _store_run_events(self):
+        if self._the_run is not None and self.event_log is not None:
+            self._the_run.events[:] = self.event_log[:]
+
     async def parse_stream(
         self,
         stream: AGUI_EventIterator,
@@ -706,6 +720,8 @@ class EventStreamParser:
         async for event in stream:
             self(event)
             yield event
+
+        await self._store_run_events()
 
     async def parse_json_stream(
         self,
@@ -715,6 +731,8 @@ class EventStreamParser:
             event = agui_event_from_json(json_dict)
             self(event)
             yield event
+
+        await self._store_run_events()
 
     @property
     def as_run_agent_input(self) -> agui_core.RunAgentInput:

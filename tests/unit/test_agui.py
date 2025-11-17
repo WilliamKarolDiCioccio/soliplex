@@ -527,10 +527,23 @@ def test_agui_event_from_json(json_dict, expectaton):
         assert found == expected
 
 
-def test_esp_ctor_wo_run_input():
-    esp = agui.EventStreamParser()
+@pytest.mark.parametrize(
+    "w_run",
+    [
+        None,
+        mock.create_autospec(agui.Run),
+    ],
+)
+def test_esp_ctor_wo_run_input(w_run):
+    if w_run is not None:
+        exp_run = w_run
+        esp = agui.EventStreamParser(run=w_run)
+    else:
+        exp_run = None
+        esp = agui.EventStreamParser()
 
     assert esp.run_input is None
+    assert esp.the_run is exp_run
     assert esp.run_status == agui.RunStatus.INITIALIZED
     assert esp.active_steps == set()
     assert esp.error_message is None
@@ -556,6 +569,7 @@ def test_esp_ctor_w_run_input(run_input):
     esp = agui.EventStreamParser(run_input)
 
     assert esp.run_input is run_input
+    assert esp.the_run is None
     assert esp.run_status == agui.RunStatus.INITIALIZED
     assert esp.active_steps == set()
     assert esp.error_message is None
@@ -1366,16 +1380,46 @@ def test_esp_call_w_ignored_event_types(
         ],
     ],
 )
+@pytest.mark.parametrize(
+    "w_run",
+    [
+        None,
+        mock.create_autospec(agui.Run, events=[]),
+    ],
+)
+async def test_esp__store_run_events(w_run, events):
+    esp = agui.EventStreamParser(run=w_run, event_log=events)
+
+    await esp._store_run_events()
+
+    if w_run is not None:
+        assert w_run.events == list(events)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "events",
+    [
+        (),
+        [
+            TEST_RUN_STARTED,
+            TEST_RUN_FINISHED,
+        ],
+    ],
+)
 async def test_esp_parse_stream(run_input, events):
     async def stream() -> agui.AGUI_EventIterator:
         for event in events:
             yield event
 
     esp = agui.EventStreamParser(run_input)
+    sre = esp._store_run_events = mock.AsyncMock(spec_set=())
 
     found = [event async for event in esp.parse_stream(stream())]
 
     assert len(found) == len(events)
+
+    sre.assert_called_once_with()
 
 
 @pytest.mark.anyio
@@ -1401,10 +1445,13 @@ async def test_esp_parse_json_stream(run_input, json_dicts, events):
             yield json_dict
 
     esp = agui.EventStreamParser(run_input)
+    sre = esp._store_run_events = mock.AsyncMock(spec_set=())
 
     found = [event async for event in esp.parse_json_stream(stream())]
 
     assert found == events
+
+    sre.assert_called_once_with()
 
 
 def test_esp_as_run_agent_input_wo_run_input():
