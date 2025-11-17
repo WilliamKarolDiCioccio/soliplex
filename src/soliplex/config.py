@@ -145,6 +145,14 @@ def _dotted_name(type_or_func) -> str:
     return f"{type_or_func.__module__}.{type_or_func.__name__}"
 
 
+def _no_repr(**kw):
+    return dataclasses.field(repr=False, **kw)
+
+
+def _no_repr_none(**kw):
+    return _no_repr(default=None, **kw)
+
+
 # ============================================================================
 #   OIDC Authentication system configuration types
 # ============================================================================
@@ -165,7 +173,7 @@ class OIDCAuthSystemConfig:
     oidc_client_pem_path: pathlib.Path = None
 
     # Set in 'from_yaml' below
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -248,7 +256,7 @@ class ToolConfig:
     _tool: abc.Callable[..., typing.Any] = None
 
     # Set in 'from_yaml' below
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -344,7 +352,7 @@ class SearchDocumentsToolConfig(ToolConfig):
     return_citations: bool = False
 
     # Set in 'from_yaml' below
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -459,7 +467,7 @@ class Stdio_MCP_ClientToolsetConfig:
     allowed_tools: list[str] = None
 
     # set in 'from_yaml' class factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -520,7 +528,7 @@ class HTTP_MCP_ClientToolsetConfig:
     allowed_tools: list[str] = None
 
     # set in 'from_yaml' class factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -657,7 +665,7 @@ class AgentConfig:
     provider_key: str = None  # secret containing API key
 
     # Set by `from_yaml` factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     # Use a config from the top-level InstallationConfig's 'agent_configs'
@@ -792,7 +800,7 @@ class FactoryAgentConfig:
     _factory: AgentFactory = None
 
     # Set by `from_yaml` factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @property
@@ -912,7 +920,7 @@ class QuizConfig:
     judge_agent: AgentConfig | None = None
 
     # Set by `from_yaml` factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
@@ -1084,7 +1092,7 @@ class RoomConfig:
     _quiz_map: dict[str, QuizConfig] = None
 
     # Set by `from_yaml` factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     logo_image: dataclasses.InitVar[str] = None
@@ -1198,7 +1206,7 @@ class CompletionConfig:
     ] = dataclasses.field(default_factory=dict)
 
     # Set by `from_yaml` factory
-    _installation_config: InstallationConfig = None
+    _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
 
     @classmethod
