@@ -1,11 +1,26 @@
+#
+#   Note: debugging output emitted below via 'print' / 'pprint' will only
+#         be visible in another terminal running 'textual console'.
+#
+#         Recommended command line for the TUI:
+#         $ textual run --dev soliplex.tui.cli:the_cli \
+#             -- --use-aguie -r <room_id>
+#
+#         Recommended command line for the console:
+#         $ textual console -x SYSTEM -x EVENT -x DEBUG
+#
 import json
+import pprint
 
 import requests
 import textual
+from ag_ui import core as agui_core
 from textual import app as t_app
 from textual import binding as t_binding
 from textual import containers as t_containers
 from textual import widgets as t_widgets
+
+from soliplex import agui
 
 
 class Prompt(t_widgets.Markdown):
@@ -51,6 +66,7 @@ class SoliplexTUI(t_app.App):
         self.room_id = room_id
         self.convo_uuid = None
         self.use_agui = use_agui
+        self.run_agent_input = None
         self.run_count = 0
         super().__init__(*args, **kwargs)
 
@@ -115,17 +131,41 @@ class SoliplexTUI(t_app.App):
         """Get the AG-UI response in a thread."""
         self.run_count += 1
         response_content = ""
-        request_json = {
-            "thread_id": "testing",
-            "run_id": f"soliplex-tui:{self.run_count}",
-            "state": {},
-            "messages": [
-                {"id": "user_001", "role": "user", "content": prompt}
-            ],
-            "tools": [],
-            "context": [],
-            "forwarded_props": {},
-        }
+
+        if self.run_agent_input is None:
+            print("X" * 50)
+            print("New thread")
+            print("X" * 50)
+            self.run_agent_input = agui_core.RunAgentInput(
+                thread_id="testing",
+                run_id=f"soliplex-tui:{self.run_count}",
+                state={},
+                messages=[
+                    {"id": "user_001", "role": "user", "content": prompt}
+                ],
+                tools=[],
+                context=[],
+                forwarded_props={},
+            )
+        else:
+            print("X" * 50)
+            print(f"Existing thread, run #{self.run_count}")
+            print("X" * 50)
+            self.run_agent_input.run_id = f"soliplex-tui:{self.run_count}"
+            self.run_agent_input.messages.append(
+                agui_core.UserMessage(
+                    id=f"user_{self.run_count:03}",
+                    content=prompt,
+                )
+            )
+
+        event_log = []
+        esp = agui.EventStreamParser(
+            self.run_agent_input,
+            event_log=event_log,
+        )
+        request_json = self.run_agent_input.model_dump()
+
         request_url = f"{self.soliplex_url}/api/v1/rooms/{self.room_id}/agui"
         streaming_response = requests.post(
             request_url,
@@ -141,6 +181,8 @@ class SoliplexTUI(t_app.App):
                     decoded = decoded[len("data: ") :]
 
                 chunk = json.loads(decoded)
+                event = agui.agui_event_from_json(chunk)
+                esp(event)
 
                 if chunk["type"] == "THINKING_START":
                     response_content += "\n\n** thinking **\n\n"
@@ -162,4 +204,21 @@ class SoliplexTUI(t_app.App):
                 elif chunk["type"] == "RUN_FINISHED":
                     response_content += "\n\n** done **"
 
+                elif chunk["type"] == "RUN_ERROR":
+                    response_content += (
+                        f"\n\n** error **\n\n{chunk['message']}"
+                    )
+
                 self.call_from_thread(response.update, response_content)
+
+        new_run_agent_input = esp.as_run_agent_input
+
+        self.run_agent_input = new_run_agent_input
+
+        print(f"Streamed {len(event_log)} events:")
+        for event in event_log:
+            pprint.pprint(event.model_dump())
+
+        print(f"Retained {len(new_run_agent_input.messages)} messages")
+        for message in new_run_agent_input.messages:
+            pprint.pprint(message.model_dump())

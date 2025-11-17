@@ -123,12 +123,12 @@ async def lifespan(
     the_installation.resolve_secrets()
     the_installation.resolve_environment()
     the_convos = convos.Conversations()
-    the_agui_threads = agui.Threads()
+    the_threads = agui.Threads()
 
     context = {
         "the_installation": the_installation,
         "the_convos": the_convos,
-        "the_agui_threads": the_agui_threads,
+        "the_threads": the_threads,
     }
 
     async with contextlib.AsyncExitStack() as stack:

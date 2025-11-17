@@ -412,8 +412,8 @@ async def test_lifespan(
     the_convos = found[0]["the_convos"]
     assert isinstance(the_convos, convos.Conversations)
 
-    the_agui_threads = found[0]["the_agui_threads"]
-    assert isinstance(the_agui_threads, agui.Threads)
+    the_threads = found[0]["the_threads"]
+    assert isinstance(the_threads, agui.Threads)
 
     for f_call, (key, mcp_app) in zip(
         app.mount.call_args_list,
