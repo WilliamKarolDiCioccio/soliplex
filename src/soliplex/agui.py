@@ -168,7 +168,6 @@ class Threads:
         *,
         user_name: str,
         room_id: str,
-        thread_name: str,
         thread_id: str = None,
     ) -> Thread:
         """Create a new thread"""
@@ -177,7 +176,6 @@ class Threads:
 
         thread = Thread(
             thread_id=thread_id,
-            name=thread_name,
             room_id=room_id,
         )
 

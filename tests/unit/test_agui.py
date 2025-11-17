@@ -37,11 +37,9 @@ UUID4 = uuid.uuid4()
 TEST_THREAD_ID = str(UUID4)
 OTHER_THREAD_ID = "thread-123"
 TEST_RUN_ID = "run-345"
-TEST_THREAD_NAME = "Test Thread"
 TEST_THREAD_ROOMID = "test-room"
 TEST_THREAD = agui.Thread(
     thread_id=TEST_THREAD_ID,
-    name=TEST_THREAD_NAME,
     room_id=TEST_THREAD_ROOMID,
 )
 TEST_THREADS = {
@@ -451,7 +449,6 @@ async def test_threads_new_thread(uu4, w_user, w_thread_id):
         found = await the_threads.new_thread(
             user_name="testing",
             room_id=TEST_THREAD_ROOMID,
-            thread_name=TEST_THREAD_NAME,
             **kwargs,
         )
         if w_user:
@@ -460,7 +457,6 @@ async def test_threads_new_thread(uu4, w_user, w_thread_id):
         assert the_threads._threads["testing"][exp_thread_id] is found
 
     assert found.thread_id == exp_thread_id
-    assert found.name == TEST_THREAD_NAME
     assert found.room_id == TEST_THREAD_ROOMID
 
 
