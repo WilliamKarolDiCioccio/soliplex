@@ -85,20 +85,24 @@ class Thread:
     name: str | None = dataclasses.field(default=None, kw_only=True)
     runs: dict[Run] = dataclasses.field(default_factory=dict)
 
-    def new_run(self, run_input: agui_core.RunAgentInput) -> Run:
-        if run_input.thread_id != self.thread_id:
-            raise WrongThreadId(run_input.thread_id, self.thread_id)
+    _: dataclasses.KW_ONLY
+    _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
 
-        if run_input.run_id in self.runs:
-            raise DuplicateRunId(run_input.run_id)
+    async def new_run(self, run_input: agui_core.RunAgentInput) -> Run:
+        async with self._lock:
+            if run_input.thread_id != self.thread_id:
+                raise WrongThreadId(run_input.thread_id, self.thread_id)
 
-        parent_run_id = run_input.parent_run_id
+            if run_input.run_id in self.runs:
+                raise DuplicateRunId(run_input.run_id)
 
-        if parent_run_id is not None and parent_run_id not in self.runs:
-            raise MissingParentRunId(parent_run_id)
+            parent_run_id = run_input.parent_run_id
 
-        run = self.runs[run_input.run_id] = Run(run_input)
-        return run
+            if parent_run_id is not None and parent_run_id not in self.runs:
+                raise MissingParentRunId(parent_run_id)
+
+            run = self.runs[run_input.run_id] = Run(run_input)
+            return run
 
 
 ThreadsByID = dict[str, Thread]

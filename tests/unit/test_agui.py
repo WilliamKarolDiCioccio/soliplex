@@ -346,35 +346,35 @@ def test__make_thread_id(uu4):
 
 
 @pytest.mark.anyio
-def test_thread_new_run_w_mismatched_thread_id(run_input):
+async def test_thread_new_run_w_mismatched_thread_id(run_input):
     thread = dataclasses.replace(TEST_THREAD, thread_id=OTHER_THREAD_ID)
 
     with pytest.raises(agui.WrongThreadId):
-        thread.new_run(run_input)
+        await thread.new_run(run_input)
 
 
 @pytest.mark.anyio
-def test_thread_new_run_w_duplicate_run_id(run_input):
+async def test_thread_new_run_w_duplicate_run_id(run_input):
     thread = dataclasses.replace(TEST_THREAD, runs={TEST_RUN_ID: object()})
 
     with pytest.raises(agui.DuplicateRunId):
-        thread.new_run(run_input)
+        await thread.new_run(run_input)
 
 
 @pytest.mark.anyio
-def test_thread_new_run_w_missing_parent_run_id(run_input):
+async def test_thread_new_run_w_missing_parent_run_id(run_input):
     run_input.parent_run_id = "BOGUS"
     thread = dataclasses.replace(TEST_THREAD, runs={})
 
     with pytest.raises(agui.MissingParentRunId):
-        thread.new_run(run_input)
+        await thread.new_run(run_input)
 
 
 @pytest.mark.anyio
-def test_thread_new_run(run_input):
+async def test_thread_new_run(run_input):
     thread = dataclasses.replace(TEST_THREAD, runs={})
 
-    run = thread.new_run(run_input)
+    run = await thread.new_run(run_input)
 
     assert run.run_input is run_input
     assert run.events == []
