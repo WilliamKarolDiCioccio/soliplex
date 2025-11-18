@@ -81,6 +81,18 @@ haiku-rag --config example/haiku.rag.yaml \
 
 See: `docs/rag.md` for more options.
 
+### Check the backend server configuration
+
+```bash
+soliplex-cli check-config example/minimal.yaml
+```
+
+### List the rooms in the backend server configuration
+
+```bash
+soliplex-cli list-rooms example/minimal.yaml
+```
+
 ### Run Soliplex backend server
 
 ```bash
