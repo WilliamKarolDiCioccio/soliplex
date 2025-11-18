@@ -20,7 +20,7 @@ from textual import binding as t_binding
 from textual import containers as t_containers
 from textual import widgets as t_widgets
 
-from soliplex import agui
+from soliplex.agui import parser as agui_parser
 
 
 class Prompt(t_widgets.Markdown):
@@ -160,7 +160,7 @@ class SoliplexTUI(t_app.App):
             )
 
         event_log = []
-        esp = agui.EventStreamParser(
+        esp = agui_parser.EventStreamParser(
             self.run_agent_input,
             event_log=event_log,
         )
@@ -181,7 +181,7 @@ class SoliplexTUI(t_app.App):
                     decoded = decoded[len("data: ") :]
 
                 chunk = json.loads(decoded)
-                event = agui.agui_event_from_json(chunk)
+                event = agui_parser.agui_event_from_json(chunk)
                 esp(event)
 
                 if chunk["type"] == "THINKING_START":
