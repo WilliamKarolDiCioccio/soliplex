@@ -51,6 +51,12 @@ Key files:
 - `controllers.dart` - Riverpod state management
 - `configure.dart` - Configuration UI
 
+### TUI (`src/soliplex/tui`)
+
+Quick-and-dirty client for room queries
+
+- **Framework**: Python `textual`
+
 ## Quick Start
 
 ### Install Soliplex and dependencies
@@ -75,6 +81,18 @@ haiku-rag --config example/haiku.rag.yaml \
 
 See: `docs/rag.md` for more options.
 
+### Check the backend server configuration
+
+```bash
+soliplex-cli check-config example/minimal.yaml
+```
+
+### List the rooms in the backend server configuration
+
+```bash
+soliplex-cli list-rooms example/minimal.yaml
+```
+
 ### Run Soliplex backend server
 
 ```bash
@@ -88,6 +106,49 @@ soliplex-cli serve example/minimal.yaml --no-auth-mode
 cd src/flutter
 flutter pub get
 flutter run -d chrome --web-port 59001
+```
+
+### TUI
+
+The TUI does not yet grok authentication, so run the back-end with
+`--no-auth-mode` when using the TUI.
+
+Within the virtual environment where you installed `soliplex`:
+
+```bash
+soliplex-tui --help
+                                                                                
+ Usage: soliplex-tui [OPTIONS]                                                  
+                                                                                
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --version             -v                                                     │
+│ --url                                  TEXT  Base URL for Soliplex back-end  │
+│                                              [default:                       │
+│                                              http://127.0.0.1:8000]          │
+│ --room                -r               TEXT  Room name for the agent         │
+│                                              [default: haiku]                │
+│ --agui                    --no-agui          Connect using Soliplex AG-UI    │
+│                                              endpoint                        │
+│                                              [default: agui]                 │
+│ --install-completion                         Install completion for the      │
+│                                              current shell.                  │
+│ --show-completion                            Show completion for the current │
+│                                              shell, to copy it or customize  │
+│                                              the installation.               │
+│ --help                -h                     Show this message and exit.     │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+```bash
+soliplex-tui
+```
+
+By default, the TUI connects to a Soliplex back-end server running
+on port 8000 on your local machine, and uses the "haiku" romm, just
+as though you typed:
+
+```bash
+soliplex-tui --url http://127.0.0.1:8000 --room haiku
 ```
 
 ## Configuration
