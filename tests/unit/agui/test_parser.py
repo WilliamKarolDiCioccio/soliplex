@@ -1,52 +1,14 @@
 import contextlib
-import dataclasses
-import datetime
-import uuid
 from unittest import mock
 
-import fastapi
 import jsonpatch
 import pytest
 from ag_ui import core as agui_core
 
-from soliplex import agui
+from soliplex.agui import parser as agui_parser
 
-SYSTEM_PROMPT = "You are a testcase"
-USER_PROMPT = "Which way is up?"
-TOOL_RETURN = "Nailed it"
-TOOL_CALL_ID = 1234
-RETRY_PROMPT = "Please try again"
-TEXT = "The opposite way from down"
-THINKING = "Hold on a minute, I'm thinking"
-TOOL_NAME = "hammer"
-
-NOW = datetime.datetime(2025, 8, 11, 16, 59, 47, tzinfo=datetime.UTC)
-TS_1 = NOW - datetime.timedelta(minutes=11)
-TS_2 = NOW - datetime.timedelta(minutes=10)
-TS_3 = NOW - datetime.timedelta(minutes=9)
-TS_4 = NOW - datetime.timedelta(minutes=8)
-
-ROOM_ID = "testing"
-SYSTEM_PROMPT = "You are a test."
-USER_PROMPT = "This is a test."
-MODEL_RESPONSE = "Now you're talking!"
-ANOTHER_USER_PROMPT = "Which way is up?"
-ANOTHER_MODEL_RESPONSE = "The other way from down"
-
-UUID4 = uuid.uuid4()
-TEST_THREAD_ID = str(UUID4)
-OTHER_THREAD_ID = "thread-123"
+TEST_THREAD_ID = "thread-123"
 TEST_RUN_ID = "run-345"
-TEST_THREAD_ROOMID = "test-room"
-TEST_THREAD = agui.Thread(
-    thread_id=TEST_THREAD_ID,
-    room_id=TEST_THREAD_ROOMID,
-)
-TEST_THREADS = {
-    TEST_THREAD_ID: TEST_THREAD,
-}
-
-TEST_RUN_UUID = str(uuid.uuid4())
 
 TEST_RUN_STARTED = agui_core.RunStartedEvent(
     thread_id=TEST_THREAD_ID,
@@ -56,26 +18,6 @@ TEST_RUN_STARTED = agui_core.RunStartedEvent(
 TEST_RUN_FINISHED = agui_core.RunFinishedEvent(
     thread_id=TEST_THREAD_ID,
     run_id=TEST_RUN_ID,
-)
-
-EMPTY_AGUI_RUN_INPUT = agui_core.RunAgentInput(
-    thread_id=TEST_THREAD_ID,
-    run_id=TEST_RUN_ID,
-    state={},
-    messages=[],
-    tools=[],
-    context=[],
-    forwarded_props=None,
-)
-
-W_STATE_AGUI_RUN_INPUT = agui_core.RunAgentInput(
-    thread_id=TEST_THREAD_ID,
-    run_id=TEST_RUN_ID,
-    state={"foo": "bar"},
-    messages=[],
-    tools=[],
-    context=[],
-    forwarded_props=None,
 )
 
 SYSTEM_PROMPT_MESSAGE_ID = "system-prompt"
@@ -135,6 +77,26 @@ TOOL_CALL_RESULT_MESSAGE = agui_core.ToolMessage(
     id=TOOL_CALL_RESULT_MESSAGE_ID,
     content=TOOL_CALL_RESULT_TEXT,
     tool_call_id=TOOL_CALL_ID,
+)
+
+EMPTY_AGUI_RUN_INPUT = agui_core.RunAgentInput(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+    state={},
+    messages=[],
+    tools=[],
+    context=[],
+    forwarded_props=None,
+)
+
+W_STATE_AGUI_RUN_INPUT = agui_core.RunAgentInput(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+    state={"foo": "bar"},
+    messages=[],
+    tools=[],
+    context=[],
+    forwarded_props=None,
 )
 
 W_PROMPT_AGUI_RUN_INPUT = agui_core.RunAgentInput(
@@ -299,7 +261,11 @@ WO_REPLACE_E_ACTIVITY_MESSAGE_SNAPSHOT = agui_core.ActivitySnapshotEvent(
 )
 
 
-no_error = contextlib.nullcontext
+@pytest.fixture
+def run():
+    from soliplex.agui import thread
+
+    return mock.create_autospec(thread.Run, events=[])
 
 
 @pytest.fixture
@@ -307,244 +273,21 @@ def run_input():
     return EMPTY_AGUI_RUN_INPUT.model_copy(deep=True)
 
 
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "events",
-    [
-        [],
-        [TEST_RUN_STARTED],
-        [TEST_RUN_STARTED, TEST_RUN_FINISHED],
-    ],
-)
-async def test_run_stream_events(run_input, events):
-    async def ev_iter():
-        for event in events:
-            yield event
-
-    run = agui.Run(run_input=run_input)
-
-    streamed = []
-
-    async for event in run.stream_events(ev_iter()):
-        streamed.append(event)
-
-    for event, s_event, r_event in zip(
-        events,
-        streamed,
-        run.events,
-        strict=True,
-    ):
-        assert s_event is event
-        assert r_event is event
+no_error = contextlib.nullcontext
 
 
-@mock.patch("uuid.uuid4")
-def test__make_thread_id(uu4):
-    uu4.return_value = UUID4
-
-    assert agui._make_thread_id() == str(UUID4)
-
-
-@pytest.mark.anyio
-async def test_thread_new_run_w_mismatched_thread_id(run_input):
-    thread = dataclasses.replace(TEST_THREAD, thread_id=OTHER_THREAD_ID)
-
-    with pytest.raises(agui.WrongThreadId):
-        await thread.new_run(run_input)
-
-
-@pytest.mark.anyio
-async def test_thread_new_run_w_duplicate_run_id(run_input):
-    thread = dataclasses.replace(TEST_THREAD, runs={TEST_RUN_ID: object()})
-
-    with pytest.raises(agui.DuplicateRunId):
-        await thread.new_run(run_input)
-
-
-@pytest.mark.anyio
-async def test_thread_new_run_w_missing_parent_run_id(run_input):
-    run_input.parent_run_id = "BOGUS"
-    thread = dataclasses.replace(TEST_THREAD, runs={})
-
-    with pytest.raises(agui.MissingParentRunId):
-        await thread.new_run(run_input)
-
-
-@pytest.mark.anyio
-async def test_thread_new_run(run_input):
-    thread = dataclasses.replace(TEST_THREAD, runs={})
-
-    run = await thread.new_run(run_input)
-
-    assert run.run_input is run_input
-    assert run.events == []
-    assert thread.runs[TEST_RUN_ID] == run
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_threads, expected",
-    [
-        ({}, {}),
-        ({"testing": TEST_THREADS}, TEST_THREADS),
-    ],
-)
-async def test_threads_user_threads(w_threads, expected):
-    the_threads = agui.Threads()
-    the_threads._threads.update(w_threads)
-
-    found = await the_threads.user_threads(user_name="testing")
-
-    assert found == expected
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_threads, expectation",
-    [
-        ({}, pytest.raises(agui.UnknownThread)),
-        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
-        (
-            {"testing": TEST_THREADS},
-            contextlib.nullcontext(TEST_THREAD),
-        ),
-    ],
-)
-async def test_threads_get_thread(w_threads, expectation):
-    the_threads = agui.Threads()
-    the_threads._threads.update(w_threads)
-
-    with expectation as expected:
-        found = await the_threads.get_thread(
-            user_name="testing",
-            thread_id=TEST_THREAD_ID,
-        )
-
-    if expected is TEST_THREAD:
-        assert found is TEST_THREAD
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize("w_thread_id", [False, True])
-@pytest.mark.parametrize("w_user", [False, True])
-@mock.patch("uuid.uuid4")
-async def test_threads_new_thread(uu4, w_user, w_thread_id):
-    uu4.return_value = UUID4
-    the_threads = agui.Threads()
-
-    user_threads_patch = {}
-    if w_user:
-        before = user_threads_patch["testing"] = {"already": object()}
-
-    kwargs = {}
-
-    if w_thread_id:
-        exp_thread_id = kwargs["thread_id"] = OTHER_THREAD_ID
-    else:
-        exp_thread_id = TEST_THREAD_ID
-
-    with (
-        mock.patch.dict(the_threads._threads, **user_threads_patch),
-    ):
-        found = await the_threads.new_thread(
-            user_name="testing",
-            room_id=TEST_THREAD_ROOMID,
-            **kwargs,
-        )
-        if w_user:
-            assert the_threads._threads["testing"] is before
-
-        assert the_threads._threads["testing"][exp_thread_id] is found
-
-    assert found.thread_id == exp_thread_id
-    assert found.room_id == TEST_THREAD_ROOMID
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_threads, expectation",
-    [
-        ({}, pytest.raises(agui.UnknownThread)),
-        ({"testing": {}}, pytest.raises(agui.UnknownThread)),
-        ({"testing": TEST_THREADS}, contextlib.nullcontext(None)),
-    ],
-)
-async def test_threads_delete_thread(w_threads, expectation):
-    the_threads = agui.Threads()
-
-    for user_name, thread_map in list(w_threads.items()):
-        new_map = {}
-
-        for thread_id, thread in list(thread_map.items()):
-            new_map[thread_id] = dataclasses.replace(thread)
-
-        the_threads._threads[user_name] = new_map
-
-    with expectation as expected:
-        await the_threads.delete_thread(
-            user_name="testing",
-            thread_id=TEST_THREAD_ID,
-        )
-
-    if expected is None:
-        assert the_threads._threads["testing"] == {}
-
-
-@pytest.mark.anyio
-async def test_get_the_threads():
-    expected = object()
-    request = fastapi.Request(scope={"type": "http"})
-    request.state.the_threads = expected
-
-    found = await agui.get_the_threads(request)
-
-    assert found is expected
-
-
-@pytest.mark.parametrize(
-    "json_dict, expectaton",
-    [
-        ({}, pytest.raises(agui.InvalidJSONEvent)),
-        ({"type": "bogus"}, pytest.raises(agui.UnknownJSONEventType)),
-        (
-            {"type": agui_core.EventType.THINKING_START},
-            no_error(agui_core.ThinkingStartEvent()),
-        ),
-        (
-            {
-                "type": agui_core.EventType.THINKING_START,
-                "title": "I'm Thinking",
-            },
-            no_error(agui_core.ThinkingStartEvent(title="I'm Thinking")),
-        ),
-    ],
-)
-def test_agui_event_from_json(json_dict, expectaton):
-    with expectaton as expected:
-        found = agui.agui_event_from_json(json_dict)
-
-    if isinstance(expected, agui_core.BaseEvent):
-        assert found == expected
-
-
-@pytest.mark.parametrize(
-    "w_run",
-    [
-        None,
-        mock.create_autospec(agui.Run),
-    ],
-)
-def test_esp_ctor_wo_run_input(w_run):
-    if w_run is not None:
-        exp_run = w_run
-        esp = agui.EventStreamParser(run=w_run)
+@pytest.mark.parametrize("w_run", [False, True])
+def test_esp_ctor_wo_run_input(run, w_run):
+    if w_run:
+        exp_run = run
+        esp = agui_parser.EventStreamParser(run=run)
     else:
         exp_run = None
-        esp = agui.EventStreamParser()
+        esp = agui_parser.EventStreamParser()
 
     assert esp.run_input is None
     assert esp.the_run is exp_run
-    assert esp.run_status == agui.RunStatus.INITIALIZED
+    assert esp.run_status == agui_parser.RunStatus.INITIALIZED
     assert esp.active_steps == set()
     assert esp.error_message is None
     assert esp.error_code is None
@@ -566,11 +309,11 @@ def test_esp_ctor_wo_run_input(w_run):
     ],
 )
 def test_esp_ctor_w_run_input(run_input):
-    esp = agui.EventStreamParser(run_input)
+    esp = agui_parser.EventStreamParser(run_input)
 
     assert esp.run_input is run_input
     assert esp.the_run is None
-    assert esp.run_status == agui.RunStatus.INITIALIZED
+    assert esp.run_status == agui_parser.RunStatus.INITIALIZED
     assert esp.active_steps == set()
     assert esp.error_message is None
     assert esp.error_code is None
@@ -584,24 +327,24 @@ def test_esp_ctor_w_run_input(run_input):
 
 
 def test_esp_run_input_setter_w_already():
-    esp = agui.EventStreamParser(EMPTY_AGUI_RUN_INPUT)
+    esp = agui_parser.EventStreamParser(EMPTY_AGUI_RUN_INPUT)
 
-    with pytest.raises(agui.RunInputAlreadySet):
+    with pytest.raises(agui_parser.RunInputAlreadySet):
         esp.run_input = W_STATE_AGUI_RUN_INPUT
 
 
-INITIALIZED = agui.RunStatus.INITIALIZED
-RUNNING = agui.RunStatus.RUNNING
-FINISHED = agui.RunStatus.FINISHED
-ERROR = agui.RunStatus.ERROR
+INITIALIZED = agui_parser.RunStatus.INITIALIZED
+RUNNING = agui_parser.RunStatus.RUNNING
+FINISHED = agui_parser.RunStatus.FINISHED
+ERROR = agui_parser.RunStatus.ERROR
 
 NO_STEPS = set()
 W_TEST_STEP = set([TEST_STEP_NAME])
 
-inv_status = pytest.raises(agui.InvalidRunStatusWithTarget)
-not_running = pytest.raises(agui.NotRunning)
-step_already = pytest.raises(agui.StepAlreadyStarted)
-step_not_started = pytest.raises(agui.StepNotStarted)
+inv_status = pytest.raises(agui_parser.InvalidRunStatusWithTarget)
+not_running = pytest.raises(agui_parser.NotRunning)
+step_already = pytest.raises(agui_parser.StepAlreadyStarted)
+step_not_started = pytest.raises(agui_parser.StepNotStarted)
 
 
 @pytest.fixture(params=[None, False, True])
@@ -643,12 +386,12 @@ def test_esp_call_w_run_start(
 ):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, **kw)
+    esp = agui_parser.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
 
-    if isinstance(expected, agui.RunStatus):
+    if isinstance(expected, agui_parser.RunStatus):
         assert esp.run_status == expected
 
         if sets_input:
@@ -670,12 +413,12 @@ def test_esp_call_w_run_start(
 def test_esp_call_w_run_finished(event_kept, status, event, expectation):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, **kw)
+    esp = agui_parser.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
 
-    if isinstance(expected, agui.RunStatus):
+    if isinstance(expected, agui_parser.RunStatus):
         assert esp.run_status == expected
         assert esp.result is event.result
 
@@ -694,12 +437,12 @@ def test_esp_call_w_run_finished(event_kept, status, event, expectation):
 def test_esp_call_w_run_error(event_kept, status, event, expectation):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, **kw)
+    esp = agui_parser.EventStreamParser(run_status=status, **kw)
 
     with expectation as expected:
         esp(event)
 
-    if isinstance(expected, agui.RunStatus):
+    if isinstance(expected, agui_parser.RunStatus):
         assert esp.run_status == expected
         assert esp.error_message is event.message
         assert esp.error_code is event.code
@@ -720,7 +463,7 @@ def test_esp_call_w_run_error(event_kept, status, event, expectation):
 def test_esp_call_w_step_start(event_kept, status, steps, event, expectation):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status, active_steps=steps.copy(), **kw
     )
 
@@ -748,7 +491,7 @@ def test_esp_call_w_step_finished(
 ):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status, active_steps=steps.copy(), **kw
     )
 
@@ -764,8 +507,8 @@ def test_esp_call_w_step_finished(
 #
 #   TextMessage events
 #
-message_already = pytest.raises(agui.MessageAlreadyExists)
-message_nonesuch = pytest.raises(agui.MessageDoesNotExist)
+message_already = pytest.raises(agui_parser.MessageAlreadyExists)
+message_nonesuch = pytest.raises(agui_parser.MessageDoesNotExist)
 
 
 @pytest.mark.parametrize(
@@ -785,7 +528,7 @@ def test_esp_call_w_text_message_start(
 
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
@@ -825,7 +568,7 @@ def test_esp_call_w_text_message_content(
 
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
@@ -865,7 +608,7 @@ def test_esp_call_w_text_message_end(
 
     esp_messages = [msg.model_copy(deep=True) for msg in messages]
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
@@ -886,8 +629,8 @@ def test_esp_call_w_text_message_end(
 #
 #   ToolCall events
 #
-tool_call_already = pytest.raises(agui.ToolCallAlreadyExists)
-tool_call_nonesuch = pytest.raises(agui.ToolCallDoesNotExist)
+tool_call_already = pytest.raises(agui_parser.ToolCallAlreadyExists)
+tool_call_nonesuch = pytest.raises(agui_parser.ToolCallDoesNotExist)
 
 
 @pytest.mark.parametrize(
@@ -930,7 +673,7 @@ def test_esp_call_w_tool_call_start(
         for key, value in active_tcs.items()
     }
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id={msg.id: msg for msg in esp_messages},
@@ -992,7 +735,7 @@ def test_esp_call_w_tool_call_args(
     }
     before, _ = active_tcs.get(event.tool_call_id, (None, None))
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         active_tool_calls=esp_tool_calls_by_id,
         **kw,
@@ -1056,7 +799,7 @@ def test_esp_call_w_tool_call_end(
         for key, value in active_tcs.items()
     }
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         active_tool_calls=esp_tool_calls_by_id,
         **kw,
@@ -1110,7 +853,7 @@ def test_esp_call_w_tool_call_result(
 ):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         completed_tool_calls=set(completed_tcs),
         **kw,
@@ -1155,7 +898,11 @@ patch_failed = pytest.raises(jsonpatch.JsonPatchException)
 def test_esp_call_w_state_delta(event_kept, status, state, event, expectation):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, state=state.copy(), **kw)
+    esp = agui_parser.EventStreamParser(
+        run_status=status,
+        state=state.copy(),
+        **kw,
+    )
 
     with expectation as expected:
         esp(event)
@@ -1181,7 +928,11 @@ def test_esp_call_w_state_snapshot(
 ):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, state=state.copy(), **kw)
+    esp = agui_parser.EventStreamParser(
+        run_status=status,
+        state=state.copy(),
+        **kw,
+    )
 
     with expectation as expected:
         esp(event)
@@ -1216,7 +967,11 @@ def test_esp_call_w_messages_snapshot(
 ):
     kw, check_log = event_kept
 
-    esp = agui.EventStreamParser(run_status=status, messages=messages, **kw)
+    esp = agui_parser.EventStreamParser(
+        run_status=status,
+        messages=messages,
+        **kw,
+    )
 
     with expectation as expected:
         esp(event)
@@ -1267,7 +1022,7 @@ def test_esp_call_w_activity_message_delta(
     esp_messages_by_id = {
         msg.id: msg.model_copy(deep=True) for msg in messages
     }
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id=esp_messages_by_id,
@@ -1330,7 +1085,7 @@ def test_esp_call_w_activity_message_snapshot(
     esp_messages_by_id = {
         msg.id: msg.model_copy(deep=True) for msg in messages
     }
-    esp = agui.EventStreamParser(
+    esp = agui_parser.EventStreamParser(
         run_status=status,
         messages=esp_messages,
         messages_by_id=esp_messages_by_id,
@@ -1362,7 +1117,7 @@ def test_esp_call_w_ignored_event_types(
     event,
 ):
     event_log = []
-    esp = agui.EventStreamParser(event_log=event_log)
+    esp = agui_parser.EventStreamParser(event_log=event_log)
 
     esp(event)
 
@@ -1380,20 +1135,17 @@ def test_esp_call_w_ignored_event_types(
         ],
     ],
 )
-@pytest.mark.parametrize(
-    "w_run",
-    [
-        None,
-        mock.create_autospec(agui.Run, events=[]),
-    ],
-)
-async def test_esp__store_run_events(w_run, events):
-    esp = agui.EventStreamParser(run=w_run, event_log=events)
+@pytest.mark.parametrize("w_run", [False, True])
+async def test_esp__store_run_events(run, w_run, events):
+    if w_run:
+        esp = agui_parser.EventStreamParser(run=run, event_log=events)
+    else:
+        esp = agui_parser.EventStreamParser(event_log=events)
 
     await esp._store_run_events()
 
-    if w_run is not None:
-        assert w_run.events == list(events)
+    if w_run:
+        assert run.events == list(events)
 
 
 @pytest.mark.anyio
@@ -1408,11 +1160,11 @@ async def test_esp__store_run_events(w_run, events):
     ],
 )
 async def test_esp_parse_stream(run_input, events):
-    async def stream() -> agui.AGUI_EventIterator:
+    async def stream() -> agui_parser.AGUI_EventIterator:
         for event in events:
             yield event
 
-    esp = agui.EventStreamParser(run_input)
+    esp = agui_parser.EventStreamParser(run_input)
     sre = esp._store_run_events = mock.AsyncMock(spec_set=())
 
     found = [event async for event in esp.parse_stream(stream())]
@@ -1440,11 +1192,11 @@ async def test_esp_parse_stream(run_input, events):
     ],
 )
 async def test_esp_parse_json_stream(run_input, json_dicts, events):
-    async def stream() -> agui.AGUI_EventIterator:
+    async def stream() -> agui_parser.AGUI_EventIterator:
         for json_dict in json_dicts:
             yield json_dict
 
-    esp = agui.EventStreamParser(run_input)
+    esp = agui_parser.EventStreamParser(run_input)
     sre = esp._store_run_events = mock.AsyncMock(spec_set=())
 
     found = [event async for event in esp.parse_json_stream(stream())]
@@ -1455,9 +1207,9 @@ async def test_esp_parse_json_stream(run_input, json_dicts, events):
 
 
 def test_esp_as_run_agent_input_wo_run_input():
-    esp = agui.EventStreamParser()
+    esp = agui_parser.EventStreamParser()
 
-    with pytest.raises(agui.NoRunInput):
+    with pytest.raises(agui_parser.NoRunInput):
         _ = esp.as_run_agent_input
 
 
@@ -1476,7 +1228,7 @@ def test_esp_as_run_agent_input_wo_run_input():
     ],
 )
 def test_esp_as_run_agent_input_w_run_input(run_input, messages, state):
-    esp = agui.EventStreamParser(run_input)
+    esp = agui_parser.EventStreamParser(run_input)
 
     if messages is not None:
         exp_messages = esp.messages = [
@@ -1494,3 +1246,29 @@ def test_esp_as_run_agent_input_w_run_input(run_input, messages, state):
 
     assert found.messages == exp_messages
     assert found.state == exp_state
+
+
+@pytest.mark.parametrize(
+    "json_dict, expectaton",
+    [
+        ({}, pytest.raises(agui_parser.InvalidJSONEvent)),
+        ({"type": "bogus"}, pytest.raises(agui_parser.UnknownJSONEventType)),
+        (
+            {"type": agui_core.EventType.THINKING_START},
+            no_error(agui_core.ThinkingStartEvent()),
+        ),
+        (
+            {
+                "type": agui_core.EventType.THINKING_START,
+                "title": "I'm Thinking",
+            },
+            no_error(agui_core.ThinkingStartEvent(title="I'm Thinking")),
+        ),
+    ],
+)
+def test_agui_event_from_json(json_dict, expectaton):
+    with expectaton as expected:
+        found = agui_parser.agui_event_from_json(json_dict)
+
+    if isinstance(expected, agui_core.BaseEvent):
+        assert found == expected

@@ -4,11 +4,11 @@ from unittest import mock
 import fastapi
 import pytest
 
-from soliplex import agui
 from soliplex import config
 from soliplex import convos
 from soliplex import installation
 from soliplex import secrets
+from soliplex.agui import thread as agui_thread
 
 KEY = "test-key"
 VALUE = "test-value"
@@ -413,7 +413,7 @@ async def test_lifespan(
     assert isinstance(the_convos, convos.Conversations)
 
     the_threads = found[0]["the_threads"]
-    assert isinstance(the_threads, agui.Threads)
+    assert isinstance(the_threads, agui_thread.Threads)
 
     for f_call, (key, mcp_app) in zip(
         app.mount.call_args_list,

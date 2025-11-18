@@ -3,9 +3,9 @@ from unittest import mock
 import fastapi
 import pytest
 
-from soliplex import agui
 from soliplex import installation
 from soliplex import models
+from soliplex.agui import thread as agui_thread
 from soliplex.views import agui as agui_views
 
 USER_NAME = "phreddy"
@@ -40,7 +40,7 @@ UNKNOWN_USER = {
 )
 @mock.patch("fastapi.responses.StreamingResponse")
 @mock.patch("pydantic_ai.ui.ag_ui.AGUIAdapter")
-@mock.patch("soliplex.agui.EventStreamParser")
+@mock.patch("soliplex.agui.parser.EventStreamParser")
 @mock.patch("soliplex.auth.authenticate")
 async def test_post_room_agui(
     auth_fn,
@@ -76,13 +76,16 @@ async def test_post_room_agui(
 
     exp_user_profile = models.UserProfile(**exp_user)
 
-    the_threads = mock.create_autospec(agui.Threads)
+    the_threads = mock.create_autospec(agui_thread.Threads)
 
     if w_thread:
         exp_thread = the_threads.get_thread.return_value
     else:
         the_threads.get_thread.side_effect = [
-            agui.UnknownThread(user_name="user-name", thread_id="thread-id"),
+            agui_thread.UnknownThread(
+                user_name="user-name",
+                thread_id="thread-id",
+            ),
         ]
         exp_new_thread = the_threads.new_thread = mock.AsyncMock()
         exp_thread = exp_new_thread.return_value

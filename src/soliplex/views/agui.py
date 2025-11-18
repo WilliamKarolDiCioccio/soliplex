@@ -3,16 +3,17 @@ from fastapi import responses
 from fastapi import security
 from pydantic_ai.ui import ag_ui as ai_ag_ui
 
-from soliplex import agui
 from soliplex import auth
 from soliplex import installation
 from soliplex import models
 from soliplex import util
+from soliplex.agui import parser as agui_parser
+from soliplex.agui import thread as agui_thread
 
 router = fastapi.APIRouter(tags=["rooms"])
 
 depend_the_installation = installation.depend_the_installation
-depend_the_threads = agui.depend_the_threads
+depend_the_threads = agui_thread.depend_the_threads
 
 
 @util.logfire_span("POST /v1/rooms/{room_id}/agui")
@@ -21,7 +22,7 @@ async def post_room_agui(
     request: fastapi.Request,
     room_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui.Threads = depend_the_threads,
+    the_threads: agui_thread.Threads = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> responses.StreamingResponse:
     """Process an AGUI interaction request"""
@@ -57,7 +58,7 @@ async def post_room_agui(
             user_name=user_name,
             thread_id=thread_id,
         )
-    except agui.UnknownThread:
+    except agui_thread.UnknownThread:
         thread = await the_threads.new_thread(
             user_name=user_name,
             room_id=room_id,
@@ -73,7 +74,7 @@ async def post_room_agui(
 
     agent_stream = agui_adapter.run_stream(deps=agent_deps)
 
-    esp = agui.EventStreamParser(run_input, run=run)
+    esp = agui_parser.EventStreamParser(run_input, run=run)
     esp_stream = esp.parse_stream(agent_stream)
     sse_stream = agui_adapter.encode_stream(esp_stream)
 
