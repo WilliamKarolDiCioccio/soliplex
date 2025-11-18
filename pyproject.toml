@@ -14,7 +14,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "ag-ui-protocol",
+    "ag-ui-protocol >= 0.1.10",
     "authlib",
     "fastapi",
     "fastmcp >= 2.13.0.2, < 2.14",
