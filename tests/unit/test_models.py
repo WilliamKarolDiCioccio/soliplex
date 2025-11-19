@@ -422,6 +422,11 @@ def room_quizzes(request, quiz_path):
     return kw
 
 
+@pytest.fixture(params=[None, False, True])
+def room_allow_mcp(request):
+    return _from_param(request, "allow_mcp")
+
+
 @pytest.fixture(params=["default", "factory"])
 def room_agent(request, installation_config):
     if request.param == "default":
@@ -446,6 +451,7 @@ def test_room_from_config(
     room_suggestions,
     room_tools,
     room_quizzes,
+    room_allow_mcp,
 ):
     room_config = config.RoomConfig(
         id=ROOM_ID,
@@ -456,6 +462,7 @@ def test_room_from_config(
         **room_suggestions,
         **room_tools,
         **room_quizzes,
+        **room_allow_mcp,
     )
 
     room_model = models.Room.from_config(room_config)
@@ -499,6 +506,8 @@ def test_room_from_config(
         }
     else:
         assert room_model.quizzes == {}
+
+    assert room_model.allow_mcp == room_config.allow_mcp
 
 
 def test_completion_from_config(room_agent, room_tools):

@@ -167,6 +167,7 @@ class Room(pydantic.BaseModel):
     mcp_client_toolsets: ConfiguredMCPClientToolsets
     quizzes: ConfiguredQuizzes
     agent: Agent
+    allow_mcp: bool
 
     @classmethod
     def from_config(cls, room_config: config.RoomConfig):
@@ -200,6 +201,7 @@ class Room(pydantic.BaseModel):
             quizzes={
                 quiz.id: Quiz.from_config(quiz) for quiz in room_config.quizzes
             },
+            allow_mcp=room_config.allow_mcp,
             agent=agent,
         )
 
