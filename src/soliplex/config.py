@@ -484,10 +484,23 @@ class SearchDocumentsToolConfig(ToolConfig, _RAGToolBase):
         )
 
 
+@dataclasses.dataclass
+class RAGResearchToolConfig(ToolConfig, _RAGToolBase):
+    kind: str = "research_report"
+    tool_name: str = "soliplex.tools.research_report"
+
+    def get_extra_parameters(self) -> dict:
+        return (
+            super().get_extra_parameters()
+            | _RAGToolBase.get_extra_parameters(self)
+        )
+
+
 TOOL_CONFIG_CLASSES_BY_TOOL_NAME = {
     klass.tool_name: klass
     for klass in [
         SearchDocumentsToolConfig,
+        RAGResearchToolConfig,
     ]
 }
 
