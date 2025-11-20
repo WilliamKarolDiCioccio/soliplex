@@ -127,19 +127,19 @@ W_ERROR_AUTHSYSTM_CONFIG_YAML = f"""
 
 
 # This one raises
-BOGUS_STDC_CONFIG_YAML = """
+BOGUS_SDTC_CONFIG_YAML = """
     #rag_lancedb_stem: "rag"
     #rag_lancedb_override_path: "/path/to/rag.lancedb"
 """
 
-W_STEM_STDC_CONFIG_KW = {
+W_STEM_SDTC_CONFIG_KW = {
     "rag_lancedb_stem": "rag",
     "return_citations": True,
     "expand_context_radius": 3,
     "search_documents_limit": 7,
     "allow_mcp": True,
 }
-W_STEM_STDC_CONFIG_YAML = """
+W_STEM_SDTC_CONFIG_YAML = """
     rag_lancedb_stem: "rag"
     return_citations: true
     expand_context_radius: 3
@@ -148,10 +148,10 @@ W_STEM_STDC_CONFIG_YAML = """
 """
 
 
-W_OVERRIDE_STDC_CONFIG_KW = {
+W_OVERRIDE_SDTC_CONFIG_KW = {
     "rag_lancedb_override_path": "/path/to/rag.lancedb",
 }
-W_OVERRIDE_STDC_CONFIG_YAML = """
+W_OVERRIDE_SDTC_CONFIG_YAML = """
     rag_lancedb_override_path: "/path/to/rag.lancedb"
 """
 
@@ -1643,9 +1643,9 @@ def test_sdtc_ctor(installation_config, temp_dir):
 @pytest.mark.parametrize(
     "config_yaml, exp_config",
     [
-        (BOGUS_STDC_CONFIG_YAML, None),
-        (W_STEM_STDC_CONFIG_YAML, W_STEM_STDC_CONFIG_KW),
-        (W_OVERRIDE_STDC_CONFIG_YAML, W_OVERRIDE_STDC_CONFIG_KW),
+        (BOGUS_SDTC_CONFIG_YAML, None),
+        (W_STEM_SDTC_CONFIG_YAML, W_STEM_SDTC_CONFIG_KW),
+        (W_OVERRIDE_SDTC_CONFIG_YAML, W_OVERRIDE_SDTC_CONFIG_KW),
     ],
 )
 def test_sdtc_from_yaml(
