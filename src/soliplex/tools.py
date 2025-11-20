@@ -17,6 +17,13 @@ async def get_current_datetime() -> str:
     return datetime.datetime.now(datetime.UTC).isoformat()
 
 
+async def get_current_user(
+    ctx: pydantic_ai.RunContext[models.AgentDependencies],
+) -> models.UserProfile:
+    """Return information from the current user's profile."""
+    return ctx.deps.user
+
+
 async def search_documents(
     query: str,
     tool_config: config.SearchDocumentsToolConfig = None,
@@ -66,10 +73,3 @@ async def search_documents(
                 )
 
         return [_search_results(doc, score) for doc, score in results]
-
-
-async def get_current_user(
-    ctx: pydantic_ai.RunContext[models.AgentDependencies],
-) -> models.UserProfile:
-    """Return information from the current user's profile."""
-    return ctx.deps.user

@@ -28,6 +28,16 @@ async def test_get_current_datetime(dt_module):
 
 
 @pytest.mark.anyio
+async def test_get_current_user():
+    deps = mock.create_autospec(models.AgentDependencies, user=USER)
+    ctx = mock.Mock(spec_set=(["deps"]), deps=deps)
+
+    found = await tools.get_current_user(ctx)
+
+    assert found is deps.user
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("w_limit", [None, 2])
 @pytest.mark.parametrize("w_cites", [False, True])
 @pytest.mark.parametrize("w_radius", [0, 2])
@@ -91,13 +101,3 @@ async def test_search_documents(
         db_path=sdt_config.rag_lancedb_path,
         config=sdt_config.haiku_rag_config,
     )
-
-
-@pytest.mark.anyio
-async def test_get_current_user():
-    deps = mock.create_autospec(models.AgentDependencies, user=USER)
-    ctx = mock.Mock(spec_set=(["deps"]), deps=deps)
-
-    found = await tools.get_current_user(ctx)
-
-    assert found is deps.user
