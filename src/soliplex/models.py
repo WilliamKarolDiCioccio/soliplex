@@ -363,6 +363,7 @@ class UserProfile(pydantic.BaseModel):
 class AgentDependencies(pydantic.BaseModel):
     the_installation: typing.Any  # installation.Installation
     user: UserProfile = None  # TBD make required
+    agui_emitter: typing.Any = None
 
 
 class SearchResult(pydantic.BaseModel):
