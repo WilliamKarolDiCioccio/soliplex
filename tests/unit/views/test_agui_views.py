@@ -6,6 +6,7 @@ import fastapi
 import pytest
 from ag_ui import core as agui_core
 
+from soliplex import agents
 from soliplex import installation
 from soliplex import models
 from soliplex.agui import thread as agui_thread
@@ -661,7 +662,7 @@ async def test_post_room_agui_thread_id_run_id(
     else:
         exp_run.check_run_input.return_value = None
 
-    exp_deps = models.AgentDependencies(
+    exp_deps = agents.AgentDependencies(
         the_installation=the_installation,
         user=USER_PROFILE,
     )

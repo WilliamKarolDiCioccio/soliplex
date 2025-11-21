@@ -360,12 +360,6 @@ class UserProfile(pydantic.BaseModel):
     preferred_username: str
 
 
-class AgentDependencies(pydantic.BaseModel):
-    the_installation: typing.Any  # installation.Installation
-    user: UserProfile = None  # TBD make required
-    agui_emitter: typing.Any = None
-
-
 class SearchResult(pydantic.BaseModel):
     content: str
     score: float

@@ -3,6 +3,7 @@ import datetime
 import pydantic_ai
 from haiku.rag import client as rag_client
 
+from soliplex import agents
 from soliplex import config
 from soliplex import models
 
@@ -18,7 +19,7 @@ async def get_current_datetime() -> str:
 
 
 async def get_current_user(
-    ctx: pydantic_ai.RunContext[models.AgentDependencies],
+    ctx: pydantic_ai.RunContext[agents.AgentDependencies],
 ) -> models.UserProfile:
     """Return information from the current user's profile."""
     return ctx.deps.user

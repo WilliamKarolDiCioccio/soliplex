@@ -6,6 +6,7 @@ from fastapi import responses
 from fastapi import security
 from pydantic_ai.ui import ag_ui as ai_ag_ui
 
+from soliplex import agents
 from soliplex import auth
 from soliplex import installation
 from soliplex import models
@@ -401,7 +402,7 @@ async def post_room_agui_thread_id_run_id(
             detail="Mismatched 'run_input'",
         ) from None
 
-    agent_deps = models.AgentDependencies(
+    agent_deps = agents.AgentDependencies(
         the_installation=the_installation,
         user=user,
     )

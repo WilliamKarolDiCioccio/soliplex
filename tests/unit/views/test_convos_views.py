@@ -8,6 +8,7 @@ import pytest
 from fastapi import responses
 from pydantic_ai import messages as ai_messages
 
+from soliplex import agents
 from soliplex import convos
 from soliplex import models
 from soliplex.views import convos as convos_views
@@ -243,7 +244,7 @@ async def test_post_convos_new_room(
 
         exp_user_profile = models.UserProfile(**exp_user)
 
-        expected_deps = models.AgentDependencies(
+        expected_deps = agents.AgentDependencies(
             the_installation=the_installation,
             user=exp_user_profile,
         )
@@ -429,7 +430,7 @@ async def test_post_convo(
 
         exp_user_profile = models.UserProfile(**exp_user)
 
-        expected_deps = models.AgentDependencies(
+        expected_deps = agents.AgentDependencies(
             the_installation=the_installation,
             user=exp_user_profile,
         )

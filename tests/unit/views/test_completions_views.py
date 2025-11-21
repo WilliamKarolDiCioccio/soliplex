@@ -3,6 +3,7 @@ from unittest import mock
 import fastapi
 import pytest
 
+from soliplex import agents
 from soliplex import config
 from soliplex import installation
 from soliplex import models
@@ -201,7 +202,7 @@ async def test_post_chat_completion_hit(
     assert response is occ.return_value
 
     exp_user_profile = models.UserProfile(**exp_user)
-    exp_agent_deps = models.AgentDependencies(
+    exp_agent_deps = agents.AgentDependencies(
         the_installation=the_installation,
         user=exp_user_profile,
     )

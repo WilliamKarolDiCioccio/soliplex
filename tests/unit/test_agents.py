@@ -7,7 +7,6 @@ from pydantic_ai import tools as ai_tools
 from soliplex import agents
 from soliplex import config
 from soliplex import mcp_client
-from soliplex import models
 from soliplex import tools
 
 MODEL = "testing"
@@ -168,7 +167,7 @@ def test_get_agent_from_configs_wo_hit_w_default_kind(
     ):
         assert akc_toolset._params == exp_toolset._params
 
-    assert akc_kw["deps_type"] is models.AgentDependencies
+    assert akc_kw["deps_type"] is agents.AgentDependencies
 
     if w_oai:
         model_klass.assert_called_once_with(

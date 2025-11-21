@@ -3,8 +3,8 @@ from unittest import mock
 
 import pytest
 
+from soliplex import agents
 from soliplex import config
-from soliplex import models
 from soliplex import tools
 
 USER = {
@@ -29,7 +29,7 @@ async def test_get_current_datetime(dt_module):
 
 @pytest.mark.anyio
 async def test_get_current_user():
-    deps = mock.create_autospec(models.AgentDependencies, user=USER)
+    deps = mock.create_autospec(agents.AgentDependencies, user=USER)
     ctx = mock.Mock(spec_set=(["deps"]), deps=deps)
 
     found = await tools.get_current_user(ctx)

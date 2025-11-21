@@ -6,6 +6,7 @@ import fastapi
 from fastapi import responses
 from fastapi import security
 
+from soliplex import agents
 from soliplex import auth
 from soliplex import convos
 from soliplex import installation
@@ -55,7 +56,7 @@ async def post_convos_new_room(
             detail=f"No such room: {room_id}",
         ) from None
 
-    agent_deps = models.AgentDependencies(
+    agent_deps = agents.AgentDependencies(
         the_installation=the_installation,
         user=user_profile,
     )
@@ -153,7 +154,7 @@ async def post_convo(
             detail=f"No such room: {convo.room_id}",
         ) from None
 
-    agent_deps = models.AgentDependencies(
+    agent_deps = agents.AgentDependencies(
         the_installation=the_installation,
         user=user_profile,
     )
