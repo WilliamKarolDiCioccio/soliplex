@@ -612,7 +612,7 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
     cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "bad_run_input, expectation",
     [
@@ -622,7 +622,8 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
 )
 @mock.patch("fastapi.responses.StreamingResponse")
 @mock.patch("pydantic_ai.ui.ag_ui.AGUIAdapter")
-@mock.patch("soliplex.agui.parser.EventStreamParser")
+@mock.patch("soliplex.agui.parser.agui_events_from_dicts")
+@mock.patch("soliplex.agui.mpx.multiplex_streams")
 @mock.patch("soliplex.views.agui._check_user_thread_run")
 @mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_room_agent")
@@ -630,7 +631,8 @@ async def test_post_room_agui_thread_id_run_id(
     cura,
     cut,
     cutr,
-    esp,
+    mpx,
+    aefd,
     aga,
     sr,
     run_input,
@@ -667,8 +669,7 @@ async def test_post_room_agui_thread_id_run_id(
     exp_adapter.encode_stream = mock.MagicMock()
     exp_adapter.run_stream = mock.MagicMock()
     exp_agent_stream = exp_adapter.run_stream.return_value
-    exp_esp = esp.return_value
-    exp_esp_stream = exp_esp.parse_stream.return_value
+    exp_mpx = mpx.return_value
     exp_sse_stream = exp_adapter.encode_stream.return_value
 
     with expectation as expected:
@@ -690,19 +691,22 @@ async def test_post_room_agui_thread_id_run_id(
             media_type=exp_adapter.accept,
         )
 
-        exp_adapter.encode_stream.assert_called_once_with(exp_esp_stream)
+        exp_adapter.encode_stream.assert_called_once_with(exp_mpx)
 
-        exp_esp.parse_stream.assert_called_once_with(exp_agent_stream)
-
-        esp.assert_called_once_with(exp_adapter.run_input, run=exp_run)
-
-        exp_adapter.run_stream.assert_called_once_with(
-            deps=the_installation.get_agent_deps_for_room.return_value,
+        mpx.assert_called_once_with(
+            exp_agent_stream,
+            aefd.return_value,
         )
+
+        exp_deps = the_installation.get_agent_deps_for_room.return_value
+        aefd.assert_called_once_with(exp_deps.agui_emitter)
+
+        exp_adapter.run_stream.assert_called_once_with(deps=exp_deps)
 
         the_installation.get_agent_deps_for_room.assert_called_once_with(
             TEST_ROOM_ID,
             USER_PROFILE,
+            exp_adapter.run_input,
         )
 
         aga.from_request.assert_called_once_with(

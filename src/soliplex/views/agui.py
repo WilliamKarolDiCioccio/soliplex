@@ -10,6 +10,7 @@ from soliplex import auth
 from soliplex import installation
 from soliplex import models
 from soliplex import util
+from soliplex.agui import mpx as agui_mpx
 from soliplex.agui import parser as agui_parser
 from soliplex.agui import thread as agui_thread
 
@@ -391,10 +392,10 @@ async def post_room_agui_thread_id_run_id(
         agent=agent,
     )
 
-    run_input = agui_adapter.run_input
+    run_agent_input = agui_adapter.run_input
 
     try:
-        run.check_run_input(run_input)
+        run.check_run_input(run_agent_input)
     except agui_thread.RunInputMismatch:
         raise fastapi.HTTPException(
             status_code=400,
@@ -404,13 +405,15 @@ async def post_room_agui_thread_id_run_id(
     agent_deps = the_installation.get_agent_deps_for_room(
         room_id,
         user=user,
+        run_agent_input=run_agent_input,
     )
 
-    agent_stream = agui_adapter.run_stream(deps=agent_deps)
+    mpx = agui_mpx.multiplex_streams(
+        agui_adapter.run_stream(deps=agent_deps),
+        agui_parser.agui_events_from_dicts(agent_deps.agui_emitter),
+    )
 
-    esp = agui_parser.EventStreamParser(run_input, run=run)
-    esp_stream = esp.parse_stream(agent_stream)
-    sse_stream = agui_adapter.encode_stream(esp_stream)
+    sse_stream = agui_adapter.encode_stream(mpx)
 
     return responses.StreamingResponse(
         sse_stream,
