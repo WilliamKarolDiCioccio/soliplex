@@ -1272,3 +1272,32 @@ def test_agui_event_from_json(json_dict, expectaton):
 
     if isinstance(expected, agui_core.BaseEvent):
         assert found == expected
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "json_dicts, events",
+    [
+        ([], []),
+        (
+            [
+                TEST_RUN_STARTED.model_dump(),
+                TEST_RUN_FINISHED.model_dump(),
+            ],
+            [
+                TEST_RUN_STARTED,
+                TEST_RUN_FINISHED,
+            ],
+        ),
+    ],
+)
+async def test_agui_events_from_dicts(run_input, json_dicts, events):
+    async def stream() -> agui_parser.AGUI_EventDictIterator:
+        for json_dict in json_dicts:
+            yield json_dict
+
+    found = [
+        event async for event in agui_parser.agui_events_from_dicts(stream())
+    ]
+
+    assert found == events
