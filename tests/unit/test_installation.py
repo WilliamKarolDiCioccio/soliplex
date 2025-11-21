@@ -144,6 +144,13 @@ def test_installation_resolve_environment(w_raise):
         the_installation.resolve_environment()
 
 
+def test_installation_haiku_rag_config():
+    i_config = mock.create_autospec(config.InstallationConfig)
+    the_installation = installation.Installation(i_config)
+
+    assert the_installation.haiku_rag_config is i_config.haiku_rag_config
+
+
 @pytest.mark.parametrize("w_oidc_configs", [[], [object()]])
 def test_installation_auth_disabled(w_oidc_configs):
     i_config = mock.create_autospec(config.InstallationConfig)

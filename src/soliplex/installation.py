@@ -5,6 +5,7 @@ import pathlib
 import fastapi
 import pydantic_ai
 from ag_ui import core as agui_core
+from haiku.rag import config as hr_config
 from haiku.rag.graph import agui as hr_agui
 
 from soliplex import agents
@@ -31,6 +32,10 @@ class Installation:
 
     def resolve_environment(self):
         self._config.resolve_environment()
+
+    @property
+    def haiku_rag_config(self) -> hr_config.AppConfig:
+        return self._config.haiku_rag_config
 
     @property
     def auth_disabled(self):
