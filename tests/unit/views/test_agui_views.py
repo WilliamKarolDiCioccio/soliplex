@@ -6,7 +6,6 @@ import fastapi
 import pytest
 from ag_ui import core as agui_core
 
-from soliplex import agents
 from soliplex import installation
 from soliplex import models
 from soliplex.agui import thread as agui_thread
@@ -662,11 +661,6 @@ async def test_post_room_agui_thread_id_run_id(
     else:
         exp_run.check_run_input.return_value = None
 
-    exp_deps = agents.AgentDependencies(
-        the_installation=the_installation,
-        user=USER_PROFILE,
-    )
-
     aga.from_request = mock.AsyncMock()
     exp_adapter = aga.from_request.return_value
     exp_adapter.run_input = run_input
@@ -702,7 +696,14 @@ async def test_post_room_agui_thread_id_run_id(
 
         esp.assert_called_once_with(exp_adapter.run_input, run=exp_run)
 
-        exp_adapter.run_stream.assert_called_once_with(deps=exp_deps)
+        exp_adapter.run_stream.assert_called_once_with(
+            deps=the_installation.get_agent_deps_for_room.return_value,
+        )
+
+        the_installation.get_agent_deps_for_room.assert_called_once_with(
+            TEST_ROOM_ID,
+            USER_PROFILE,
+        )
 
         aga.from_request.assert_called_once_with(
             request=request,

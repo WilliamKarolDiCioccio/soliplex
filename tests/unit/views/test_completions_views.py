@@ -3,7 +3,6 @@ from unittest import mock
 import fastapi
 import pytest
 
-from soliplex import agents
 from soliplex import config
 from soliplex import installation
 from soliplex import models
@@ -202,18 +201,19 @@ async def test_post_chat_completion_hit(
     assert response is occ.return_value
 
     exp_user_profile = models.UserProfile(**exp_user)
-    exp_agent_deps = agents.AgentDependencies(
-        the_installation=the_installation,
-        user=exp_user_profile,
-    )
     occ.assert_awaited_once_with(
         the_installation.get_agent_for_completion.return_value,
-        exp_agent_deps,
+        the_installation.get_agent_deps_for_completion.return_value,
         chat_request,
     )
 
     the_installation.get_agent_for_completion.assert_called_once_with(
         COMPLETION_ID, auth_fn.return_value
+    )
+
+    the_installation.get_agent_deps_for_completion.assert_called_once_with(
+        COMPLETION_ID,
+        exp_user_profile,
     )
 
     auth_fn.assert_called_once_with(the_installation, token)

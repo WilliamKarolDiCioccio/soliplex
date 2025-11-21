@@ -2,7 +2,6 @@ import fastapi
 from fastapi import responses
 from fastapi import security
 
-from soliplex import agents
 from soliplex import auth
 from soliplex import completions
 from soliplex import installation
@@ -91,8 +90,8 @@ async def post_chat_completion(
             status_code=404, detail=f"No such completion: {completion_id}"
         ) from None
 
-    agent_deps = agents.AgentDependencies(
-        the_installation=the_installation,
+    agent_deps = the_installation.get_agent_deps_for_completion(
+        completion_id,
         user=user_profile,
     )
 

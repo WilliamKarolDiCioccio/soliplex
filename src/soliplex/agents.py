@@ -18,6 +18,7 @@ from soliplex import models
 class AgentDependencies(pydantic.BaseModel):
     the_installation: typing.Any  # installation.Installation
     user: models.UserProfile = None  # TBD make required
+    tool_configs: config.ToolConfigMap = None
     agui_emitter: typing.Any = None
 
 

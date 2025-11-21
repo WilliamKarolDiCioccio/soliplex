@@ -8,7 +8,6 @@ import pytest
 from fastapi import responses
 from pydantic_ai import messages as ai_messages
 
-from soliplex import agents
 from soliplex import convos
 from soliplex import models
 from soliplex.views import convos as convos_views
@@ -244,15 +243,15 @@ async def test_post_convos_new_room(
 
         exp_user_profile = models.UserProfile(**exp_user)
 
-        expected_deps = agents.AgentDependencies(
-            the_installation=the_installation,
-            user=exp_user_profile,
-        )
-
         agent.run.assert_called_once_with(
             USER_PROMPT,
             message_history=[],
-            deps=expected_deps,
+            deps=the_installation.get_agent_deps_for_room.return_value,
+        )
+
+        the_installation.get_agent_deps_for_room.assert_called_once_with(
+            TEST_CONVO_ROOMID,
+            exp_user_profile,
         )
 
         the_convos.new_conversation.assert_called_once_with(
@@ -430,15 +429,15 @@ async def test_post_convo(
 
         exp_user_profile = models.UserProfile(**exp_user)
 
-        expected_deps = agents.AgentDependencies(
-            the_installation=the_installation,
-            user=exp_user_profile,
-        )
-
         agent.run_stream.assert_called_once_with(
             USER_PROMPT,
             message_history=OLD_AI_MESSAGES,
-            deps=expected_deps,
+            deps=the_installation.get_agent_deps_for_room.return_value,
+        )
+
+        the_installation.get_agent_deps_for_room.assert_called_once_with(
+            TEST_CONVO_ROOMID,
+            exp_user_profile,
         )
 
         the_convos.get_conversation.assert_called_once_with(
