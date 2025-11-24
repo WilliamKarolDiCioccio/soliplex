@@ -89,7 +89,8 @@ environment:
 agent_configs:
 
   - id: "template_qwen3"
-    model_name: "qwen3:latest"
+    model_name: "gpt-4o-mini"
+    provider_type: "openai"
     provider_base_url: "https://api.openai.com"
     provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
@@ -101,6 +102,7 @@ agent_configs:
 
   - id: "template_gpt_oss"
     model_name: "gpt-oss:20b"
+    provider_type: "openai"
     provider_base_url: "https://api.openai.com"
     provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
