@@ -9,6 +9,8 @@ class Thread {
   final List<ag_ui.Run> _runs = [];
   final StreamController<ag_ui.Message> _messagesController;
 
+  final StringBuffer _textBuffer = StringBuffer();
+
   Thread({required this.id, required this.client})
     : _messagesController = StreamController.broadcast();
 
@@ -39,7 +41,21 @@ class Thread {
         ):
           final message = ag_ui.AssistantMessage(id: msgId, content: text);
           _messagesController.add(message);
-
+        // TODO: verify that msgId matches across
+        // `TextMessageStartEvent`, `..Content...`, and `..End..`
+        case ag_ui.TextMessageStartEvent(messageId: final _):
+          _textBuffer.clear();
+        case ag_ui.TextMessageContentEvent(
+          messageId: final _,
+          delta: final text,
+        ):
+          _textBuffer.write(text);
+        case ag_ui.TextMessageEndEvent(messageId: final msgId):
+          final message = ag_ui.AssistantMessage(
+            id: msgId,
+            content: _textBuffer.toString(),
+          );
+          _messagesController.add(message);
         default:
           debugPrint("Ignore $event");
       }
