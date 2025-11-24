@@ -205,7 +205,7 @@ haiku_rag_config_file: "./haiku.rag.yaml"
 
 agent_configs:
 
-  - id: "template_qwen3"
+  - id: "default_chat"
     model_name: "qwen3:latest"
     provider_base_url: "https://api.openai.com"
     provider_key: "secret:OPENAI_API_KEY"
@@ -216,7 +216,7 @@ agent_configs:
 
       Always provide code or examples in Markdown blocks.
 
-  - id: "template_gpt_oss"
+  - id: "alternate_chat"
     model_name: "gpt-oss:20b"
     provider_base_url: "https://api.openai.com"
     provider_key: "secret:OPENAI_API_KEY"

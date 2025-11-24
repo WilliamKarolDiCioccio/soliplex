@@ -83,7 +83,7 @@ environment:
 
 agent_configs:
 
-  - id: "template_qwen3"
+  - id: "default_chat"
     model_name: "qwen3:latest"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
@@ -92,7 +92,7 @@ agent_configs:
 
       Always provide code or examples in Markdown blocks.
 
-  - id: "template_gpt_oss"
+  - id: "alternate_chat"
     model_name: "gpt-oss:20b"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
