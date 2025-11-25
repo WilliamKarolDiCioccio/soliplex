@@ -45,28 +45,6 @@ environment:
     value: "qwen3:latest"
 
   #------------------------------------------------------------------------
-  # 'haiku.rag' config vars
-  #------------------------------------------------------------------------
-
-  - name: "EMBEDDINGS_PROVIDER"
-    value: "ollama"
-
-  - name: "EMBEDDINGS_MODEL"
-    value: "mxbai-embed-large"
-
-  - name: "EMBEDDINGS_VECTOR_DIM"
-    value: "1024"
-
-  - name: "QA_PROVIDER"
-    value: "ollama"
-
-  - name: "QA_MODEL"
-    value: "qwen3:latest"
-
-  - name: "RERANK"
-    value: "false"
-
-  #------------------------------------------------------------------------
   # 'soliplex': on-disk configuration locations
   #------------------------------------------------------------------------
 
@@ -75,6 +53,13 @@ environment:
 
   - name: "RAG_LANCE_DB_PATH"
     value: "file:../db/rag"
+
+
+#==========================================================================
+# Global 'haiku-rag' configuration
+#==========================================================================
+
+haiku_rag_config_file: "./haiku.rag.yaml"
 
 
 #==========================================================================

@@ -49,27 +49,6 @@ environment:
   - name: "DEFAULT_AGENT_MODEL"
     value: "gpt-4o-mini"
 
-  #------------------------------------------------------------------------
-  # 'haiku.rag' config vars
-  #------------------------------------------------------------------------
-
-  - name: "EMBEDDINGS_PROVIDER"
-    value: "ollama"
-
-  - name: "EMBEDDINGS_MODEL"
-    value: "qwen3-embedding:4b"
-
-  - name: "EMBEDDINGS_VECTOR_DIM"
-    value: "2560"
-
-  - name: "QA_PROVIDER"
-    value: "openai"
-
-  - name: "QA_MODEL"
-    value: "gpt-4o-mini"
-
-  - name: "RERANK"
-    value: "false"
 
   #------------------------------------------------------------------------
   # 'soliplex': on-disk configuration locations
@@ -80,6 +59,13 @@ environment:
 
   - name: "RAG_LANCE_DB_PATH"
     value: "file:../db/rag"
+
+
+#==========================================================================
+# Global 'haiku-rag' configuration
+#==========================================================================
+
+haiku_rag_config_file: "./haiku.rag.yaml"
 
 
 #==========================================================================
