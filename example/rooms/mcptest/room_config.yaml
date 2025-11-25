@@ -5,7 +5,7 @@ suggestions:
 - "What is the weather in <your location>?"
 
 agent:
-  template_id: "template_qwen3"
+  template_id: "default_chat"
   system_prompt: "./prompt.txt"
 
 tools:

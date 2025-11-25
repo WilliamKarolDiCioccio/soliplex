@@ -49,7 +49,24 @@ to OpenAI and provides RAG functionality.
 ## Running the example
 
 The example configuration provides an overview of how a soliplex
-application is assembled.  It includes a number of rooms that 
+application is assembled.  It contains four top-level installation
+configurations:
+
+- `example/minimal.yaml` is a minimal example using Ollama:  it requires
+  no secrets.
+
+- `example/installation.yaml` is a more fleshed-out example using Ollama:
+  it requires secrets for the exernal Model-Control Protocol (MCP) client
+  toosets for the room `mcptest`.
+
+- `example/minimal-openai.yaml` is a minimal example using OpenAI: 
+  it requires no secrets beyond the `OPENAI_API_KEY`.
+
+- `example/installation.yaml` is a more fleshed-out example using OpenAI:
+  in addition tothe `OPENAI_API_KEY` secret, it requires secrets for the
+  exernal Model-Control Protocol (MCP) client toosets for the room `mcptest`.
+
+Each installation configuration includes a number of rooms that 
 
 1. Configure resources:
 
@@ -62,14 +79,18 @@ application is assembled.  It includes a number of rooms that
    a. OIDC configuration:
    TODO
 
-2. Configure Ollama:
+2. Configure the LLM (Ollama / OpenAI):
 
-   - Export the URL of your model server as `OLLAMA_BASE_URL`.  This
-    url should *not* contain the `/v1` suffix: e.g. use
-    `OLLAMA_BASE_URL=http://localhost:11434` if you are running Ollama
-    on your own machine.
+   - For the Ollama veriants, export the URL of your model server as
+     `OLLAMA_BASE_URL`.  This url should *not* contain the `/v1` suffix.
+     E.g. if you are running Ollama on your own machine:
 
-   - The example configuration uses the qwen3 model.  To install:
+     ```bash
+     export OLLAMA_BASE_URL=http://localhost:11434
+     ```
+
+   - The example configuration uses the `qwen3` model.  If using either
+     Ollama variant, install that model via:
      ```bash
      ollama pull qwen3:latest
      ```
@@ -79,19 +100,19 @@ application is assembled.  It includes a number of rooms that
    This command will check the server for any missing variables or
    invalid configuration files.
    ```bash
-   soliplex-cli check-config example/installation.yaml
+   soliplex-cli check-config example/<installation config>.yaml
    ```
 
-   The secrets used in the default configuration should be exported as
-   environment variables:
+   The secrets used in the your chosen configuration should be exported as
+   environment variables, e.g.:
    ```
    SMITHERY_AI_API_KEY=<your key>
    SMITHERY_AI_PROFILE=<your profile>
-   OLLAMA_BASE_URL=http://localhost:11434
    ```
 
-   Note that there is an alternate installation configuration,
-   `example/minimal.yaml` which requires no secrets, but still expects
+   Note that the alternate installation configurations, `example/minimal.yaml`
+   and `example/minimal-openai.yaml`, requires no additional secrets
+   The `example/minimal.yaml` configuration still expects
    the `OLLAMA_BASE_URL` environment variable to be set (or present in
    an `.env` file):
    ```bash

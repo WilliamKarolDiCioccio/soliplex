@@ -29,6 +29,7 @@ dependencies = [
     "starlette",
     "trio",
     "uvicorn[standard]",
+    "certifi >= 2025.11.12",
 ]
 
 [project.scripts]

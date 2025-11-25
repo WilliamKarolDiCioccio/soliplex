@@ -20,6 +20,7 @@ class Thread {
   Stream<ag_ui.Message> get messageStream => _messagesController.stream;
 
   Future<void> startRun({
+    required String endpoint,
     required String runId,
     required ag_ui.UserMessage message,
   }) async {
@@ -34,7 +35,7 @@ class Thread {
       messages: [message],
     );
 
-    await for (final event in client.runAgent('endpoint', agentInput)) {
+    await for (final event in client.runAgent(endpoint, agentInput)) {
       switch (event) {
         case ag_ui.TextMessageChunkEvent(
           messageId: final msgId,

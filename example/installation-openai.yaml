@@ -2,7 +2,7 @@
 # Soliplex installation configuration
 #==========================================================================
 
-id: "soliplex-conf-default"
+id: "soliplex-conf-default-openai"
 
 #==========================================================================
 # Meta-configuration
@@ -91,6 +91,11 @@ meta:
 #==========================================================================
 
 secrets:
+
+  # ----------------------------------------------------------------------
+  # API key for OpenAI
+  # ----------------------------------------------------------------------
+  - "OPENAI_API_KEY"
 
   # ----------------------------------------------------------------------
   # API key for Pydantic AI logging / debugging
@@ -201,7 +206,10 @@ haiku_rag_config_file: "./haiku.rag.yaml"
 agent_configs:
 
   - id: "default_chat"
-    model_name: "qwen3:latest"
+    model_name: "gpt-4o-mini"
+    provider_type: "openai"
+    provider_base_url: "https://api.openai.com"
+    provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
 
@@ -210,7 +218,10 @@ agent_configs:
       Always provide code or examples in Markdown blocks.
 
   - id: "alternate_chat"
-    model_name: "gpt-oss:20b"
+    model_name: "gpt-5"
+    provider_type: "openai"
+    provider_base_url: "https://api.openai.com"
+    provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
 
