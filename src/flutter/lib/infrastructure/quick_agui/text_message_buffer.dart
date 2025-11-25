@@ -1,14 +1,8 @@
 class TextMessageBuffer {
-  final StringBuffer messageId = StringBuffer();
+  final String messageId;
   final StringBuffer _buffer = StringBuffer();
 
-  TextMessageBuffer();
-
-  void start(String id) {
-    messageId.clear();
-    messageId.write(id);
-    _buffer.clear();
-  }
+  TextMessageBuffer(this.messageId);
 
   void add(String id, String content) {
     if (id != messageId.toString()) {
