@@ -41,6 +41,7 @@ void main() {
       ).thenAnswer((_) => Stream.empty());
 
       thread.startRun(
+        endpoint: 'agent',
         runId: '--irrelevant-run-id--',
         message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
       );
@@ -66,6 +67,7 @@ void main() {
       final thread = Thread(id: threadId, client: client);
       final publishedMessages = thread.messageStream.take(2).toList();
       thread.startRun(
+        endpoint: 'agent',
         runId: runId,
         message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
       );
