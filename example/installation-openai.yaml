@@ -2,7 +2,7 @@
 # Soliplex installation configuration
 #==========================================================================
 
-id: "soliplex-conf-default"
+id: "soliplex-conf-default-openai"
 
 #==========================================================================
 # Meta-configuration
@@ -91,6 +91,11 @@ meta:
 #==========================================================================
 
 secrets:
+
+  # ----------------------------------------------------------------------
+  # API key for OpenAI
+  # ----------------------------------------------------------------------
+  - "OPENAI_API_KEY"
 
   # ----------------------------------------------------------------------
   # API key for Pydantic AI logging / debugging
@@ -202,6 +207,8 @@ agent_configs:
 
   - id: "default_chat"
     model_name: "qwen3:latest"
+    provider_base_url: "https://api.openai.com"
+    provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
 
@@ -211,6 +218,8 @@ agent_configs:
 
   - id: "alternate_chat"
     model_name: "gpt-oss:20b"
+    provider_base_url: "https://api.openai.com"
+    provider_key: "secret:OPENAI_API_KEY"
     system_prompt: |
       You are an expert AI assistant specializing in information retrieval.
 

@@ -352,6 +352,19 @@ system_prompt: "{SYSTEM_PROMPT}"
 model_name: "{MODEL_NAME}"
 """
 
+W_PROVIDER_KW_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    provider_type=config.LLMProviderType.OPENAI,
+    provider_base_url=OTHER_PROVIDER_BASE_URL,
+    provider_key="secret:OTHER_PROVIDER_KEY",
+)
+W_PROVIDER_KW_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+provider_type: "openai"
+provider_base_url: "{OTHER_PROVIDER_BASE_URL}"
+provider_key: "secret:OTHER_PROVIDER_KEY"
+"""
+
 AGENT_RETRIES = 7
 W_RETRIES_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
@@ -1933,6 +1946,10 @@ def test_agentconfig_ctor(installation_config, kw):
         (EMPTY_AGENT_CONFIG_YAML, EMPTY_AGENT_CONFIG_KW.copy()),
         (BARE_AGENT_CONFIG_YAML, BARE_AGENT_CONFIG_KW.copy()),
         (
+            W_PROVIDER_KW_AGENT_CONFIG_YAML,
+            W_PROVIDER_KW_AGENT_CONFIG_KW.copy(),
+        ),
+        (
             W_RETRIES_AGENT_CONFIG_YAML,
             W_RETRIES_AGENT_CONFIG_KW.copy(),
         ),
@@ -2083,13 +2100,12 @@ def test_agentconfig_llm_provider_kw(
         installation_config.get_secret.assert_not_called()
 
 
-@pytest.mark.parametrize("has_pk", [False, True])
-@pytest.mark.parametrize("has_base_url", [False, True])
 @pytest.mark.parametrize(
     "agent_config_kw",
     [
         EMPTY_AGENT_CONFIG_KW.copy(),
         BARE_AGENT_CONFIG_KW.copy(),
+        W_PROVIDER_KW_AGENT_CONFIG_KW.copy(),
         W_RETRIES_AGENT_CONFIG_KW.copy(),
         W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
     ],
@@ -2097,8 +2113,6 @@ def test_agentconfig_llm_provider_kw(
 def test_agentconfig_as_yaml(
     installation_config,
     agent_config_kw,
-    has_base_url,
-    has_pk,
 ):
     agent_config_kw = copy.deepcopy(agent_config_kw)
 
@@ -2120,20 +2134,15 @@ def test_agentconfig_as_yaml(
         "system_prompt": system_prompt,
         "model_name": model_name,
         "retries": agent_config_kw.get("retries", 3),
-        "provider_type": "ollama",
+        "provider_type": agent_config_kw.get("provider_type", "ollama"),
     }
 
-    if has_base_url:
-        agent_config_kw["provider_base_url"] = PROVIDER_BASE_URL
-        expected["provider_base_url"] = PROVIDER_BASE_URL
-    else:
-        expected["provider_base_url"] = OLLAMA_BASE_URL
+    expected["provider_base_url"] = agent_config_kw.get(
+        "provider_base_url",
+        OLLAMA_BASE_URL,
+    )
 
-    if has_pk:
-        agent_config_kw["provider_key"] = "secret:SECRET_NAME"
-        expected["provider_key"] = "secret:SECRET_NAME"
-    else:
-        expected["provider_key"] = None
+    expected["provider_key"] = agent_config_kw.get("provider_key")
 
     aconfig = config.AgentConfig(**agent_config_kw)
 

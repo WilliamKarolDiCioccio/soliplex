@@ -778,7 +778,7 @@ class AgentConfig:
             "model_name": self.model_name,
             "retries": self.retries,
             "system_prompt": prompt,
-            "provider_type": self.provider_type.value,
+            "provider_type": str(self.provider_type),
             "provider_base_url": provider_base_url,
             "provider_key": self.provider_key,  # "secret:SECRET_NAME"
         }
