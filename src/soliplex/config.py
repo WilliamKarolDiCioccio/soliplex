@@ -9,6 +9,7 @@ import json
 import os
 import pathlib
 import random
+import ssl
 import typing
 from collections import abc
 from urllib import parse as url_parse
@@ -209,7 +210,9 @@ class OIDCAuthSystemConfig:
             client_kwargs["scope"] = self.scope
 
         if self.oidc_client_pem_path is not None:
-            client_kwargs["verify"] = str(self.oidc_client_pem_path)
+            client_kwargs["verify"] = ssl.create_default_context(
+                cafile=self.oidc_client_pem_path
+            )
 
         try:
             client_secret = self._installation_config.get_secret(
