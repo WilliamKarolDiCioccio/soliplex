@@ -47,7 +47,7 @@ environment:
   - "OLLAMA_BASE_URL"
 
   - name: "DEFAULT_AGENT_MODEL"
-    value: "qwen3:latest"
+    value: "gpt-4o-mini"
 
   #------------------------------------------------------------------------
   # 'haiku.rag' config vars
@@ -57,16 +57,16 @@ environment:
     value: "ollama"
 
   - name: "EMBEDDINGS_MODEL"
-    value: "mxbai-embed-large"
+    value: "qwen3-embedding:4b"
 
   - name: "EMBEDDINGS_VECTOR_DIM"
-    value: "1024"
+    value: "2560"
 
   - name: "QA_PROVIDER"
-    value: "ollama"
+    value: "openai"
 
   - name: "QA_MODEL"
-    value: "qwen3:latest"
+    value: "gpt-4o-mini"
 
   - name: "RERANK"
     value: "false"
@@ -101,7 +101,7 @@ agent_configs:
       Always provide code or examples in Markdown blocks.
 
   - id: "alternate_chat"
-    model_name: "gpt-oss:20b"
+    model_name: "gpt-5"
     provider_type: "openai"
     provider_base_url: "https://api.openai.com"
     provider_key: "secret:OPENAI_API_KEY"
