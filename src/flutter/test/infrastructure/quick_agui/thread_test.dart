@@ -1,6 +1,7 @@
 import 'package:ag_ui/ag_ui.dart' as ag_ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+
 import 'package:soliplex_client/infrastructure/quick_agui/thread.dart';
 
 class AgUiClientMock extends Mock implements ag_ui.AgUiClient {}
@@ -130,6 +131,37 @@ void main() {
             )
             .having((m) => m.id, "message id", equals("msg-id-2")),
       );
+    }, timeout: Timeout(Duration(seconds: 2)));
+  });
+
+  group('Parse all events', () {
+    setUp(() {
+      thread = Thread(id: threadId, client: client);
+    });
+
+    test('step events', () async {
+      const runId = '--irrelevant-run-id--';
+      when(() => client.runAgent(any(), any())).thenAnswer(
+        (_) => Stream.fromIterable([
+          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+          ag_ui.StepStartedEvent(stepName: 'task a'),
+          ag_ui.StepFinishedEvent(stepName: 'task a'),
+          ag_ui.StepStartedEvent(stepName: 'task b'),
+          ag_ui.StepFinishedEvent(stepName: 'task b'),
+          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+        ]),
+      );
+
+      final publishedStates = thread.stateStream.take(2).toList();
+      thread.startRun(
+        endpoint: 'agent',
+        runId: runId,
+        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+      );
+
+      final [{'step': step1}, {'step': step2}] = await publishedStates;
+      expect(step1, equals('task a'));
+      expect(step2, equals('task b'));
     }, timeout: Timeout(Duration(seconds: 2)));
   });
 

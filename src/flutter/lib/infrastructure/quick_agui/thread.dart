@@ -11,15 +11,18 @@ class Thread {
   final ag_ui.AgUiClient client;
   final List<ag_ui.Run> _runs = [];
   final StreamController<ag_ui.Message> _messagesController;
+  final StreamController<ag_ui.State> _statesController;
 
   var _textBuffer = TextMessageBuffer('');
 
   Thread({required this.id, required this.client})
-    : _messagesController = StreamController.broadcast();
+    : _messagesController = StreamController.broadcast(),
+      _statesController = StreamController.broadcast();
 
   Iterable<ag_ui.Run> get runs => _runs;
 
   Stream<ag_ui.Message> get messageStream => _messagesController.stream;
+  Stream<ag_ui.State> get stateStream => _statesController.stream;
 
   Future<void> startRun({
     required String endpoint,
@@ -45,20 +48,26 @@ class Thread {
         ):
           final message = ag_ui.AssistantMessage(id: msgId, content: text);
           _messagesController.add(message);
-          
+
         case ag_ui.TextMessageStartEvent(messageId: final msgId):
           _textBuffer = TextMessageBuffer(msgId);
+
         case ag_ui.TextMessageContentEvent(
           messageId: final msgId,
           delta: final text,
         ):
           _textBuffer.add(msgId, text);
+
         case ag_ui.TextMessageEndEvent(messageId: final msgId):
           final message = ag_ui.AssistantMessage(
             id: msgId,
             content: _textBuffer.content,
           );
           _messagesController.add(message);
+
+        case ag_ui.StepStartedEvent(stepName: final stepName):
+          _statesController.add({'step': stepName});
+
         default:
           debugPrint("Ignore $event");
       }
