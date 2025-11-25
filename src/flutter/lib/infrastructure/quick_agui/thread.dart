@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:ag_ui/ag_ui.dart' as ag_ui;
 import 'package:flutter/foundation.dart';
+import 'package:soliplex_client/infrastructure/quick_agui/text_message_buffer.dart';
 
 class Thread {
   final String id;
@@ -9,7 +10,7 @@ class Thread {
   final List<ag_ui.Run> _runs = [];
   final StreamController<ag_ui.Message> _messagesController;
 
-  final StringBuffer _textBuffer = StringBuffer();
+  final _textBuffer = TextMessageBuffer();
 
   Thread({required this.id, required this.client})
     : _messagesController = StreamController.broadcast();
@@ -41,19 +42,18 @@ class Thread {
         ):
           final message = ag_ui.AssistantMessage(id: msgId, content: text);
           _messagesController.add(message);
-        // TODO: verify that msgId matches across
-        // `TextMessageStartEvent`, `..Content...`, and `..End..`
-        case ag_ui.TextMessageStartEvent(messageId: final _):
-          _textBuffer.clear();
+          
+        case ag_ui.TextMessageStartEvent(messageId: final msgId):
+          _textBuffer.start(msgId);
         case ag_ui.TextMessageContentEvent(
-          messageId: final _,
+          messageId: final msgId,
           delta: final text,
         ):
-          _textBuffer.write(text);
+          _textBuffer.add(msgId, text);
         case ag_ui.TextMessageEndEvent(messageId: final msgId):
           final message = ag_ui.AssistantMessage(
             id: msgId,
-            content: _textBuffer.toString(),
+            content: _textBuffer.content,
           );
           _messagesController.add(message);
         default:
