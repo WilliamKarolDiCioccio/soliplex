@@ -86,7 +86,6 @@ void main() {
     }, timeout: Timeout(Duration(seconds: 2)));
 
     test('text message contents', () async {
-      const threadId = '--irrelevant-thread-id--';
       const runId = '--irrelevant-run-id--';
       when(() => client.runAgent(any(), any())).thenAnswer(
         (_) => Stream.fromIterable([
@@ -107,7 +106,6 @@ void main() {
         ]),
       );
 
-      final thread = Thread(id: threadId, client: client);
       final publishedMessages = thread.messageStream.take(2).toList();
       thread.startRun(
         endpoint: 'agent',
