@@ -4,7 +4,7 @@ import 'package:soliplex_client/infrastructure/quick_agui/text_message_buffer.da
 
 void main() {
   group('TextMessageBuffer class', () {
-    test('should be instantiable', () {
+    test('should accept an id parameter and expose it', () {
       // Arrange & Act
       final buffer = TextMessageBuffer('message-id');
 
