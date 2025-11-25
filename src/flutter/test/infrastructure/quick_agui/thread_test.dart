@@ -57,7 +57,7 @@ void main() {
           ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
           ag_ui.TextMessageChunkEvent(
             messageId: 'msg-id-2',
-            delta: "hi! What can I do?",
+            delta: 'hi! What can I do?',
           ),
           ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
         ]),
@@ -81,6 +81,53 @@ void main() {
         msg2,
         isA<ag_ui.AssistantMessage>()
             .having((m) => m.content, "content", equals("hi! What can I do?"))
+            .having((m) => m.id, "message id", equals("msg-id-2")),
+      );
+    }, timeout: Timeout(Duration(seconds: 2)));
+
+    test('text message contents', () async {
+      const runId = '--irrelevant-run-id--';
+      when(() => client.runAgent(any(), any())).thenAnswer(
+        (_) => Stream.fromIterable([
+          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+          ag_ui.TextMessageStartEvent(messageId: 'msg-id-2'),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'he'),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'll'),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'o'),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: '!'),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' '),
+          ag_ui.TextMessageContentEvent(
+            messageId: 'msg-id-2',
+            delta: 'what can I',
+          ),
+          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' do?'),
+          ag_ui.TextMessageEndEvent(messageId: 'msg-id-2'),
+          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+        ]),
+      );
+
+      final publishedMessages = thread.messageStream.take(2).toList();
+      thread.startRun(
+        endpoint: 'agent',
+        runId: runId,
+        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+      );
+
+      final [msg1, msg2] = await publishedMessages;
+      expect(
+        msg1,
+        isA<ag_ui.UserMessage>()
+            .having((m) => m.content, "content", equals('hi!'))
+            .having((m) => m.id, "message id", equals("msg-id-1")),
+      );
+      expect(
+        msg2,
+        isA<ag_ui.AssistantMessage>()
+            .having(
+              (m) => m.content,
+              "content",
+              equals("hello! what can I do?"),
+            )
             .having((m) => m.id, "message id", equals("msg-id-2")),
       );
     }, timeout: Timeout(Duration(seconds: 2)));
