@@ -16,26 +16,26 @@ void main() {
     );
   });
 
+  const threadId = '--irrelevant-thread-id--';
+
   late ag_ui.AgUiClient client;
+  late Thread thread;
 
   setUp(() {
     client = AgUiClientMock();
   });
 
   group('Initialised Thread', () {
+    setUp(() {
+      thread = Thread(id: threadId, client: client);
+    });
+
     test('exposes an empty iterable of Run objects', () {
-      const testId = 'thread-456';
-      final thread = Thread(id: testId, client: client);
-
-      final runs = thread.runs;
-
-      expect(runs, isNotNull);
-      expect(runs, isA<Iterable<ag_ui.Run>>());
+      expect(thread.runs, isNotNull);
+      expect(thread.runs, isA<Iterable<ag_ui.Run>>());
     });
 
     test('startRun tracks the first run', () {
-      final thread = Thread(id: '--irrelevant-thread-id--', client: client);
-
       when(
         () => client.runAgent(any(), any()),
       ).thenAnswer((_) => Stream.empty());
@@ -51,7 +51,6 @@ void main() {
     });
 
     test('one text message chunk', () async {
-      const threadId = '--irrelevant-thread-id--';
       const runId = '--irrelevant-run-id--';
       when(() => client.runAgent(any(), any())).thenAnswer(
         (_) => Stream.fromIterable([
@@ -64,7 +63,6 @@ void main() {
         ]),
       );
 
-      final thread = Thread(id: threadId, client: client);
       final publishedMessages = thread.messageStream.take(2).toList();
       thread.startRun(
         endpoint: 'agent',
@@ -87,4 +85,6 @@ void main() {
       );
     }, timeout: Timeout(Duration(seconds: 2)));
   });
+
+  group('Thread after first run', () {});
 }
