@@ -5,6 +5,7 @@ import functools
 import inspect
 import json
 import pathlib
+import ssl
 import typing
 from unittest import mock
 from urllib import parse as url_parse
@@ -15,6 +16,8 @@ from haiku.rag import config as hr_config_module
 
 from soliplex import config
 from soliplex import secrets
+
+here = pathlib.Path(__file__).resolve().parent
 
 AUTHSYSTEM_ID = "testing"
 AUTHSYSTEM_TITLE = "Testing OIDC"
@@ -105,7 +108,9 @@ W_OIDC_CPP_REL_CONFIG_YAML = f"""
     oidc_client_pem_path: "{AUTHSYSTEM_OIDC_CLIENT_PEM_PATH_REL}"
 """
 
-AUTHSYSTEM_OIDC_CLIENT_PEM_PATH_ABS = "/path/to/cacert.pem"
+AUTHSYSTEM_OIDC_CLIENT_PEM_PATH_ABS = str(
+    pathlib.Path(here, "fixtures/cacert.pem")
+)
 W_OIDC_CPP_ABS_KW = BARE_AUTHSYSTEM_CONFIG_KW.copy()
 W_OIDC_CPP_ABS_KW["oidc_client_pem_path"] = AUTHSYSTEM_OIDC_CLIENT_PEM_PATH_ABS
 W_OIDC_CPP_ABS_CONFIG_YAML = f"""
@@ -1256,6 +1261,10 @@ def test_authsystem_oauth_client_args(
     assert found["name"] == AUTHSYSTEM_ID
     assert found["server_metadata_url"] == exp_url
     assert found["client_id"] == AUTHSYSTEM_CLIENT_ID
+    if "verify" in found["client_kwargs"]:
+        exp_client_kwargs.pop("verify")
+        actual_verify = found["client_kwargs"].pop("verify")
+        assert actual_verify.__class__ is ssl.SSLContext
     assert found["client_kwargs"] == exp_client_kwargs
 
     if bare_secret:
