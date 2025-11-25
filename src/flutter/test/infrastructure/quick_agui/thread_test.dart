@@ -18,6 +18,7 @@ void main() {
   });
 
   const threadId = '--irrelevant-thread-id--';
+  const runId = '--irrelevant-run-id--';
 
   late ag_ui.AgUiClient client;
   late Thread thread;
@@ -43,16 +44,15 @@ void main() {
 
       thread.startRun(
         endpoint: 'agent',
-        runId: '--irrelevant-run-id--',
+        runId: runId,
         message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
       );
 
       final [ag_ui.Run(runId: capturedRunId)] = thread.runs.toList();
-      expect(capturedRunId, '--irrelevant-run-id--');
+      expect(capturedRunId, runId);
     });
 
     test('one text message chunk', () async {
-      const runId = '--irrelevant-run-id--';
       when(() => client.runAgent(any(), any())).thenAnswer(
         (_) => Stream.fromIterable([
           ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
@@ -75,19 +75,18 @@ void main() {
       expect(
         msg1,
         isA<ag_ui.UserMessage>()
-            .having((m) => m.content, "content", equals('hi!'))
-            .having((m) => m.id, "message id", equals("msg-id-1")),
+            .having((m) => m.content, 'content', equals('hi!'))
+            .having((m) => m.id, 'message id', equals('msg-id-1')),
       );
       expect(
         msg2,
         isA<ag_ui.AssistantMessage>()
-            .having((m) => m.content, "content", equals("hi! What can I do?"))
-            .having((m) => m.id, "message id", equals("msg-id-2")),
+            .having((m) => m.content, 'content', equals('hi! What can I do?'))
+            .having((m) => m.id, 'message id', equals('msg-id-2')),
       );
     }, timeout: Timeout(Duration(seconds: 2)));
 
     test('text message contents', () async {
-      const runId = '--irrelevant-run-id--';
       when(() => client.runAgent(any(), any())).thenAnswer(
         (_) => Stream.fromIterable([
           ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
@@ -118,18 +117,18 @@ void main() {
       expect(
         msg1,
         isA<ag_ui.UserMessage>()
-            .having((m) => m.content, "content", equals('hi!'))
-            .having((m) => m.id, "message id", equals("msg-id-1")),
+            .having((m) => m.content, 'content', equals('hi!'))
+            .having((m) => m.id, 'message id', equals('msg-id-1')),
       );
       expect(
         msg2,
         isA<ag_ui.AssistantMessage>()
             .having(
               (m) => m.content,
-              "content",
-              equals("hello! what can I do?"),
+              'content',
+              equals('hello! what can I do?'),
             )
-            .having((m) => m.id, "message id", equals("msg-id-2")),
+            .having((m) => m.id, 'message id', equals('msg-id-2')),
       );
     }, timeout: Timeout(Duration(seconds: 2)));
   });
@@ -140,7 +139,6 @@ void main() {
     });
 
     test('step events', () async {
-      const runId = '--irrelevant-run-id--';
       when(() => client.runAgent(any(), any())).thenAnswer(
         (_) => Stream.fromIterable([
           ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
@@ -162,6 +160,69 @@ void main() {
       final [{'step': step1}, {'step': step2}] = await publishedStates;
       expect(step1, equals('task a'));
       expect(step2, equals('task b'));
+    }, timeout: Timeout(Duration(seconds: 2)));
+
+    test('tool call events', () async {
+      const toolCallId = 'tool-call-id';
+      const toolCallName = 'add-numbers';
+      when(() => client.runAgent(any(), any())).thenAnswer(
+        (_) => Stream.fromIterable([
+          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+          ag_ui.ToolCallStartEvent(
+            toolCallId: toolCallId,
+            toolCallName: toolCallName,
+          ),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: "{'arg1':"),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: " 1, '"),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: "arg2'"),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ": 2}"),
+          ag_ui.ToolCallEndEvent(toolCallId: toolCallId),
+          ag_ui.ToolCallResultEvent(
+            messageId: 'result_$toolCallId',
+            toolCallId: toolCallId,
+            content: "{'sum': 3}",
+          ),
+          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+        ]),
+      );
+
+      final publishedMessages = thread.messageStream.take(3).toList();
+      thread.startRun(
+        endpoint: 'agent',
+        runId: runId,
+        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+      );
+
+      final [_, msg1, msg2] = await publishedMessages;
+      expect(
+        msg1,
+        isA<ag_ui.AssistantMessage>().having(
+          (m) => m.toJson(),
+          'entire message in json',
+          equals(msg1.toJson()),
+        ),
+      );
+
+      final assistantMessage = msg1 as ag_ui.AssistantMessage;
+
+      expect(assistantMessage.id, equals('msg_$toolCallId'));
+      expect(assistantMessage.toolCalls?.length ?? 0, equals(1));
+
+      final [toolCall] = assistantMessage.toolCalls!;
+
+      expect(toolCall.id, equals(toolCallId));
+
+      final functionCall = toolCall.function;
+
+      expect(functionCall.name, toolCallName);
+      expect(functionCall.arguments, "{'arg1': 1, 'arg2': 2}");
+
+      expect(
+        msg2,
+        isA<ag_ui.ToolMessage>()
+            .having((m) => m.content, 'content', equals("{'sum': 3}"))
+            .having((m) => m.id, 'message id', equals('result_$toolCallId')),
+      );
     }, timeout: Timeout(Duration(seconds: 2)));
   });
 

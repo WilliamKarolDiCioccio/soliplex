@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:ag_ui/ag_ui.dart' as ag_ui;
 
+import 'pending_tool_call.dart';
 import 'text_message_buffer.dart';
 
 class Thread {
@@ -20,6 +21,8 @@ class Thread {
       _statesController = StreamController.broadcast();
 
   Iterable<ag_ui.Run> get runs => _runs;
+
+  final Map<String, PendingToolCall> _pendingToolCalls = {};
 
   Stream<ag_ui.Message> get messageStream => _messagesController.stream;
   Stream<ag_ui.State> get stateStream => _statesController.stream;
@@ -67,6 +70,45 @@ class Thread {
 
         case ag_ui.StepStartedEvent(stepName: final stepName):
           _statesController.add({'step': stepName});
+
+        case ag_ui.ToolCallStartEvent(
+          toolCallId: final id,
+          toolCallName: final name,
+        ):
+          _pendingToolCalls[id] = PendingToolCall(name);
+
+        case ag_ui.ToolCallArgsEvent(toolCallId: final id, delta: final delta):
+          _pendingToolCalls[id]?.appendArgs(delta);
+
+        case ag_ui.ToolCallEndEvent(toolCallId: final id):
+          final pending = _pendingToolCalls.remove(id);
+
+          if (pending == null) break;
+
+          _messagesController.add(
+            ag_ui.AssistantMessage(
+              // TODO: may need to get msg some other way (generate it or retrieve it from server).
+              id: 'msg_$id',
+              toolCalls: [
+                ag_ui.ToolCall(
+                  id: id,
+                  function: ag_ui.FunctionCall(
+                    name: pending.name,
+                    arguments: pending.args.isEmpty ? '{}' : pending.args,
+                  ),
+                ),
+              ],
+            ),
+          );
+
+        case ag_ui.ToolCallResultEvent(
+          messageId: final msgId,
+          toolCallId: final id,
+          content: final content,
+        ):
+          _messagesController.add(
+            ag_ui.ToolMessage(id: msgId, toolCallId: id, content: content),
+          );
 
         default:
           debugPrint("Ignore $event");
