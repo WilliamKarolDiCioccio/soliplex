@@ -26,13 +26,13 @@ indexing of documents.  For that purpose, either:
 - Pull the `docling-serve` Docker image, and run its server, with
   your `haiku.rag.yaml` file configured to use it.
 
-See the `haiku.rag` documentation to determine which installation you need:
+See the `haiku.rag` documentation to determine:
 
-https://ggozad.github.io/haiku.rag/installation/
+- [Which installation do you need?](https://ggozad.github.io/haiku.rag/installation/)
 
-and how to use `haiku-rag` in "remote processing" mode:
+- [What are the tradeoffs of local vs. remote processing?](https://ggozad.github.io/haiku.rag/configuration/processing/#local-vs-remote-processing)
 
-https://ggozad.github.io/haiku.rag/remote-processing/
+- [How to configure `haiku-rag` to run in "remote processing" mode?](https://ggozad.github.io/haiku.rag/remote-processing/)
 
 
 ## Adding a single document
