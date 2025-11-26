@@ -140,13 +140,11 @@ void main() {
           'msg-4',
         );
 
-        when(() => client.runAgent(any(), any())).thenAnswer(
-          (_) => Stream.fromIterable([
-            ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-1'),
-            ag_ui.TextMessageChunkEvent(messageId: msgId2, delta: 'hello'),
-            ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-1'),
-          ]),
-        );
+        clientWillReceive(client, [
+          ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-1'),
+          ag_ui.TextMessageChunkEvent(messageId: msgId2, delta: 'hello'),
+          ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-1'),
+        ]);
 
         await thread.startRun(
           endpoint: 'agent',
@@ -154,13 +152,11 @@ void main() {
           message: ag_ui.UserMessage(id: msgId1, content: "hi"),
         );
 
-        when(() => client.runAgent(any(), any())).thenAnswer(
-          (_) => Stream.fromIterable([
-            ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-2'),
-            ag_ui.TextMessageChunkEvent(messageId: msgId4, delta: 'No problem'),
-            ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-2'),
-          ]),
-        );
+        clientWillReceive(client, [
+          ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-2'),
+          ag_ui.TextMessageChunkEvent(messageId: msgId4, delta: 'No problem'),
+          ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-2'),
+        ]);
 
         await thread.startRun(
           endpoint: 'agent',
@@ -168,22 +164,11 @@ void main() {
           message: ag_ui.UserMessage(id: msgId3, content: "Thanks"),
         );
 
-        final captured =
-            verify(() => client.runAgent('agent', captureAny())).captured.last
-                as ag_ui.SimpleRunAgentInput;
+        final captured = captureRunAgentInput(client);
 
-        expect(
-          captured.messages![0],
-          isA<ag_ui.UserMessage>().having((m) => m.id, 'id', msgId1),
-        );
-        expect(
-          captured.messages![1],
-          isA<ag_ui.AssistantMessage>().having((m) => m.id, 'id', msgId2),
-        );
-        expect(
-          captured.messages![2],
-          isA<ag_ui.UserMessage>().having((m) => m.id, 'id', msgId3),
-        );
+        expect(captured.messages![0], isUserMessage(msgId1));
+        expect(captured.messages![1], isAssistantMessage(msgId2));
+        expect(captured.messages![2], isUserMessage(msgId3));
       });
     });
   });
@@ -281,3 +266,20 @@ void main() {
     }, timeout: Timeout(Duration(seconds: 2)));
   });
 }
+
+void clientWillReceive(ag_ui.AgUiClient client, List<ag_ui.BaseEvent> events) {
+  when(
+    () => client.runAgent(any(), any()),
+  ).thenAnswer((_) => Stream.fromIterable(events));
+}
+
+ag_ui.SimpleRunAgentInput captureRunAgentInput(ag_ui.AgUiClient client) {
+  return verify(() => client.runAgent('agent', captureAny())).captured.last
+      as ag_ui.SimpleRunAgentInput;
+}
+
+TypeMatcher<ag_ui.UserMessage> isUserMessage(String id) =>
+    isA<ag_ui.UserMessage>().having((m) => m.id, "id", equals(id));
+
+TypeMatcher<ag_ui.AssistantMessage> isAssistantMessage(String id) =>
+    isA<ag_ui.AssistantMessage>().having((m) => m.id, "id", equals(id));
