@@ -25,112 +25,167 @@ void main() {
 
   setUp(() {
     client = AgUiClientMock();
+    thread = Thread(id: threadId, client: client);
   });
 
   group('Initialised Thread', () {
-    setUp(() {
-      thread = Thread(id: threadId, client: client);
-    });
-
     test('exposes an empty iterable of Run objects', () {
       expect(thread.runs, isNotNull);
       expect(thread.runs, isA<Iterable<ag_ui.Run>>());
     });
 
-    test('startRun tracks the first run', () {
-      when(
-        () => client.runAgent(any(), any()),
-      ).thenAnswer((_) => Stream.empty());
+    group('First run', () {
+      test('startRun tracks the first run', () {
+        when(
+          () => client.runAgent(any(), any()),
+        ).thenAnswer((_) => Stream.empty());
 
-      thread.startRun(
-        endpoint: 'agent',
-        runId: runId,
-        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
-      );
+        thread.startRun(
+          endpoint: 'agent',
+          runId: runId,
+          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+        );
 
-      final [ag_ui.Run(runId: capturedRunId)] = thread.runs.toList();
-      expect(capturedRunId, runId);
+        final [ag_ui.Run(runId: capturedRunId)] = thread.runs.toList();
+        expect(capturedRunId, runId);
+      });
+
+      test('one text message chunk', () async {
+        when(() => client.runAgent(any(), any())).thenAnswer(
+          (_) => Stream.fromIterable([
+            ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+            ag_ui.TextMessageChunkEvent(
+              messageId: 'msg-id-2',
+              delta: 'hi! What can I do?',
+            ),
+            ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+          ]),
+        );
+
+        final publishedMessages = thread.messageStream.take(2).toList();
+        thread.startRun(
+          endpoint: 'agent',
+          runId: runId,
+          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+        );
+
+        final [msg1, msg2] = await publishedMessages;
+        expect(
+          msg1,
+          isA<ag_ui.UserMessage>()
+              .having((m) => m.content, 'content', equals('hi!'))
+              .having((m) => m.id, 'message id', equals('msg-id-1')),
+        );
+        expect(
+          msg2,
+          isA<ag_ui.AssistantMessage>()
+              .having((m) => m.content, 'content', equals('hi! What can I do?'))
+              .having((m) => m.id, 'message id', equals('msg-id-2')),
+        );
+      }, timeout: Timeout(Duration(seconds: 2)));
+
+      test('text message contents', () async {
+        when(() => client.runAgent(any(), any())).thenAnswer(
+          (_) => Stream.fromIterable([
+            ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+            ag_ui.TextMessageStartEvent(messageId: 'msg-id-2'),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'he'),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'll'),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'o'),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: '!'),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' '),
+            ag_ui.TextMessageContentEvent(
+              messageId: 'msg-id-2',
+              delta: 'what can I',
+            ),
+            ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' do?'),
+            ag_ui.TextMessageEndEvent(messageId: 'msg-id-2'),
+            ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+          ]),
+        );
+
+        final publishedMessages = thread.messageStream.take(2).toList();
+        thread.startRun(
+          endpoint: 'agent',
+          runId: runId,
+          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+        );
+
+        final [msg1, msg2] = await publishedMessages;
+        expect(
+          msg1,
+          isA<ag_ui.UserMessage>()
+              .having((m) => m.content, 'content', equals('hi!'))
+              .having((m) => m.id, 'message id', equals('msg-id-1')),
+        );
+        expect(
+          msg2,
+          isA<ag_ui.AssistantMessage>()
+              .having(
+                (m) => m.content,
+                'content',
+                equals('hello! what can I do?'),
+              )
+              .having((m) => m.id, 'message id', equals('msg-id-2')),
+        );
+      }, timeout: Timeout(Duration(seconds: 2)));
     });
 
-    test('one text message chunk', () async {
-      when(() => client.runAgent(any(), any())).thenAnswer(
-        (_) => Stream.fromIterable([
-          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
-          ag_ui.TextMessageChunkEvent(
-            messageId: 'msg-id-2',
-            delta: 'hi! What can I do?',
-          ),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
-        ]),
-      );
+    group('Second run starting with user message', () {
+      test('sends message history along the new user message', () async {
+        final (msgId1, msgId2, msgId3, msgId4) = (
+          'msg-1',
+          'msg-2',
+          'msg-3',
+          'msg-4',
+        );
 
-      final publishedMessages = thread.messageStream.take(2).toList();
-      thread.startRun(
-        endpoint: 'agent',
-        runId: runId,
-        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
-      );
+        when(() => client.runAgent(any(), any())).thenAnswer(
+          (_) => Stream.fromIterable([
+            ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-1'),
+            ag_ui.TextMessageChunkEvent(messageId: msgId2, delta: 'hello'),
+            ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-1'),
+          ]),
+        );
 
-      final [msg1, msg2] = await publishedMessages;
-      expect(
-        msg1,
-        isA<ag_ui.UserMessage>()
-            .having((m) => m.content, 'content', equals('hi!'))
-            .having((m) => m.id, 'message id', equals('msg-id-1')),
-      );
-      expect(
-        msg2,
-        isA<ag_ui.AssistantMessage>()
-            .having((m) => m.content, 'content', equals('hi! What can I do?'))
-            .having((m) => m.id, 'message id', equals('msg-id-2')),
-      );
-    }, timeout: Timeout(Duration(seconds: 2)));
+        await thread.startRun(
+          endpoint: 'agent',
+          runId: 'run-id-1',
+          message: ag_ui.UserMessage(id: msgId1, content: "hi"),
+        );
 
-    test('text message contents', () async {
-      when(() => client.runAgent(any(), any())).thenAnswer(
-        (_) => Stream.fromIterable([
-          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
-          ag_ui.TextMessageStartEvent(messageId: 'msg-id-2'),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'he'),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'll'),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'o'),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: '!'),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' '),
-          ag_ui.TextMessageContentEvent(
-            messageId: 'msg-id-2',
-            delta: 'what can I',
-          ),
-          ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' do?'),
-          ag_ui.TextMessageEndEvent(messageId: 'msg-id-2'),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
-        ]),
-      );
+        when(() => client.runAgent(any(), any())).thenAnswer(
+          (_) => Stream.fromIterable([
+            ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-2'),
+            ag_ui.TextMessageChunkEvent(messageId: msgId4, delta: 'No problem'),
+            ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-2'),
+          ]),
+        );
 
-      final publishedMessages = thread.messageStream.take(2).toList();
-      thread.startRun(
-        endpoint: 'agent',
-        runId: runId,
-        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
-      );
+        await thread.startRun(
+          endpoint: 'agent',
+          runId: 'run-id-2',
+          message: ag_ui.UserMessage(id: msgId3, content: "Thanks"),
+        );
 
-      final [msg1, msg2] = await publishedMessages;
-      expect(
-        msg1,
-        isA<ag_ui.UserMessage>()
-            .having((m) => m.content, 'content', equals('hi!'))
-            .having((m) => m.id, 'message id', equals('msg-id-1')),
-      );
-      expect(
-        msg2,
-        isA<ag_ui.AssistantMessage>()
-            .having(
-              (m) => m.content,
-              'content',
-              equals('hello! what can I do?'),
-            )
-            .having((m) => m.id, 'message id', equals('msg-id-2')),
-      );
-    }, timeout: Timeout(Duration(seconds: 2)));
+        final captured =
+            verify(() => client.runAgent('agent', captureAny())).captured.last
+                as ag_ui.SimpleRunAgentInput;
+
+        expect(
+          captured.messages![0],
+          isA<ag_ui.UserMessage>().having((m) => m.id, 'id', msgId1),
+        );
+        expect(
+          captured.messages![1],
+          isA<ag_ui.AssistantMessage>().having((m) => m.id, 'id', msgId2),
+        );
+        expect(
+          captured.messages![2],
+          isA<ag_ui.UserMessage>().having((m) => m.id, 'id', msgId3),
+        );
+      });
+    });
   });
 
   group('Parse all events', () {
@@ -225,6 +280,4 @@ void main() {
       );
     }, timeout: Timeout(Duration(seconds: 2)));
   });
-
-  group('Thread after first run', () {});
 }

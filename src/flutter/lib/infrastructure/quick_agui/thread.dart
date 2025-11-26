@@ -13,6 +13,7 @@ class Thread {
   final List<ag_ui.Run> _runs = [];
   final StreamController<ag_ui.Message> _messagesController;
   final StreamController<ag_ui.State> _statesController;
+  final List<ag_ui.Message> messageHistory = [];
 
   var _textBuffer = TextMessageBuffer('');
 
@@ -25,6 +26,7 @@ class Thread {
   final Map<String, PendingToolCall> _pendingToolCalls = {};
 
   Stream<ag_ui.Message> get messageStream => _messagesController.stream;
+
   Stream<ag_ui.State> get stateStream => _statesController.stream;
 
   Future<void> startRun({
@@ -35,12 +37,13 @@ class Thread {
     final run = ag_ui.Run(threadId: id, runId: runId);
     _runs.add(run);
 
+    messageHistory.add(message);
     _messagesController.add(message);
 
     final agentInput = ag_ui.SimpleRunAgentInput(
       threadId: id,
       runId: runId,
-      messages: [message],
+      messages: messageHistory,
     );
 
     await for (final event in client.runAgent(endpoint, agentInput)) {
@@ -50,6 +53,7 @@ class Thread {
           delta: final text,
         ):
           final message = ag_ui.AssistantMessage(id: msgId, content: text);
+          messageHistory.add(message);
           _messagesController.add(message);
 
         case ag_ui.TextMessageStartEvent(messageId: final msgId):
@@ -66,6 +70,7 @@ class Thread {
             id: msgId,
             content: _textBuffer.content,
           );
+          messageHistory.add(message);
           _messagesController.add(message);
 
         case ag_ui.StepStartedEvent(stepName: final stepName):
@@ -85,21 +90,20 @@ class Thread {
 
           if (pending == null) break;
 
-          _messagesController.add(
-            ag_ui.AssistantMessage(
-              // TODO: may need to get msg some other way (generate it or retrieve it from server).
-              id: 'msg_$id',
-              toolCalls: [
-                ag_ui.ToolCall(
-                  id: id,
-                  function: ag_ui.FunctionCall(
-                    name: pending.name,
-                    arguments: pending.args.isEmpty ? '{}' : pending.args,
-                  ),
+          final toolCall = ag_ui.AssistantMessage(
+            // TODO: may need to get msg some other way (generate it or retrieve it from server).
+            id: 'msg_$id',
+            toolCalls: [
+              ag_ui.ToolCall(
+                id: id,
+                function: ag_ui.FunctionCall(
+                  name: pending.name,
+                  arguments: pending.args.isEmpty ? '{}' : pending.args,
                 ),
-              ],
-            ),
+              ),
+            ],
           );
+          _messagesController.add(toolCall);
 
         case ag_ui.ToolCallResultEvent(
           messageId: final msgId,
@@ -111,7 +115,7 @@ class Thread {
           );
 
         default:
-          debugPrint("Ignore $event");
+          debugPrint("Ignored $event");
       }
     }
   }
