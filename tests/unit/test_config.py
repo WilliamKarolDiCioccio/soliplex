@@ -220,6 +220,7 @@ FULL_HTTP_MCTC_CONFIG_YAML = """
 
 AGENT_ID = "testing"
 TEMPLATE_AGENT_ID = "testing-template"
+BOGUS_TEMPLATE_AGENT_ID = "BOGUS"
 SYSTEM_PROMPT = "You are a test"
 MODEL_NAME = "test-model"
 OTHER_MODEL_NAME = "test-model-other"
@@ -401,6 +402,12 @@ W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW = dict(
 W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 template_id: "{TEMPLATE_AGENT_ID}"
+system_prompt: ./prompt.txt
+"""
+
+W_PROMPT_FILE_W_BOGUS_TEMPLATE_ID_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+template_id: "{BOGUS_TEMPLATE_AGENT_ID}"
 system_prompt: ./prompt.txt
 """
 
@@ -2073,26 +2080,41 @@ def test_agentconfig_ctor(installation_config, kw):
 
 
 @pytest.mark.parametrize(
-    "config_yaml, expected_kw",
+    "config_yaml, expectation",
     [
-        (BOGUS_AGENT_CONFIG_YAML, None),
-        (EMPTY_AGENT_CONFIG_YAML, EMPTY_AGENT_CONFIG_KW.copy()),
-        (BARE_AGENT_CONFIG_YAML, BARE_AGENT_CONFIG_KW.copy()),
+        (
+            BOGUS_AGENT_CONFIG_YAML,
+            pytest.raises(config.FromYamlException),
+        ),
+        (
+            EMPTY_AGENT_CONFIG_YAML,
+            contextlib.nullcontext(EMPTY_AGENT_CONFIG_KW.copy()),
+        ),
+        (
+            BARE_AGENT_CONFIG_YAML,
+            contextlib.nullcontext(BARE_AGENT_CONFIG_KW.copy()),
+        ),
         (
             W_PROVIDER_KW_AGENT_CONFIG_YAML,
-            W_PROVIDER_KW_AGENT_CONFIG_KW.copy(),
+            contextlib.nullcontext(W_PROVIDER_KW_AGENT_CONFIG_KW.copy()),
         ),
         (
             W_RETRIES_AGENT_CONFIG_YAML,
-            W_RETRIES_AGENT_CONFIG_KW.copy(),
+            contextlib.nullcontext(W_RETRIES_AGENT_CONFIG_KW.copy()),
         ),
         (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
-            W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
+            contextlib.nullcontext(W_PROMPT_FILE_AGENT_CONFIG_KW.copy()),
         ),
         (
             W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_YAML,
-            W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW.copy(),
+            contextlib.nullcontext(
+                W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW.copy()
+            ),
+        ),
+        (
+            W_PROMPT_FILE_W_BOGUS_TEMPLATE_ID_AGENT_CONFIG_YAML,
+            pytest.raises(config.FromYamlException),
         ),
     ],
 )
@@ -2100,7 +2122,7 @@ def test_agentconfig_from_yaml(
     installation_config,
     temp_dir,
     config_yaml,
-    expected_kw,
+    expectation,
 ):
     yaml_file = temp_dir / "test.yaml"
     yaml_file.write_text(config_yaml)
@@ -2108,39 +2130,38 @@ def test_agentconfig_from_yaml(
     with yaml_file.open() as stream:
         config_dict = yaml.safe_load(stream)
 
-    if expected_kw is None:
-        with pytest.raises(config.FromYamlException):
-            config.AgentConfig.from_yaml(
-                installation_config,
-                yaml_file,
-                config_dict,
-            )
-    else:
+    if config_dict is not None:
         template_id = config_dict.get("template_id")
+    else:
+        template_id = None
 
-        if template_id is not None:
-            template_kw = {
-                "model_name": OTHER_MODEL_NAME,
-                "provider_base_url": OTHER_PROVIDER_BASE_URL,
-            }
-            installation_config.agent_configs = [
-                config.AgentConfig(id=template_id, **template_kw),
-            ]
-            expected_kw = template_kw | expected_kw
+    if template_id not in (None, BOGUS_TEMPLATE_AGENT_ID):
+        template_kw = {
+            "model_name": OTHER_MODEL_NAME,
+            "provider_base_url": OTHER_PROVIDER_BASE_URL,
+        }
+        installation_config.agent_configs = [
+            config.AgentConfig(id=template_id, **template_kw),
+        ]
+    else:
+        template_kw = {}
+        installation_config.agent_configs = []
 
-        expected = config.AgentConfig(
-            _installation_config=installation_config,
-            _config_path=yaml_file,
-            **expected_kw,
-        )
-
+    with expectation as expected:
         found = config.AgentConfig.from_yaml(
             installation_config,
             yaml_file,
             config_dict,
         )
 
-        assert found == expected
+    if isinstance(expected, dict):
+        exp_agent_config = config.AgentConfig(
+            _installation_config=installation_config,
+            _config_path=yaml_file,
+            **(template_kw | expected),
+        )
+
+        assert found == exp_agent_config
 
         # See #180.
         assert found._installation_config is installation_config

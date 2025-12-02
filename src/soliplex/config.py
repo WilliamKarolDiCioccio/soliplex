@@ -86,6 +86,16 @@ class RagDbFileNotFound(ValueError):
         )
 
 
+class InvalidAgentTemplateID(KeyError):
+    def __init__(self, template_id, _config_path):
+        self.template_id = template_id
+        self._config_path = _config_path
+        super().__init__(
+            f"Template agent not found: {template_id} "
+            f"(configured in {_config_path})"
+        )
+
+
 class QCExactlyOneOfStemOrOverride(TypeError):
     def __init__(self, _config_path):
         self._config_path = _config_path
@@ -735,6 +745,12 @@ class AgentConfig:
                     agent_config.id: agent_config
                     for agent_config in installation_config.agent_configs
                 }
+
+                if template_id not in ic_agent_configs_map:
+                    raise InvalidAgentTemplateID(  # noqa: TRY301
+                        template_id,
+                        config_path,
+                    )
 
                 template_config = ic_agent_configs_map[template_id]
 
