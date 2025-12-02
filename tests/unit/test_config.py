@@ -1640,6 +1640,49 @@ def test_sdtc_from_yaml(
 
 
 @pytest.mark.parametrize(
+    "stem, override, which",
+    [
+        ("testing", None, "stem"),
+        (None, "./override", "override"),
+    ],
+)
+def test_sdtc_get_extra_parameters_w_missing_file(
+    installation_config,
+    temp_dir,
+    stem,
+    override,
+    which,
+):
+    db_rag_path = temp_dir / "db" / "rag"
+    db_rag_path.mkdir(parents=True)
+
+    if which == "stem":
+        exp_filename = db_rag_path / f"{stem}.lancedb"
+    else:
+        exp_filename = temp_dir / override
+
+    ic_environ = {"RAG_LANCE_DB_PATH": str(db_rag_path)}
+    installation_config.get_environment = ic_environ.get
+
+    kw = {
+        "_installation_config": installation_config,
+        "_config_path": temp_dir / "room_config.yaml",
+    }
+
+    if stem is not None:
+        kw["rag_lancedb_stem"] = stem
+
+    if override is not None:
+        kw["rag_lancedb_override_path"] = override
+
+    sdt_config = config.SearchDocumentsToolConfig(**kw)
+
+    ep = sdt_config.get_extra_parameters()
+
+    assert ep["rag_lancedb_path"] == f"MISSING: {exp_filename}"
+
+
+@pytest.mark.parametrize(
     "hrc_override_yaml, hrc_override_kw",
     [
         (None, {}),

@@ -439,11 +439,16 @@ class SearchDocumentsToolConfig(ToolConfig):
             return rspdb
 
     def get_extra_parameters(self) -> dict:
+        try:
+            rag_lancedb_path = self.rag_lancedb_path
+        except RagDbFileNotFound as exc:
+            rag_lancedb_path = f"MISSING: {exc.rag_db_filename}"
+
         return {
             "expand_context_radius": self.expand_context_radius,
             "search_documents_limit": self.search_documents_limit,
             "return_citations": self.return_citations,
-            "rag_lancedb_path": self.rag_lancedb_path,
+            "rag_lancedb_path": rag_lancedb_path,
         }
 
 
