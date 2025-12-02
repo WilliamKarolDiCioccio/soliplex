@@ -4329,7 +4329,7 @@ def test_installationconfig_oidc_auth_system_configs_w_existing():
 
 
 def test_installationconfig_room_configs_wo_existing(temp_dir):
-    ROOM_IDS = ["foo", "bar"]
+    ROOM_IDS = ["foo", "bar", ".baz"]
 
     kw = BARE_INSTALLATION_CONFIG_KW.copy()
     kw["_config_path"] = temp_dir / "installation.yaml"
@@ -4342,6 +4342,10 @@ def test_installationconfig_room_configs_wo_existing(temp_dir):
         room_path = rooms / room_id
         room_path.mkdir()
         room_config = room_path / "room_config.yaml"
+
+        if room_id.startswith("."):
+            room_id = room_id[1:]
+
         room_config.write_text(
             BARE_ROOM_CONFIG_YAML.replace(
                 f'id: "{ROOM_ID}"',
@@ -4356,6 +4360,9 @@ def test_installationconfig_room_configs_wo_existing(temp_dir):
 
     assert found["foo"].id == "foo"
     assert found["bar"].id == "bar"
+
+    assert ".baz" not in found
+    assert "baz" not in found
 
 
 def test_installationconfig_room_configs_wo_existing_w_conflict(temp_dir):
