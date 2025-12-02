@@ -383,6 +383,77 @@ id: "{AGENT_ID}"
 retries: {AGENT_RETRIES}
 """
 
+OLLAMA_SEED = 1234
+OLLAMA_TEMPERATURE = 0.90
+OLLAMA_TOP_K = 2345
+OLLAMA_TOP_P = 0.70
+OLLAMA_MIN_P = 0.20
+OLLAMA_STOP = "STOP"
+OLLAMA_NUM_CTX = 1000
+OLLAMA_NUM_PREDICT = 500
+
+W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    provider_type="ollama",
+    provider_model_settings=config.OllamaModelSettings(
+        seed=OLLAMA_SEED,
+        temperature=OLLAMA_TEMPERATURE,
+        top_k=OLLAMA_TOP_K,
+        top_p=OLLAMA_TOP_P,
+        min_p=OLLAMA_MIN_P,
+        stop=OLLAMA_STOP,
+        num_ctx=OLLAMA_NUM_CTX,
+        num_predict=OLLAMA_NUM_PREDICT,
+    ),
+)
+W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+provider_type: "ollama"
+provider_model_settings:
+    seed: {OLLAMA_SEED}
+    temperature: {OLLAMA_TEMPERATURE}
+    top_k: {OLLAMA_TOP_K}
+    top_p: {OLLAMA_TOP_P}
+    min_p: {OLLAMA_MIN_P}
+    stop: {OLLAMA_STOP}
+    num_ctx: {OLLAMA_NUM_CTX}
+    num_predict: {OLLAMA_NUM_PREDICT}
+"""
+
+OPENAI_TEMPERATURE = 0.91
+OPENAI_TOP_P = 0.71
+OPENAI_FREQUENCY_PENALTY = 0.31
+OPENAI_PRESENCE_PENALTY = 0.21
+OPENAI_MAX_TOKENS = 1000
+
+W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    provider_type="openai",
+    provider_model_settings=config.OpenAIModelSettings(
+        temperature=OPENAI_TEMPERATURE,
+        top_p=OPENAI_TOP_P,
+        frequency_penalty=OPENAI_FREQUENCY_PENALTY,
+        presence_penalty=OPENAI_PRESENCE_PENALTY,
+        parallel_tool_calls=False,
+        truncation="disabled",
+        max_tokens=OPENAI_MAX_TOKENS,
+        verbosity="high",
+    ),
+)
+W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+provider_type: "openai"
+provider_model_settings:
+    temperature: {OPENAI_TEMPERATURE}
+    top_p: {OPENAI_TOP_P}
+    frequency_penalty: {OPENAI_FREQUENCY_PENALTY}
+    presence_penalty: {OPENAI_PRESENCE_PENALTY}
+    parallel_tool_calls: false
+    truncation: "disabled"
+    max_tokens: {OPENAI_MAX_TOKENS}
+    verbosity: "high"
+"""
+
 W_PROMPT_FILE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     _system_prompt_path="./prompt.txt",
@@ -2101,6 +2172,18 @@ def test_agentconfig_ctor(installation_config, kw):
         (
             W_RETRIES_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_RETRIES_AGENT_CONFIG_KW.copy()),
+        ),
+        (
+            W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_YAML,
+            contextlib.nullcontext(
+                W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()
+            ),
+        ),
+        (
+            W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_YAML,
+            contextlib.nullcontext(
+                W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()
+            ),
         ),
         (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,

@@ -697,6 +697,37 @@ class LLMProviderType(enum.StrEnum):
 
 
 @dataclasses.dataclass
+class OllamaModelSettings:
+    # See: https://docs.ollama.com/api/generate#body-options
+    _: dataclasses.KW_ONLY
+    seed: int = None
+    temperature: float = None
+    top_k: int = None
+    top_p: float = None
+    min_p: float = None
+    stop: str | list[str] = None
+    num_ctx: int = None
+    num_predict: int = None
+
+
+@dataclasses.dataclass
+class OpenAIModelSettings:
+    # See: https://openai.github.io/openai-agents-python/ref/model_settings/
+    _: dataclasses.KW_ONLY
+    temperature: float = None
+    top_p: float = None
+    frequency_penalty: float = None
+    presence_penalty: float = None
+    parallel_tool_calls: bool = None
+    truncation: typing.Literal["auto", "disabled"] = None
+    max_tokens: int = None
+    verbosity: typing.Literal["low", "medium", "high"] = None
+
+
+LLMProviderModelSettings = OllamaModelSettings | OpenAIModelSettings
+
+
+@dataclasses.dataclass
 class AgentConfig:
     #
     # Agent-specific options
@@ -713,6 +744,7 @@ class AgentConfig:
     provider_type: LLMProviderType = LLMProviderType.OLLAMA
     provider_base_url: str = None  # installation config provides default
     provider_key: str = None  # secret containing API key
+    provider_model_settings: LLMProviderModelSettings = None
 
     # Set by `from_yaml` factory
     _installation_config: InstallationConfig = _no_repr_none()
@@ -774,6 +806,17 @@ class AgentConfig:
                     config["_system_prompt_path"] = system_prompt
                 else:
                     config["system_prompt"] = system_prompt
+
+            if "provider_model_settings" in config:
+                pm_settings = config.pop("provider_model_settings")
+                p_type = config.get("provider_type", LLMProviderType.OLLAMA)
+
+                if p_type == LLMProviderType.OPENAI:
+                    s_klass = OpenAIModelSettings
+                else:
+                    s_klass = OllamaModelSettings
+
+                config["provider_model_settings"] = s_klass(**pm_settings)
 
             return cls(**config)
         except Exception as exc:
