@@ -231,7 +231,7 @@ class SoliplexTUI(t_app.App):
 
                 elif chunk["type"] == "ACTIVITY_SNAPSHOT":
                     response_content += (
-                        f"** activity **\n\n{chunk['content']}\n\n"
+                        f"\n\n** activity **\n\n{chunk['content']}\n\n"
                     )
 
                 elif chunk["type"] == "RUN_FINISHED":
