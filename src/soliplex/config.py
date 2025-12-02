@@ -32,10 +32,17 @@ class FromYamlException(ValueError):
         self._config_path = _config_path
         self.kind = kind
         self.config = config
+
+        if config is not None and "_installation_config" in config:
+            elide_ic = {"_installation_config": "<elided>"}
+            tb_config = config | elide_ic
+        else:
+            tb_config = config
+
         super().__init__(
             f"Error in YAML configuration: {_config_path}; "
             f"Kind: {kind}; "
-            f"Config: {config}; "
+            f"Config: {tb_config}; "
         )
 
 
