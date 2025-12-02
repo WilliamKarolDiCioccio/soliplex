@@ -408,9 +408,14 @@ async def post_room_agui_thread_id_run_id(
         run_agent_input=run_agent_input,
     )
 
+    emitter = agent_deps.agui_emitter
+
+    async def close_emitter(_result):
+        await emitter.close()
+
     mpx = agui_mpx.multiplex_streams(
-        agui_adapter.run_stream(deps=agent_deps),
-        agui_parser.agui_events_from_dicts(agent_deps.agui_emitter),
+        agui_adapter.run_stream(deps=agent_deps, on_complete=close_emitter),
+        agui_parser.agui_events_from_dicts(emitter),
     )
 
     sse_stream = agui_adapter.encode_stream(mpx)

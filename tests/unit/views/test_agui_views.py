@@ -647,6 +647,11 @@ async def test_post_room_agui_thread_id_run_id(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_installation.get_agent_for_room.return_value = agent
+
+    exp_deps = the_installation.get_agent_deps_for_room.return_value
+    exp_emitter = exp_deps.agui_emitter = mock.Mock(spec_set=["close"])
+    exp_emitter.close = mock.AsyncMock(spec_set=())
+
     the_threads = mock.create_autospec(agui_thread.Threads)
     token = object()
 
@@ -698,10 +703,22 @@ async def test_post_room_agui_thread_id_run_id(
             aefd.return_value,
         )
 
-        exp_deps = the_installation.get_agent_deps_for_room.return_value
-        aefd.assert_called_once_with(exp_deps.agui_emitter)
+        aefd.assert_called_once_with(exp_emitter)
 
-        exp_adapter.run_stream.assert_called_once_with(deps=exp_deps)
+        exp_adapter.run_stream.assert_called_once()
+        (rs_call_0,) = exp_adapter.run_stream.call_args_list
+        assert rs_call_0.args == ()
+        assert rs_call_0.kwargs["deps"] is exp_deps
+
+        # the 'agui_emitter' stream does not get closed until the
+        # adapter's 'run_stream' calls its 'on_complete' callback.
+        exp_emitter.close.assert_not_awaited()
+
+        rs_on_complete = rs_call_0.kwargs["on_complete"]
+        faux_result = object()
+        await rs_on_complete(faux_result)
+
+        exp_emitter.close.assert_awaited_once_with()
 
         the_installation.get_agent_deps_for_room.assert_called_once_with(
             TEST_ROOM_ID,
