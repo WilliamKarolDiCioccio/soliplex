@@ -1519,6 +1519,10 @@ def _find_configs(
 
     except NoSuchConfig:
         for sub in sorted(to_search.glob("*")):
+            # See #233
+            if sub.name.startswith("."):
+                continue
+
             if sub.is_dir():
                 sub_config = sub / filename_yaml
                 try:

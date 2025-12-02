@@ -1,6 +1,8 @@
 # Room Configuration Filesystem Layout
 
-A room is configured via directory, whose name is the room ID.
+A room is configured via a directory, whose name is the room ID.
+
+**NOTE:** directories whose names start with '.' are ignored.
 
 Within that directory should be one or two files:
 
