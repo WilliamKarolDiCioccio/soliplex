@@ -13,7 +13,6 @@ from urllib import parse as url_parse
 import pytest
 import yaml
 from haiku.rag import config as hr_config_module
-from pydantic_ai import settings as ai_settings
 
 from soliplex import config
 from soliplex import secrets
@@ -407,64 +406,6 @@ W_RETRIES_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 retries: {AGENT_RETRIES}
 """
-
-MODEL_SETTING_MAX_TOKENS = 1000
-MODEL_SETTING_TEMPERATURE = 0.90
-MODEL_SETTING_TOP_P = 0.70
-MODEL_SETTING_TIMEOUT = 60
-MODEL_SETTING_PARALLELL_TOOL_CALLS = True
-MODEL_SETTING_SEED = 1234
-MODEL_SETTING_FREQUENCY_PENALTY = 0.31
-MODEL_SETTING_PRESENCE_PENALTY = 0.21
-MODEL_SETTING_LOGIT_BIAS = {"waaa": 14}
-MODEL_SETTING_STOP_SEQUENCE = "STOP"
-MODEL_SETTING_EXTRA_HEADER_NAME = "test-header"
-MODEL_SETTING_EXTRA_HEADER_VALUE = "test-header-value"
-MODEL_SETTING_EXTRA_BODY_NAME = "test-body"
-MODEL_SETTING_EXTRA_BODY_VALUE = "test-body-value"
-
-W_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
-    id=AGENT_ID,
-    provider_type="ollama",
-    model_settings=ai_settings.ModelSettings(
-        max_tokens=MODEL_SETTING_MAX_TOKENS,
-        temperature=MODEL_SETTING_TEMPERATURE,
-        top_p=MODEL_SETTING_TOP_P,
-        timeout=MODEL_SETTING_TIMEOUT,
-        parallel_tool_calls=MODEL_SETTING_PARALLELL_TOOL_CALLS,
-        seed=MODEL_SETTING_SEED,
-        frequency_penalty=MODEL_SETTING_FREQUENCY_PENALTY,
-        presence_penalty=MODEL_SETTING_PRESENCE_PENALTY,
-        logit_bias=MODEL_SETTING_LOGIT_BIAS,
-        stop_sequences=[MODEL_SETTING_STOP_SEQUENCE],
-        extra_headers={
-            MODEL_SETTING_EXTRA_HEADER_NAME: MODEL_SETTING_EXTRA_HEADER_VALUE,
-        },
-        extra_body={
-            MODEL_SETTING_EXTRA_BODY_NAME: MODEL_SETTING_EXTRA_BODY_VALUE,
-        },
-    ),
-)
-W_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
-id: "{AGENT_ID}"
-model_settings:
-    max_tokens: {MODEL_SETTING_MAX_TOKENS}
-    temperature: {MODEL_SETTING_TEMPERATURE}
-    top_p: {MODEL_SETTING_TOP_P}
-    timeout: {MODEL_SETTING_TIMEOUT}
-    parallel_tool_calls: {str(MODEL_SETTING_PARALLELL_TOOL_CALLS).lower()}
-    seed: {MODEL_SETTING_SEED}
-    frequency_penalty: {MODEL_SETTING_FREQUENCY_PENALTY}
-    presence_penalty: {MODEL_SETTING_PRESENCE_PENALTY}
-    logit_bias: {MODEL_SETTING_LOGIT_BIAS}
-    stop_sequences:
-        - {MODEL_SETTING_STOP_SEQUENCE}
-    extra_headers:
-        {MODEL_SETTING_EXTRA_HEADER_NAME}: {MODEL_SETTING_EXTRA_HEADER_VALUE}
-    extra_body:
-        {MODEL_SETTING_EXTRA_BODY_NAME}: {MODEL_SETTING_EXTRA_BODY_VALUE}
-"""
-
 
 W_PROMPT_FILE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
@@ -2317,10 +2258,6 @@ def test_agentconfig_ctor(installation_config, kw):
             contextlib.nullcontext(W_RETRIES_AGENT_CONFIG_KW.copy()),
         ),
         (
-            W_MODEL_SETTINGS_AGENT_CONFIG_YAML,
-            contextlib.nullcontext(W_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()),
-        ),
-        (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_PROMPT_FILE_AGENT_CONFIG_KW.copy()),
         ),
@@ -2391,7 +2328,6 @@ def test_agentconfig_from_yaml(
     [
         EMPTY_AGENT_CONFIG_KW.copy(),
         BARE_AGENT_CONFIG_KW.copy(),
-        W_MODEL_SETTINGS_AGENT_CONFIG_KW.copy(),
         W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
     ],
 )
@@ -2502,12 +2438,10 @@ def test_agentconfig_as_yaml(
         or agent_config_kw.get("_system_prompt_path")
     )
     model_name = agent_config_kw.get("model_name") or MODEL_NAME
-    model_settings = agent_config_kw.get("model_settings")
     expected = {
         "id": AGENT_ID,
         "system_prompt": system_prompt,
         "model_name": model_name,
-        "model_settings": model_settings,
         "retries": agent_config_kw.get("retries", 3),
         "provider_type": agent_config_kw.get("provider_type", "ollama"),
     }
