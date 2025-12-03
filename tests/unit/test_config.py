@@ -3719,14 +3719,14 @@ def test_installationconfig_secrets_map_w_existing():
     assert found is already
 
 
-NoSuchSecret = pytest.raises(KeyError)
+RaiseUnknownSecret = pytest.raises(secrets.UnknownSecret)
 NoRaise = contextlib.nullcontext()
 
 
 @pytest.mark.parametrize(
     "secret_map, expectation",
     [
-        ({}, NoSuchSecret),
+        ({}, RaiseUnknownSecret),
         ({SECRET_NAME_1: SECRET_CONFIG_1}, NoRaise),
     ],
 )
@@ -3751,7 +3751,7 @@ def test_installationconfig_get_secret(gs, secret_map, expectation):
     "value, secret_map, expectation, exp_value",
     [
         ("No secret here", {}, NoRaise, "No secret here"),
-        (f"Foo secret:{SECRET_NAME_1}", {}, NoSuchSecret, None),
+        (f"Foo secret:{SECRET_NAME_1}", {}, RaiseUnknownSecret, None),
         (
             f"Foo secret:{SECRET_NAME_1}",
             {SECRET_NAME_1: SECRET_CONFIG_1},

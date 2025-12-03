@@ -9,6 +9,12 @@ class SecretError(ValueError):
     pass
 
 
+class UnknownSecret(SecretError):
+    def __init__(self, secret_name: str):
+        self.secret_name = secret_name
+        super().__init__(f"Unknown secret: {secret_name}")
+
+
 class SecretEnvVarNotFound(SecretError):
     def __init__(self, secret_name: str, env_var: str):
         self.secret_name = secret_name
