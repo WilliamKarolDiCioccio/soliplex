@@ -17,6 +17,13 @@ agent:
 
 ## Required Agent Elements
 
+- `model_name`: a string, should be the identifier of an LLM model for the
+  agent.
+
+  **NOTE**: this value was previously optional, defaulting to the value
+            of the since-deprecated `DEFAULT_AGENT_MODEL` key in the
+            installation environment.
+
 - `system_prompt` is the "instructions" for the LLM serving the room.
   If it starts with a `./`, it will be treated as a filename in the
   same directory, whose contents will be read in its place.
@@ -25,6 +32,7 @@ A minimal configuration, without an external prompt file:
 
 ```yaml
 agent:
+    model_name: "qwen3:latest"
     system_prompt: |
         You are a knowledgeable assistant that helps users find information from a document knowledge base.
 
@@ -37,18 +45,11 @@ A minimal configuration, but with the prompt stored in external file:
 
 ```yaml
 agent:
+    model_name: "qwen3:latest"
     system_prompt: "./prompt.txt"
 ```
 
 ## Optional Agent Elements
-
-- `model_name`: a string, defaulting to the value configured in
-  the installation environment as `DEFAULT_AGENT_MODEL`, should be the
-  identifier of an alternate model for the agent.  E.g.:
-
-  ```yaml
-  model_name: "mistral:7b"
-  ```
 
 - `provider_type`: a string, must be one of `"ollama"` (the default) or
   `"openai"`.

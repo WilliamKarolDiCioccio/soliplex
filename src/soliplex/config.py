@@ -11,6 +11,7 @@ import pathlib
 import random
 import ssl
 import typing
+import warnings
 from collections import abc
 from urllib import parse as url_parse
 
@@ -797,6 +798,13 @@ class AgentConfig:
                     | config
                     | {"_template_id": template_id}
                 )
+
+            if "model_name" not in config:
+                msg = (
+                    f"Missing 'model_name' in agent configuration "
+                    f"(configured in {config_path})"
+                )
+                warnings.warn(msg, DeprecationWarning)  # noqa B028
 
             if "system_prompt" in config:
                 system_prompt = config.pop("system_prompt")
