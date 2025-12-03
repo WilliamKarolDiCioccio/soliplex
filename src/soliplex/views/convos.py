@@ -22,7 +22,11 @@ depend_the_installation = installation.depend_the_installation
 
 
 @util.logfire_span("POST /v1/convos/new/{room_id}")
-@router.post("/v1/convos/new/{room_id}", summary="Post new conversation")
+@router.post(
+    "/v1/convos/new/{room_id}",
+    summary="Post new conversation",
+    deprecated=True,
+)
 async def post_convos_new_room(
     request: fastapi.Request,
     room_id: str,
@@ -80,7 +84,11 @@ async def post_convos_new_room(
 
 
 @util.logfire_span("GET /v1/convos")
-@router.get("/v1/convos", summary="Get Conversations")
+@router.get(
+    "/v1/convos",
+    summary="Get Conversations",
+    deprecated=True,
+)
 async def get_convos(
     request: fastapi.Request,
     the_installation: installation.Installation = depend_the_installation,
@@ -98,7 +106,11 @@ async def get_convos(
 
 
 @util.logfire_span("GET /v1/convos/{convo_uuid}")
-@router.get("/v1/convos/{convo_uuid}", summary="Get Conversation")
+@router.get(
+    "/v1/convos/{convo_uuid}",
+    summary="Get Conversation",
+    deprecated=True,
+)
 async def get_convo(
     request: fastapi.Request,
     convo_uuid: uuid.UUID,
@@ -117,7 +129,11 @@ async def get_convo(
 
 
 @util.logfire_span("POST /v1/convos/{convo_uuid}")
-@router.post("/v1/convos/{convo_uuid}", summary="Post to Conversation")
+@router.post(
+    "/v1/convos/{convo_uuid}",
+    summary="Post to Conversation",
+    deprecated=True,
+)
 async def post_convo(
     request: fastapi.Request,
     convo_uuid: uuid.UUID,
@@ -208,6 +224,7 @@ async def post_convo(
     "/v1/convos/{convo_uuid}",
     status_code=204,
     summary="Delete Conversation",
+    deprecated=True,
 )
 async def delete_convo(
     request: fastapi.Request,
