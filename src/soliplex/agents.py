@@ -14,11 +14,13 @@ from soliplex import config
 from soliplex import mcp_client
 from soliplex import models
 
+ToolConfigMap = dict[str, typing.Any]
+
 
 class AgentDependencies(pydantic.BaseModel):
     the_installation: typing.Any  # installation.Installation
     user: models.UserProfile = None  # TBD make required
-    tool_configs: config.ToolConfigMap = None
+    tool_configs: ToolConfigMap = None
     agui_emitter: typing.Any = None
 
 
@@ -26,7 +28,7 @@ SoliplexAgent = ai_agent.AbstractAgent[AgentDependencies, typing.Any]
 AgentFactory = abc.Callable[
     [
         config.AgentConfig,
-        config.ToolConfigMap,
+        ToolConfigMap,
         config.MCP_ClientToolsetConfigMap,
     ],
     SoliplexAgent,
@@ -54,7 +56,7 @@ def make_mcp_client_toolset(
 
 def _get_default_agent_from_configs(
     agent_config: config.AgentConfig,
-    tool_configs: config.ToolConfigMap,
+    tool_configs: ToolConfigMap,
     mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
 ) -> SoliplexAgent:
     """Build a Pydantic AI agent from a config"""
@@ -79,6 +81,7 @@ def _get_default_agent_from_configs(
             model_name=agent_config.model_name,
             provider=provider,
         ),
+        model_settings=agent_config.model_settings,
         tools=tools,
         toolsets=toolsets,
         instructions=agent_config.get_system_prompt(),
@@ -88,7 +91,7 @@ def _get_default_agent_from_configs(
 
 def get_agent_from_configs(
     agent_config: config.AgentConfig,
-    tool_configs: config.ToolConfigMap,
+    tool_configs: ToolConfigMap,
     mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
 ) -> SoliplexAgent:
     """Get or create an agent from the specified agent and tool configs."""

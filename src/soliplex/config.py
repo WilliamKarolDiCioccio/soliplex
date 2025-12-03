@@ -17,6 +17,7 @@ from urllib import parse as url_parse
 import dotenv
 import yaml
 from haiku.rag import config as hr_config
+from pydantic_ai import settings as ai_settings
 from pydantic_ai.agent import abstract as ai_ag_abstract
 
 SECRET_PREFIX = "secret:"
@@ -742,6 +743,8 @@ class AgentConfig:
     provider_base_url: str = None  # installation config provides default
     provider_key: str = None  # secret containing API key
 
+    model_settings: ai_settings.ModelSettings = None
+
     # Set by `from_yaml` factory
     _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
@@ -803,6 +806,12 @@ class AgentConfig:
                 else:
                     config["system_prompt"] = system_prompt
 
+            if config.get("model_settings") is not None:
+                pm_settings = config.pop("model_settings")
+                config["model_settings"] = ai_settings.ModelSettings(
+                    **pm_settings
+                )
+
             return cls(**config)
         except Exception as exc:
             raise FromYamlException(config_path, "agent", config) from exc
@@ -862,6 +871,7 @@ class AgentConfig:
             "model_name": self.model_name,
             "retries": self.retries,
             "system_prompt": prompt,
+            "model_settings": self.model_settings,
             "provider_type": str(self.provider_type),
             "provider_base_url": provider_base_url,
             "provider_key": self.provider_key,  # "secret:SECRET_NAME"
