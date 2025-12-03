@@ -1810,7 +1810,12 @@ class InstallationConfig:
         from soliplex import secrets as secrets_module  # avoid cycle
 
         secret_name = strip_secret_prefix(secret_name)
-        secret_config = self.secrets_map[secret_name]
+
+        try:
+            secret_config = self.secrets_map[secret_name]
+        except KeyError:
+            raise secrets_module.UnknownSecret(secret_name) from None
+
         return secrets_module.get_secret(secret_config)
 
     def interpolate_secret(self, value):
