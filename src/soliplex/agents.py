@@ -70,6 +70,7 @@ def _get_default_agent_from_configs(
             model_name=agent_config.model_name,
             provider=provider,
         ),
+        model_settings=agent_config.model_settings,
         tools=tools,
         toolsets=toolsets,
         instructions=agent_config.get_system_prompt(),
