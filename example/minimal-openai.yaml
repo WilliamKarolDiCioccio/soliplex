@@ -46,10 +46,6 @@ environment:
 
   - "OLLAMA_BASE_URL"
 
-  - name: "DEFAULT_AGENT_MODEL"
-    value: "gpt-4o-mini"
-
-
   #------------------------------------------------------------------------
   # 'soliplex': on-disk configuration locations
   #------------------------------------------------------------------------

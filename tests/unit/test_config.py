@@ -7,6 +7,7 @@ import json
 import pathlib
 import ssl
 import typing
+import warnings
 from unittest import mock
 from urllib import parse as url_parse
 
@@ -365,6 +366,7 @@ EMPTY_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
 """
 
+# XXX DEPRECATED:  'model_name' will be required.
 EMPTY_W_KIND_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     kind="testing",
@@ -376,23 +378,25 @@ kind: "testing"
 
 BARE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
-    system_prompt=SYSTEM_PROMPT,
     model_name=MODEL_NAME,
+    system_prompt=SYSTEM_PROMPT,
 )
 BARE_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
-system_prompt: "{SYSTEM_PROMPT}"
 model_name: "{MODEL_NAME}"
+system_prompt: "{SYSTEM_PROMPT}"
 """
 
 W_PROVIDER_KW_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
+    model_name=MODEL_NAME,
     provider_type=config.LLMProviderType.OPENAI,
     provider_base_url=OTHER_PROVIDER_BASE_URL,
     provider_key="secret:OTHER_PROVIDER_KEY",
 )
 W_PROVIDER_KW_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
+model_name: "{MODEL_NAME}"
 provider_type: "openai"
 provider_base_url: "{OTHER_PROVIDER_BASE_URL}"
 provider_key: "secret:OTHER_PROVIDER_KEY"
@@ -401,10 +405,12 @@ provider_key: "secret:OTHER_PROVIDER_KEY"
 AGENT_RETRIES = 7
 W_RETRIES_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
+    model_name=MODEL_NAME,
     retries=AGENT_RETRIES,
 )
 W_RETRIES_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
+model_name: "{MODEL_NAME}"
 retries: {AGENT_RETRIES}
 """
 
@@ -425,6 +431,7 @@ MODEL_SETTING_EXTRA_BODY_VALUE = "test-body-value"
 
 W_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
+    model_name=MODEL_NAME,
     provider_type="ollama",
     model_settings=ai_settings.ModelSettings(
         max_tokens=MODEL_SETTING_MAX_TOKENS,
@@ -447,6 +454,7 @@ W_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
 )
 W_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
+model_name: "{MODEL_NAME}"
 model_settings:
     max_tokens: {MODEL_SETTING_MAX_TOKENS}
     temperature: {MODEL_SETTING_TEMPERATURE}
@@ -468,15 +476,16 @@ model_settings:
 
 W_PROMPT_FILE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
-    _system_prompt_path="./prompt.txt",
     model_name=MODEL_NAME,
+    _system_prompt_path="./prompt.txt",
 )
 W_PROMPT_FILE_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
-system_prompt: ./prompt.txt
 model_name: "{MODEL_NAME}"
+system_prompt: ./prompt.txt
 """
 
+# 'model_name' not required heree:  supplied by template
 W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     _template_id=TEMPLATE_AGENT_ID,
@@ -2294,45 +2303,54 @@ def test_agentconfig_ctor(installation_config, kw):
 
 
 @pytest.mark.parametrize(
-    "config_yaml, expectation",
+    "config_yaml, expectation, warns",
     [
         (
             BOGUS_AGENT_CONFIG_YAML,
             pytest.raises(config.FromYamlException),
+            False,
         ),
         (
             EMPTY_AGENT_CONFIG_YAML,
             contextlib.nullcontext(EMPTY_AGENT_CONFIG_KW.copy()),
+            True,
         ),
         (
             BARE_AGENT_CONFIG_YAML,
             contextlib.nullcontext(BARE_AGENT_CONFIG_KW.copy()),
+            False,
         ),
         (
             W_PROVIDER_KW_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_PROVIDER_KW_AGENT_CONFIG_KW.copy()),
+            False,
         ),
         (
             W_RETRIES_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_RETRIES_AGENT_CONFIG_KW.copy()),
+            False,
         ),
         (
             W_MODEL_SETTINGS_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()),
+            False,
         ),
         (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
             contextlib.nullcontext(W_PROMPT_FILE_AGENT_CONFIG_KW.copy()),
+            False,
         ),
         (
             W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_YAML,
             contextlib.nullcontext(
                 W_PROMPT_FILE_W_TEMPLATE_ID_AGENT_CONFIG_KW.copy()
             ),
+            False,
         ),
         (
             W_PROMPT_FILE_W_BOGUS_TEMPLATE_ID_AGENT_CONFIG_YAML,
             pytest.raises(config.FromYamlException),
+            False,
         ),
     ],
 )
@@ -2341,6 +2359,7 @@ def test_agentconfig_from_yaml(
     temp_dir,
     config_yaml,
     expectation,
+    warns,
 ):
     yaml_file = temp_dir / "test.yaml"
     yaml_file.write_text(config_yaml)
@@ -2365,7 +2384,10 @@ def test_agentconfig_from_yaml(
         template_kw = {}
         installation_config.agent_configs = []
 
-    with expectation as expected:
+    with (
+        expectation as expected,
+        warnings.catch_warnings(record=True) as log,
+    ):
         found = config.AgentConfig.from_yaml(
             installation_config,
             yaml_file,
@@ -2373,6 +2395,11 @@ def test_agentconfig_from_yaml(
         )
 
     if isinstance(expected, dict):
+        if warns:
+            assert len(log) == 1
+        else:
+            assert len(log) == 0
+
         exp_agent_config = config.AgentConfig(
             _installation_config=installation_config,
             _config_path=yaml_file,
