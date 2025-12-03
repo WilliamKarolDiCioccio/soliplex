@@ -2236,6 +2236,7 @@ def test_agentconfig_from_yaml(
     [
         EMPTY_AGENT_CONFIG_KW.copy(),
         BARE_AGENT_CONFIG_KW.copy(),
+        W_MODEL_SETTINGS_AGENT_CONFIG_KW.copy(),
         W_PROMPT_FILE_AGENT_CONFIG_KW.copy(),
     ],
 )
@@ -2346,10 +2347,12 @@ def test_agentconfig_as_yaml(
         or agent_config_kw.get("_system_prompt_path")
     )
     model_name = agent_config_kw.get("model_name") or MODEL_NAME
+    model_settings = agent_config_kw.get("model_settings")
     expected = {
         "id": AGENT_ID,
         "system_prompt": system_prompt,
         "model_name": model_name,
+        "model_settings": model_settings,
         "retries": agent_config_kw.get("retries", 3),
         "provider_type": agent_config_kw.get("provider_type", "ollama"),
     }

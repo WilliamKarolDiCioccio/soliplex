@@ -778,7 +778,7 @@ class AgentConfig:
                 else:
                     config["system_prompt"] = system_prompt
 
-            if "model_settings" in config:
+            if config.get("model_settings") is not None:
                 pm_settings = config.pop("model_settings")
                 config["model_settings"] = ai_settings.ModelSettings(
                     **pm_settings
@@ -843,6 +843,7 @@ class AgentConfig:
             "model_name": self.model_name,
             "retries": self.retries,
             "system_prompt": prompt,
+            "model_settings": self.model_settings,
             "provider_type": str(self.provider_type),
             "provider_base_url": provider_base_url,
             "provider_key": self.provider_key,  # "secret:SECRET_NAME"
