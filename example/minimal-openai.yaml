@@ -113,6 +113,7 @@ room_paths:
   - "./rooms/joker"
   - "./rooms/faux"
   - "./rooms/quiztest"
+  - "./rooms/research"
 
 #==========================================================================
 # Completions configuration
