@@ -13,6 +13,7 @@ from urllib import parse as url_parse
 import pytest
 import yaml
 from haiku.rag import config as hr_config_module
+from pydantic_ai import settings as ai_settings
 
 from soliplex import config
 from soliplex import secrets
@@ -383,76 +384,63 @@ id: "{AGENT_ID}"
 retries: {AGENT_RETRIES}
 """
 
-OLLAMA_SEED = 1234
-OLLAMA_TEMPERATURE = 0.90
-OLLAMA_TOP_K = 2345
-OLLAMA_TOP_P = 0.70
-OLLAMA_MIN_P = 0.20
-OLLAMA_STOP = "STOP"
-OLLAMA_NUM_CTX = 1000
-OLLAMA_NUM_PREDICT = 500
+MODEL_SETTING_MAX_TOKENS = 1000
+MODEL_SETTING_TEMPERATURE = 0.90
+MODEL_SETTING_TOP_P = 0.70
+MODEL_SETTING_TIMEOUT = 60
+MODEL_SETTING_PARALLELL_TOOL_CALLS = True
+MODEL_SETTING_SEED = 1234
+MODEL_SETTING_FREQUENCY_PENALTY = 0.31
+MODEL_SETTING_PRESENCE_PENALTY = 0.21
+MODEL_SETTING_LOGIT_BIAS = {"waaa": 14}
+MODEL_SETTING_STOP_SEQUENCE = "STOP"
+MODEL_SETTING_EXTRA_HEADER_NAME = "test-header"
+MODEL_SETTING_EXTRA_HEADER_VALUE = "test-header-value"
+MODEL_SETTING_EXTRA_BODY_NAME = "test-body"
+MODEL_SETTING_EXTRA_BODY_VALUE = "test-body-value"
 
-W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
+W_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     provider_type="ollama",
-    provider_model_settings=config.OllamaModelSettings(
-        seed=OLLAMA_SEED,
-        temperature=OLLAMA_TEMPERATURE,
-        top_k=OLLAMA_TOP_K,
-        top_p=OLLAMA_TOP_P,
-        min_p=OLLAMA_MIN_P,
-        stop=OLLAMA_STOP,
-        num_ctx=OLLAMA_NUM_CTX,
-        num_predict=OLLAMA_NUM_PREDICT,
+    model_settings=ai_settings.ModelSettings(
+        max_tokens=MODEL_SETTING_MAX_TOKENS,
+        temperature=MODEL_SETTING_TEMPERATURE,
+        top_p=MODEL_SETTING_TOP_P,
+        timeout=MODEL_SETTING_TIMEOUT,
+        parallel_tool_calls=MODEL_SETTING_PARALLELL_TOOL_CALLS,
+        seed=MODEL_SETTING_SEED,
+        frequency_penalty=MODEL_SETTING_FREQUENCY_PENALTY,
+        presence_penalty=MODEL_SETTING_PRESENCE_PENALTY,
+        logit_bias=MODEL_SETTING_LOGIT_BIAS,
+        stop_sequences=[MODEL_SETTING_STOP_SEQUENCE],
+        extra_headers={
+            MODEL_SETTING_EXTRA_HEADER_NAME: MODEL_SETTING_EXTRA_HEADER_VALUE,
+        },
+        extra_body={
+            MODEL_SETTING_EXTRA_BODY_NAME: MODEL_SETTING_EXTRA_BODY_VALUE,
+        },
     ),
 )
-W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
+W_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
-provider_type: "ollama"
-provider_model_settings:
-    seed: {OLLAMA_SEED}
-    temperature: {OLLAMA_TEMPERATURE}
-    top_k: {OLLAMA_TOP_K}
-    top_p: {OLLAMA_TOP_P}
-    min_p: {OLLAMA_MIN_P}
-    stop: {OLLAMA_STOP}
-    num_ctx: {OLLAMA_NUM_CTX}
-    num_predict: {OLLAMA_NUM_PREDICT}
+model_settings:
+    max_tokens: {MODEL_SETTING_MAX_TOKENS}
+    temperature: {MODEL_SETTING_TEMPERATURE}
+    top_p: {MODEL_SETTING_TOP_P}
+    timeout: {MODEL_SETTING_TIMEOUT}
+    parallel_tool_calls: {str(MODEL_SETTING_PARALLELL_TOOL_CALLS).lower()}
+    seed: {MODEL_SETTING_SEED}
+    frequency_penalty: {MODEL_SETTING_FREQUENCY_PENALTY}
+    presence_penalty: {MODEL_SETTING_PRESENCE_PENALTY}
+    logit_bias: {MODEL_SETTING_LOGIT_BIAS}
+    stop_sequences:
+        - {MODEL_SETTING_STOP_SEQUENCE}
+    extra_headers:
+        {MODEL_SETTING_EXTRA_HEADER_NAME}: {MODEL_SETTING_EXTRA_HEADER_VALUE}
+    extra_body:
+        {MODEL_SETTING_EXTRA_BODY_NAME}: {MODEL_SETTING_EXTRA_BODY_VALUE}
 """
 
-OPENAI_TEMPERATURE = 0.91
-OPENAI_TOP_P = 0.71
-OPENAI_FREQUENCY_PENALTY = 0.31
-OPENAI_PRESENCE_PENALTY = 0.21
-OPENAI_MAX_TOKENS = 1000
-
-W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_KW = dict(
-    id=AGENT_ID,
-    provider_type="openai",
-    provider_model_settings=config.OpenAIModelSettings(
-        temperature=OPENAI_TEMPERATURE,
-        top_p=OPENAI_TOP_P,
-        frequency_penalty=OPENAI_FREQUENCY_PENALTY,
-        presence_penalty=OPENAI_PRESENCE_PENALTY,
-        parallel_tool_calls=False,
-        truncation="disabled",
-        max_tokens=OPENAI_MAX_TOKENS,
-        verbosity="high",
-    ),
-)
-W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_YAML = f"""
-id: "{AGENT_ID}"
-provider_type: "openai"
-provider_model_settings:
-    temperature: {OPENAI_TEMPERATURE}
-    top_p: {OPENAI_TOP_P}
-    frequency_penalty: {OPENAI_FREQUENCY_PENALTY}
-    presence_penalty: {OPENAI_PRESENCE_PENALTY}
-    parallel_tool_calls: false
-    truncation: "disabled"
-    max_tokens: {OPENAI_MAX_TOKENS}
-    verbosity: "high"
-"""
 
 W_PROMPT_FILE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
@@ -2174,16 +2162,8 @@ def test_agentconfig_ctor(installation_config, kw):
             contextlib.nullcontext(W_RETRIES_AGENT_CONFIG_KW.copy()),
         ),
         (
-            W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_YAML,
-            contextlib.nullcontext(
-                W_OLLAMA_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()
-            ),
-        ),
-        (
-            W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_YAML,
-            contextlib.nullcontext(
-                W_OPENAI_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()
-            ),
+            W_MODEL_SETTINGS_AGENT_CONFIG_YAML,
+            contextlib.nullcontext(W_MODEL_SETTINGS_AGENT_CONFIG_KW.copy()),
         ),
         (
             W_PROMPT_FILE_AGENT_CONFIG_YAML,
