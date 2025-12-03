@@ -50,9 +50,13 @@ agent:
   model_name: "mistral:7b"
   ```
 
+- `provider_type`: a string, must be one of `"ollama"` (the default) or
+  `"openai"`.
+
 - `provider_base_url`: a string, defaulting to the value configured in
-  the installation environment as `OLLAMA_BASE_URL` is the base API URL for the agent's
-  LLM provider. Must be specified *without* the `/v1` suffix. E.g.:
+  the installation environment as `OLLAMA_BASE_URL` is the base API URL
+  for the agent's LLM provider. Must be specified *without* the `/v1`
+    suffix. E.g.:
 
   ```yaml
   provider_base_url: "https://provider.example.com/api"
@@ -64,3 +68,45 @@ agent:
 
   ```yaml
   provider_key: "secret:FOO_PROVIDER_API_KEY"
+  ```
+
+  `provider_model_settings`: a mapping, whose keys are determined by
+  the `provider_type` above (see below).
+
+
+## Example Ollama Configuration
+
+**NOTE**: the values below show types, but should not be used without
+          testing.
+
+```yaml
+model_name: "qwen3:latest"
+provider_type: "ollama"
+provider_model_settings:
+  temperature: 0.90
+  top_k: 100
+  top_p: 0.75
+  min_p: 0.25
+  stop: "STOP"
+  num_ctx: 2048
+  num_predict: 2000
+```
+
+## Example OpenAI Configuration
+
+**NOTE**: the values below show types, but should not be used without
+          testing.
+
+```yaml
+model_name: "mistral:7b"
+provider_type: "openai"
+provider_model_settings:
+  temperature: 0.90
+  top_p: 0.70
+  frequency_penalty: 0.25
+  presence_penalty: 0.50
+  parallel_tool_calls: false
+  truncation: "disabled"
+  max_tokens: 2048
+  verbosity: "high"
+```

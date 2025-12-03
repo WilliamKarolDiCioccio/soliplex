@@ -21,6 +21,9 @@ OPENAI_PROVIDER_KW = {
     "base_url": BASE_URL,
     "api_key": API_KEY,
 }
+MODEL_SETTINGS = {
+    "temperature": 0.875,
+}
 
 ROOM_ID = "test-room"
 RAG_LANCEDB_OVERRIDE_PATH = "/path/to/db/rag"
@@ -87,6 +90,7 @@ def mcp_ct_configs_tools(request):
     return request.param
 
 
+@pytest.mark.parametrize("w_model_settings", [None, MODEL_SETTINGS])
 @pytest.mark.parametrize(
     "llm_provider_kw, w_oai",
     [
@@ -107,12 +111,14 @@ def test_get_agent_from_configs_wo_hit_w_default_kind(
     mcp_ct_configs_tools,
     llm_provider_kw,
     w_oai,
+    w_model_settings,
 ):
     agent_config = mock.create_autospec(config.AgentConfig)
     agent_config.kind = "default"
     agent_config.id = ROOM_ID
     agent_config.model_name = MODEL
     agent_config.get_system_prompt.return_value = SYSTEM_PROMPT
+    agent_config.model_settings = w_model_settings
 
     if w_oai:
         agent_config.provider_type = config.LLMProviderType.OPENAI
@@ -151,6 +157,7 @@ def test_get_agent_from_configs_wo_hit_w_default_kind(
     akc_kw = akc.kwargs
     assert akc_kw["model"] == model_klass.return_value
     assert akc_kw["instructions"] == SYSTEM_PROMPT
+    assert akc_kw["model_settings"] == w_model_settings
 
     for akc_tool, exp_tool in zip(akc_kw["tools"], exp_tools, strict=True):
         if isinstance(akc_tool.function, functools.partial):
