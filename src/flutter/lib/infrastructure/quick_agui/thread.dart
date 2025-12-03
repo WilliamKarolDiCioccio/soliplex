@@ -3,47 +3,66 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'package:ag_ui/ag_ui.dart' as ag_ui;
+import 'package:json_patch/json_patch.dart';
 
-import 'pending_tool_call.dart';
 import 'text_message_buffer.dart';
+import 'tool_call_reception_buffer.dart';
+import 'tool_call_registry.dart';
 
 class Thread {
   final String id;
   final ag_ui.AgUiClient client;
+  final List<ag_ui.Tool> _tools;
+  final Map<String, Future<String> Function(ag_ui.ToolCall)> _toolExecutors;
   final List<ag_ui.Run> _runs = [];
   final StreamController<ag_ui.Message> _messagesController;
   final StreamController<ag_ui.State> _statesController;
+  ag_ui.State? currentState;
   final List<ag_ui.Message> messageHistory = [];
 
   var _textBuffer = TextMessageBuffer('');
 
-  Thread({required this.id, required this.client})
-    : _messagesController = StreamController.broadcast(),
-      _statesController = StreamController.broadcast();
+  Thread({
+    required this.id,
+    required this.client,
+    List<ag_ui.Tool> tools = const <ag_ui.Tool>[],
+    Map<String, Future<String> Function(ag_ui.ToolCall)> toolExecutors =
+        const <String, Future<String> Function(ag_ui.ToolCall)>{},
+  }) : _tools = tools,
+       _toolExecutors = toolExecutors,
+       _messagesController = StreamController.broadcast(),
+       _statesController = StreamController.broadcast() {
+    stateStream.forEach((s) => currentState = s);
+  }
 
   Iterable<ag_ui.Run> get runs => _runs;
 
-  final Map<String, PendingToolCall> _pendingToolCalls = {};
+  final Map<String, ToolCallReceptionBuffer> _toolCallReceptions = {};
+  final _toolRegistry = ToolCallRegistry();
 
   Stream<ag_ui.Message> get messageStream => _messagesController.stream;
 
   Stream<ag_ui.State> get stateStream => _statesController.stream;
 
-  Future<void> startRun({
+  Future<List<ag_ui.ToolMessage>> startRun({
     required String endpoint,
     required String runId,
-    required ag_ui.UserMessage message,
+    List<ag_ui.Message>? messages,
+    dynamic state,
   }) async {
     final run = ag_ui.Run(threadId: id, runId: runId);
     _runs.add(run);
 
-    messageHistory.add(message);
-    _messagesController.add(message);
+    // TODO: should we synchronise the `messageHistory` iterable by listening to the message stream?
+    messageHistory.addAll(messages ?? []);
+    (messages ?? []).forEach(_messagesController.add);
 
     final agentInput = ag_ui.SimpleRunAgentInput(
       threadId: id,
       runId: runId,
       messages: messageHistory,
+      state: state,
+      tools: _tools,      
     );
 
     await for (final event in client.runAgent(endpoint, agentInput)) {
@@ -80,43 +99,108 @@ class Thread {
           toolCallId: final id,
           toolCallName: final name,
         ):
-          _pendingToolCalls[id] = PendingToolCall(name);
+          _toolCallReceptions[id] = ToolCallReceptionBuffer(id, name);
 
         case ag_ui.ToolCallArgsEvent(toolCallId: final id, delta: final delta):
-          _pendingToolCalls[id]?.appendArgs(delta);
+          _toolCallReceptions[id]?.appendArgs(delta);
 
         case ag_ui.ToolCallEndEvent(toolCallId: final id):
-          final pending = _pendingToolCalls.remove(id);
+          final receivedToolCall = _toolCallReceptions.remove(id);
 
-          if (pending == null) break;
+          if (receivedToolCall == null) break;
 
-          final toolCall = ag_ui.AssistantMessage(
-            // TODO: may need to get msg some other way (generate it or retrieve it from server).
-            id: 'msg_$id',
-            toolCalls: [
-              ag_ui.ToolCall(
-                id: id,
-                function: ag_ui.FunctionCall(
-                  name: pending.name,
-                  arguments: pending.args.isEmpty ? '{}' : pending.args,
-                ),
-              ),
-            ],
+          messageHistory.add(receivedToolCall.message);
+
+          final toolCall = receivedToolCall.toolCall;
+          final isClientTool = _tools.any(
+            (t) => t.name == toolCall.function.name,
           );
-          _messagesController.add(toolCall);
+          if (isClientTool) {
+            _toolRegistry.register(toolCall);
+          }
 
         case ag_ui.ToolCallResultEvent(
           messageId: final msgId,
           toolCallId: final id,
           content: final content,
         ):
-          _messagesController.add(
-            ag_ui.ToolMessage(id: msgId, toolCallId: id, content: content),
+          final result = ag_ui.ToolMessage(
+            id: msgId,
+            toolCallId: id,
+            content: content,
+          );
+
+          messageHistory.add(result);
+          _toolRegistry.markCompleted(id, result);
+
+        case ag_ui.StateSnapshotEvent(snapshot: final snapshot):
+          _statesController.add(snapshot);
+
+        case ag_ui.StateDeltaEvent(delta: final deltas):
+          _statesController.add(
+            JsonPatch.apply(currentState, deltas.cast<Map<String, dynamic>>()),
           );
 
         default:
           debugPrint("Ignored $event");
       }
     }
+
+    final pendingToolCalls = _toolRegistry.pendingCalls;
+    if (pendingToolCalls.isEmpty) {
+      return [];
+    }
+    final results = await _executeClientTools(pendingToolCalls.toList());
+    return results;
+  }
+
+  Future<List<ag_ui.ToolMessage>> _executeClientTools(
+    List<ag_ui.ToolCall> toolCalls,
+  ) async {
+    final results = await Future.wait(
+      toolCalls.map((toolCall) => _executeClientTool(toolCall)),
+    );
+
+    final toolMessages = <ag_ui.ToolMessage>[];
+    for (int i = 0; i < results.length; i++) {
+      final toolCallId = toolCalls[i].id;
+      final result = results[i];
+
+      toolMessages.add(
+        ag_ui.ToolMessage(
+          // TODO: may need to get msg some other way (generate it or retrieve it from server).
+          id: 'msg-$toolCallId',
+          toolCallId: toolCallId,
+          content: result,
+        ),
+      );
+    }
+
+    return toolMessages;
+  }
+
+  Future<String> _executeClientTool(ag_ui.ToolCall toolCall) async {
+    final executor = _toolExecutors[toolCall.function.name];
+
+    if (executor == null) {
+      throw StateError(
+        'No executor registered for client tool: ${toolCall.function.name}',
+      );
+    }
+
+    try {
+      final result = await executor(toolCall);
+      return result;
+    } catch (e) {
+      return 'ERROR: ${e.toString()}';
+    }
+  }
+
+  Future<List<ag_ui.ToolMessage>> sendToolResults({
+    required String endpoint,
+    required String runId,
+    required List<ag_ui.ToolMessage> toolMessages,
+  }) async {
+    return startRun(endpoint: endpoint, runId: runId, messages: toolMessages);
   }
 }

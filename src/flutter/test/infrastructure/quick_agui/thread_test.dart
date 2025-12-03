@@ -1,7 +1,8 @@
+import 'dart:convert';
+
 import 'package:ag_ui/ag_ui.dart' as ag_ui;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-
 import 'package:soliplex_client/infrastructure/quick_agui/thread.dart';
 
 class AgUiClientMock extends Mock implements ag_ui.AgUiClient {}
@@ -36,14 +37,12 @@ void main() {
 
     group('First run', () {
       test('startRun tracks the first run', () {
-        when(
-          () => client.runAgent(any(), any()),
-        ).thenAnswer((_) => Stream.empty());
+        clientWillReceive(client, []);
 
         thread.startRun(
           endpoint: 'agent',
           runId: runId,
-          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+          messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
         );
 
         final [ag_ui.Run(runId: capturedRunId)] = thread.runs.toList();
@@ -51,14 +50,13 @@ void main() {
       });
 
       test('one text message chunk', () async {
-        when(() => client.runAgent(any(), any())).thenAnswer(
-          (_) => Stream.fromIterable([
-            ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+        clientWillReceive(
+          client,
+          aRunWithEvents(threadId, runId, [
             ag_ui.TextMessageChunkEvent(
               messageId: 'msg-id-2',
               delta: 'hi! What can I do?',
             ),
-            ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
           ]),
         );
 
@@ -66,28 +64,18 @@ void main() {
         thread.startRun(
           endpoint: 'agent',
           runId: runId,
-          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+          messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
         );
 
         final [msg1, msg2] = await publishedMessages;
-        expect(
-          msg1,
-          isA<ag_ui.UserMessage>()
-              .having((m) => m.content, 'content', equals('hi!'))
-              .having((m) => m.id, 'message id', equals('msg-id-1')),
-        );
-        expect(
-          msg2,
-          isA<ag_ui.AssistantMessage>()
-              .having((m) => m.content, 'content', equals('hi! What can I do?'))
-              .having((m) => m.id, 'message id', equals('msg-id-2')),
-        );
+        expect(msg1, isUserMsg(id: 'msg-id-1', msg: 'hi!'));
+        expect(msg2, isAssistantMsg(id: 'msg-id-2', msg: 'hi! What can I do?'));
       }, timeout: Timeout(Duration(seconds: 2)));
 
       test('text message contents', () async {
-        when(() => client.runAgent(any(), any())).thenAnswer(
-          (_) => Stream.fromIterable([
-            ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+        clientWillReceive(
+          client,
+          aRunWithEvents(threadId, runId, [
             ag_ui.TextMessageStartEvent(messageId: 'msg-id-2'),
             ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'he'),
             ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: 'll'),
@@ -100,7 +88,6 @@ void main() {
             ),
             ag_ui.TextMessageContentEvent(messageId: 'msg-id-2', delta: ' do?'),
             ag_ui.TextMessageEndEvent(messageId: 'msg-id-2'),
-            ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
           ]),
         );
 
@@ -108,67 +95,177 @@ void main() {
         thread.startRun(
           endpoint: 'agent',
           runId: runId,
-          message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+          messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
         );
 
         final [msg1, msg2] = await publishedMessages;
-        expect(
-          msg1,
-          isA<ag_ui.UserMessage>()
-              .having((m) => m.content, 'content', equals('hi!'))
-              .having((m) => m.id, 'message id', equals('msg-id-1')),
-        );
+        expect(msg1, isUserMsg(id: 'msg-id-1', msg: 'hi!'));
         expect(
           msg2,
-          isA<ag_ui.AssistantMessage>()
-              .having(
-                (m) => m.content,
-                'content',
-                equals('hello! what can I do?'),
-              )
-              .having((m) => m.id, 'message id', equals('msg-id-2')),
+          isAssistantMsg(id: 'msg-id-2', msg: 'hello! what can I do?'),
         );
       }, timeout: Timeout(Duration(seconds: 2)));
+
+      test('one full state snapshot', () async {
+        clientWillReceive(
+          client,
+          aRunWithEvents(threadId, runId, [
+            ag_ui.StateSnapshotEvent(
+              snapshot: {'firstName': 'Tony', 'lastName': 'Stark'},
+            ),
+          ]),
+        );
+
+        final upcomingStateUpdate = thread.stateStream.first;
+        thread.startRun(
+          endpoint: 'agent',
+          runId: runId,
+          messages: [
+            ag_ui.UserMessage(
+              id: '--irrelevant-msg-id--',
+              content: '--irrelevant-content--',
+            ),
+          ],
+        );
+
+        final stateUpdate = await upcomingStateUpdate;
+        expect(
+          stateUpdate,
+          isMap
+              .having((m) => m['firstName'], 'firstName', 'Tony')
+              .having((m) => m['lastName'], 'lastName', 'Stark'),
+        );
+      }, timeout: Timeout(Duration(seconds: 2)));
+
+      test(
+        'thread tracks last received state snapshot',
+        () async {
+          clientWillReceive(
+            client,
+            aRunWithEvents(threadId, runId, [
+              ag_ui.StateSnapshotEvent(
+                snapshot: {'firstName': 'Tony', 'lastName': 'Stark'},
+              ),
+            ]),
+          );
+          final upcomingStateUpdate = thread.stateStream.first;
+          thread.startRun(
+            endpoint: 'agent',
+            runId: runId,
+            messages: [
+              ag_ui.UserMessage(
+                id: '--irrelevant-msg-id--',
+                content: '--irrelevant-content--',
+              ),
+            ],
+          );
+          final stateUpdate = await upcomingStateUpdate;
+          expect(thread.currentState, equals(stateUpdate));
+        },
+        timeout: Timeout(Duration(seconds: 2)),
+      );
     });
 
-    group('Second run starting with user message', () {
-      test('sends message history along the new user message', () async {
-        final (msgId1, msgId2, msgId3, msgId4) = (
-          'msg-1',
-          'msg-2',
-          'msg-3',
-          'msg-4',
+    group('Second run', () {
+      group('starting with user message', () {
+        setUp(() async {
+          clientWillReceive(
+            client,
+            aRunWithEvents(threadId, 'run-id-1', [
+              ag_ui.TextMessageChunkEvent(messageId: 'msg-2', delta: 'hello'),
+            ]),
+          );
+
+          await thread.startRun(
+            endpoint: 'agent',
+            runId: 'run-id-1',
+            messages: [ag_ui.UserMessage(id: 'msg-1', content: "hi")],
+          );
+        });
+
+        test('sends message history along the new user message', () async {
+          clientWillReceive(
+            client,
+            aRunWithEvents(threadId, 'run-id-2', [
+              ag_ui.TextMessageChunkEvent(
+                messageId: 'msg-4',
+                delta: 'No problem',
+              ),
+            ]),
+          );
+
+          await thread.startRun(
+            endpoint: 'agent',
+            runId: 'run-id-2',
+            messages: [ag_ui.UserMessage(id: 'msg-3', content: "Thanks")],
+          );
+
+          final captured = captureRunAgentInput(client);
+          final [msg0, msg1, msg2, ...] = captured.messages!;
+          expect(msg0, isUserMsg(id: 'msg-1', msg: 'hi'));
+          expect(msg1, isAssistantMsg(id: 'msg-2', msg: 'hello'));
+          expect(msg2, isUserMsg(id: 'msg-3', msg: 'Thanks'));
+        });
+
+        test(
+          'patch current state upon receiving state delta event',
+          () async {
+            clientWillReceive(
+              client,
+              aRunWithEvents(threadId, runId, [
+                ag_ui.StateSnapshotEvent(
+                  snapshot: {"firstName": "Tony", "lastName": "Stark"},
+                ),
+                ag_ui.StateDeltaEvent(
+                  delta: [
+                    {
+                      "op": "replace",
+                      "path": "/lastName",
+                      "value": "Not Stark",
+                    },
+                  ],
+                ),
+              ]),
+            );
+
+            final upcomingStateUpdate = thread.stateStream.take(2).last;
+            thread.startRun(
+              endpoint: '--irrelevant--',
+              runId: '--irrelevant--',
+              messages: [
+                ag_ui.UserMessage(
+                  id: '--irrelevant--',
+                  content: '--irrelevant--',
+                ),
+              ],
+            );
+
+            await upcomingStateUpdate;
+            expect(thread.currentState['firstName'], 'Tony');
+            expect(thread.currentState['lastName'], 'Not Stark');
+          },
+          timeout: Timeout(Duration(seconds: 2)),
         );
+      });
 
-        clientWillReceive(client, [
-          ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-1'),
-          ag_ui.TextMessageChunkEvent(messageId: msgId2, delta: 'hello'),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-1'),
-        ]);
-
-        await thread.startRun(
-          endpoint: 'agent',
-          runId: 'run-id-1',
-          message: ag_ui.UserMessage(id: msgId1, content: "hi"),
-        );
-
-        clientWillReceive(client, [
-          ag_ui.RunStartedEvent(threadId: threadId, runId: 'run-id-2'),
-          ag_ui.TextMessageChunkEvent(messageId: msgId4, delta: 'No problem'),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: 'run-id-2'),
-        ]);
-
-        await thread.startRun(
-          endpoint: 'agent',
-          runId: 'run-id-2',
-          message: ag_ui.UserMessage(id: msgId3, content: "Thanks"),
-        );
-
-        final captured = captureRunAgentInput(client);
-
-        expect(captured.messages![0], isUserMessage(msgId1));
-        expect(captured.messages![1], isAssistantMessage(msgId2));
-        expect(captured.messages![2], isUserMessage(msgId3));
+      group("starts with a patched state", () {
+        test("the patched state is sent to the agent", () async {
+          clientWillReceive(
+            client,
+            aRunWithEvents(threadId, '--irrelevant-run-id--', []),
+          );
+          thread.startRun(
+            endpoint: '--irrelevant-endpoint--',
+            runId: '--irrelevant-run-id--',
+            messages: [],
+            state: {'firstName': 'Tony', 'lastName': 'Stark'},
+          );
+          final submittedState = captureRunAgentInput(client).state;
+          expect(
+            submittedState,
+            equals({'firstName': 'Tony', 'lastName': 'Stark'}),
+          );
+        });
       });
     });
   });
@@ -179,14 +276,13 @@ void main() {
     });
 
     test('step events', () async {
-      when(() => client.runAgent(any(), any())).thenAnswer(
-        (_) => Stream.fromIterable([
-          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+      clientWillReceive(
+        client,
+        aRunWithEvents(threadId, runId, [
           ag_ui.StepStartedEvent(stepName: 'task a'),
           ag_ui.StepFinishedEvent(stepName: 'task a'),
           ag_ui.StepStartedEvent(stepName: 'task b'),
           ag_ui.StepFinishedEvent(stepName: 'task b'),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
         ]),
       );
 
@@ -194,7 +290,30 @@ void main() {
       thread.startRun(
         endpoint: 'agent',
         runId: runId,
-        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+        messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
+      );
+
+      final [{'step': step1}, {'step': step2}] = await publishedStates;
+      expect(step1, equals('task a'));
+      expect(step2, equals('task b'));
+    }, timeout: Timeout(Duration(seconds: 2)));
+
+    test('interleaving step events', () async {
+      clientWillReceive(
+        client,
+        aRunWithEvents(threadId, runId, [
+          ag_ui.StepStartedEvent(stepName: 'task a'),
+          ag_ui.StepStartedEvent(stepName: 'task b'),
+          ag_ui.StepFinishedEvent(stepName: 'task a'),
+          ag_ui.StepFinishedEvent(stepName: 'task b'),
+        ]),
+      );
+
+      final publishedStates = thread.stateStream.take(2).toList();
+      thread.startRun(
+        endpoint: 'agent',
+        runId: runId,
+        messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
       );
 
       final [{'step': step1}, {'step': step2}] = await publishedStates;
@@ -205,35 +324,33 @@ void main() {
     test('tool call events', () async {
       const toolCallId = 'tool-call-id';
       const toolCallName = 'add-numbers';
-      when(() => client.runAgent(any(), any())).thenAnswer(
-        (_) => Stream.fromIterable([
-          ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+      clientWillReceive(
+        client,
+        aRunWithEvents(threadId, runId, [
           ag_ui.ToolCallStartEvent(
             toolCallId: toolCallId,
             toolCallName: toolCallName,
           ),
-          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: "{'arg1':"),
-          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: " 1, '"),
-          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: "arg2'"),
-          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ": 2}"),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: '{"arg1":'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ' 1, "'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: 'arg2"'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ': 2}'),
           ag_ui.ToolCallEndEvent(toolCallId: toolCallId),
           ag_ui.ToolCallResultEvent(
             messageId: 'result_$toolCallId',
             toolCallId: toolCallId,
             content: "{'sum': 3}",
           ),
-          ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
         ]),
       );
 
-      final publishedMessages = thread.messageStream.take(3).toList();
-      thread.startRun(
+      await thread.startRun(
         endpoint: 'agent',
         runId: runId,
-        message: ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!'),
+        messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
       );
 
-      final [_, msg1, msg2] = await publishedMessages;
+      final [_, msg1, msg2] = thread.messageHistory;
       expect(
         msg1,
         isA<ag_ui.AssistantMessage>().having(
@@ -255,7 +372,7 @@ void main() {
       final functionCall = toolCall.function;
 
       expect(functionCall.name, toolCallName);
-      expect(functionCall.arguments, "{'arg1': 1, 'arg2': 2}");
+      expect(functionCall.arguments, '{"arg1": 1, "arg2": 2}');
 
       expect(
         msg2,
@@ -265,6 +382,80 @@ void main() {
       );
     }, timeout: Timeout(Duration(seconds: 2)));
   });
+
+  group('Tool call interactions', () {
+    const toolCallName = 'add-numbers';
+
+    setUp(() {
+      thread = Thread(
+        id: threadId,
+        client: client,
+        tools: [
+          ag_ui.Tool(
+            name: toolCallName,
+            parameters: {
+              'schema': 'json-schema.org',
+              'title': 'Two Integer Inputs',
+              'description':
+                  'A schema for an object containing two integer inputs.',
+              'type': 'object',
+              'required': ['input1', 'input2'],
+              'properties': {
+                'input1': {
+                  'type': 'integer',
+                  'description': 'The first integer input.',
+                  'minimum': -2147483648,
+                  'maximum': 2147483647,
+                },
+                'input2': {
+                  'type': 'integer',
+                  'description': 'The second integer input.',
+                  'minimum': -2147483648,
+                  'maximum': 2147483647,
+                },
+              },
+              'additionalProperties': false,
+            },
+            description: 'add two numbers',
+          ),
+        ],
+        toolExecutors: {
+          toolCallName: (toolCall) async {
+            final arguments = jsonDecode(toolCall.function.arguments);
+            return '{"sum":${arguments['input1'] + arguments['input2']}}';
+          },
+        },
+      );
+    });
+
+    test('Client side tool call', () async {
+      const toolCallId = 'tool-call-id';
+      const toolCallName = 'add-numbers';
+
+      clientWillReceive(
+        client,
+        aRunWithEvents(threadId, runId, [
+          ag_ui.ToolCallStartEvent(
+            toolCallId: toolCallId,
+            toolCallName: toolCallName,
+          ),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: '{"input1":'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ' 1, "'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: 'input2"'),
+          ag_ui.ToolCallArgsEvent(toolCallId: toolCallId, delta: ': 2}'),
+          ag_ui.ToolCallEndEvent(toolCallId: toolCallId),
+        ]),
+      );
+
+      final [result] = await thread.startRun(
+        endpoint: 'agent',
+        runId: runId,
+        messages: [ag_ui.UserMessage(id: 'msg-id-1', content: 'hi!')],
+      );
+
+      expect(result.content, equals('{"sum":3}'));
+    });
+  });
 }
 
 void clientWillReceive(ag_ui.AgUiClient client, List<ag_ui.BaseEvent> events) {
@@ -273,13 +464,33 @@ void clientWillReceive(ag_ui.AgUiClient client, List<ag_ui.BaseEvent> events) {
   ).thenAnswer((_) => Stream.fromIterable(events));
 }
 
+List<ag_ui.BaseEvent> aRunWithEvents(
+  String threadId,
+  String runId,
+  List<ag_ui.BaseEvent> events,
+) {
+  return [
+    ag_ui.RunStartedEvent(threadId: threadId, runId: runId),
+    ...events,
+    ag_ui.RunFinishedEvent(threadId: threadId, runId: runId),
+  ];
+}
+
 ag_ui.SimpleRunAgentInput captureRunAgentInput(ag_ui.AgUiClient client) {
-  return verify(() => client.runAgent('agent', captureAny())).captured.last
+  return verify(() => client.runAgent(any(), captureAny())).captured.last
       as ag_ui.SimpleRunAgentInput;
 }
 
-TypeMatcher<ag_ui.UserMessage> isUserMessage(String id) =>
-    isA<ag_ui.UserMessage>().having((m) => m.id, "id", equals(id));
+TypeMatcher<ag_ui.UserMessage> isUserMsg({
+  required String id,
+  required String msg,
+}) => isA<ag_ui.UserMessage>()
+    .having((m) => m.id, "id", equals(id))
+    .having((m) => m.content, 'content', equals(msg));
 
-TypeMatcher<ag_ui.AssistantMessage> isAssistantMessage(String id) =>
-    isA<ag_ui.AssistantMessage>().having((m) => m.id, "id", equals(id));
+TypeMatcher<ag_ui.AssistantMessage> isAssistantMsg({
+  required String id,
+  required String msg,
+}) => isA<ag_ui.AssistantMessage>()
+    .having((m) => m.id, "id", equals(id))
+    .having((m) => m.content, 'content', equals(msg));
