@@ -1,5 +1,7 @@
 """Parser for AGUI events (and their JSON equivalents"""
 
+from __future__ import annotations
+
 import dataclasses
 import enum
 import typing
@@ -11,6 +13,7 @@ from ag_ui import core as agui_core
 from soliplex.agui import thread as agui_thread
 
 AGUI_EventIterator = abc.AsyncIterator[agui_core.BaseEvent]
+AGUI_EventDictIterator = abc.AsyncIterator[agui_core.BaseEvent]
 
 
 AGUI_EVENT_CLASSES_BY_TYPE = {
@@ -543,3 +546,10 @@ class EventStreamParser:
                 "state": self.state,
             },
         )
+
+
+async def agui_events_from_dicts(
+    ed_iterator: AGUI_EventDictIterator,
+) -> AGUI_EventIterator:
+    async for event_dict in ed_iterator:
+        yield agui_event_from_json(event_dict)

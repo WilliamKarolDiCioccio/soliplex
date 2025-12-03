@@ -3,10 +3,14 @@ from unittest import mock
 
 import fastapi
 import pytest
+from ag_ui import core as agui_core
+from haiku.rag.graph import agui as hr_agui
 
+from soliplex import agents
 from soliplex import config
 from soliplex import convos
 from soliplex import installation
+from soliplex import models
 from soliplex import secrets
 from soliplex.agui import thread as agui_thread
 
@@ -21,9 +25,28 @@ SECRET_CONFIG_2 = config.SecretConfig(SECRET_NAME_2)
 MISS_ERROR = object()
 OLLAMA_BASE_URL = "http://ollama.example.com:11434"
 
+THREAD_ID = "test-agui-thread"
+RUN_ID = "test-agui-run"
+
+RUN_AGENT_INPUT = mock.create_autospec(
+    agui_core.RunAgentInput,
+    thread_id=THREAD_ID,
+    run_id=RUN_ID,
+)
+
 NoSuchSecret = pytest.raises(KeyError)
 RaisesSecretError = pytest.raises(secrets.SecretError)
 NoRaise = contextlib.nullcontext()
+
+
+@pytest.fixture
+def test_user() -> models.UserProfile:
+    return models.UserProfile(
+        given_name="Phreddy",
+        family_name="Phlyntstone",
+        email="phreddy@example.com",
+        preferred_username="phreddy",
+    )
 
 
 @pytest.mark.parametrize(
@@ -121,6 +144,13 @@ def test_installation_resolve_environment(w_raise):
         the_installation.resolve_environment()
 
 
+def test_installation_haiku_rag_config():
+    i_config = mock.create_autospec(config.InstallationConfig)
+    the_installation = installation.Installation(i_config)
+
+    assert the_installation.haiku_rag_config is i_config.haiku_rag_config
+
+
 @pytest.mark.parametrize("w_oidc_configs", [[], [object()]])
 def test_installation_auth_disabled(w_oidc_configs):
     i_config = mock.create_autospec(config.InstallationConfig)
@@ -141,12 +171,11 @@ def test_installation_oidc_auth_system_configs():
     )
 
 
-def test_installation_get_room_configs():
+def test_installation_get_room_configs(test_user):
     r_config = mock.create_autospec(config.RoomConfig)
     r_configs = {"room_id": r_config}
     i_config = mock.create_autospec(config.InstallationConfig)
     i_config.room_configs = r_configs
-    test_user = {"name": "test"}
 
     the_installation = installation.Installation(i_config)
 
@@ -156,12 +185,11 @@ def test_installation_get_room_configs():
 @pytest.mark.parametrize(
     "w_room_id, raises", [("room_id", False), ("nonesuch", True)]
 )
-def test_installation_get_room_config(w_room_id, raises):
+def test_installation_get_room_config(test_user, w_room_id, raises):
     r_config = mock.create_autospec(config.RoomConfig)
     r_configs = {"room_id": r_config}
     i_config = mock.create_autospec(config.InstallationConfig)
     i_config.room_configs = r_configs
-    test_user = {"name": "test"}
 
     the_installation = installation.Installation(i_config)
 
@@ -174,12 +202,11 @@ def test_installation_get_room_config(w_room_id, raises):
         assert found is r_config
 
 
-def test_installation_get_completion_configs():
+def test_installation_get_completion_configs(test_user):
     c_config = mock.create_autospec(config.CompletionConfig)
     c_configs = {"completion_id": c_config}
     i_config = mock.create_autospec(config.InstallationConfig)
     i_config.completion_configs = c_configs
-    test_user = {"name": "test"}
 
     the_installation = installation.Installation(i_config)
 
@@ -189,12 +216,15 @@ def test_installation_get_completion_configs():
 @pytest.mark.parametrize(
     "w_completion_id, raises", [("completion_id", False), ("nonesuch", True)]
 )
-def test_installation_get_completion_config(w_completion_id, raises):
+def test_installation_get_completion_config(
+    test_user,
+    w_completion_id,
+    raises,
+):
     c_config = mock.create_autospec(config.CompletionConfig)
     c_configs = {"completion_id": c_config}
     i_config = mock.create_autospec(config.InstallationConfig)
     i_config.completion_configs = c_configs
-    test_user = {"name": "test"}
 
     the_installation = installation.Installation(i_config)
 
@@ -235,7 +265,7 @@ def test_installation_get_agent_by_id(gafc, w_agent_id, raises):
     "w_room_id, raises", [("room_id", False), ("nonesuch", True)]
 )
 @mock.patch("soliplex.agents.get_agent_from_configs")
-def test_installation_get_agent_for_room(gafc, w_room_id, raises):
+def test_installation_get_agent_for_room(gafc, test_user, w_room_id, raises):
     a_config = mock.create_autospec(config.AgentConfig)
 
     tc_config = mock.create_autospec(config.ToolConfig)
@@ -262,7 +292,6 @@ def test_installation_get_agent_for_room(gafc, w_room_id, raises):
     r_configs = {"room_id": r_config}
     i_config = mock.create_autospec(config.InstallationConfig)
     i_config.room_configs = r_configs
-    test_user = {"name": "test"}
 
     the_installation = installation.Installation(i_config)
 
@@ -279,7 +308,12 @@ def test_installation_get_agent_for_room(gafc, w_room_id, raises):
     "w_completion_id, raises", [("completion_id", False), ("nonesuch", True)]
 )
 @mock.patch("soliplex.agents.get_agent_from_configs")
-def test_installation_get_agent_for_completion(gafc, w_completion_id, raises):
+def test_installation_get_agent_for_completion(
+    gafc,
+    test_user,
+    w_completion_id,
+    raises,
+):
     a_config = mock.create_autospec(config.AgentConfig)
 
     tc_config = mock.create_autospec(config.ToolConfig)
@@ -292,21 +326,20 @@ def test_installation_get_agent_for_completion(gafc, w_completion_id, raises):
         config.HTTP_MCP_ClientToolsetConfig
     )
 
-    r_config = mock.create_autospec(config.RoomConfig)
-    r_config.agent_config = a_config
-    t_configs = r_config.tool_configs = {
+    c_config = mock.create_autospec(config.CompletionConfig)
+    c_config.agent_config = a_config
+    t_configs = c_config.tool_configs = {
         "test_tool": tc_config,
         "test_sdtc": sdtc_config,
     }
-    mcp_configs = r_config.mcp_client_toolset_configs = {
+    mcp_configs = c_config.mcp_client_toolset_configs = {
         "test_stdio": mcp_stdio_config,
         "test_http": mcp_http_streaming_config,
     }
 
-    r_configs = {"completion_id": r_config}
+    c_configs = {"completion_id": c_config}
     i_config = mock.create_autospec(config.InstallationConfig)
-    i_config.completion_configs = r_configs
-    test_user = {"name": "test"}
+    i_config.completion_configs = c_configs
 
     the_installation = installation.Installation(i_config)
 
@@ -323,6 +356,120 @@ def test_installation_get_agent_for_completion(gafc, w_completion_id, raises):
         )
         assert found is gafc.return_value
         gafc.assert_called_once_with(a_config, t_configs, mcp_configs)
+
+
+@pytest.mark.parametrize("w_run_agent_input", [False, True])
+@pytest.mark.parametrize(
+    "w_room_id, raises", [("room_id", False), ("nonesuch", True)]
+)
+def test_installation_get_agent_deps_for_room(
+    test_user,
+    w_room_id,
+    raises,
+    w_run_agent_input,
+):
+    tc_config = mock.create_autospec(config.ToolConfig)
+    sdtc_config = mock.create_autospec(config.SearchDocumentsToolConfig)
+
+    r_config = mock.create_autospec(config.RoomConfig)
+    t_configs = r_config.tool_configs = {
+        "test_tool": tc_config,
+        "test_sdtc": sdtc_config,
+    }
+
+    r_configs = {"room_id": r_config}
+    i_config = mock.create_autospec(config.InstallationConfig)
+    i_config.room_configs = r_configs
+
+    the_installation = installation.Installation(i_config)
+
+    kw = {}
+    if w_run_agent_input:
+        kw["run_agent_input"] = RUN_AGENT_INPUT
+
+    if raises:
+        with pytest.raises(KeyError):
+            the_installation.get_agent_deps_for_room(
+                w_room_id,
+                test_user,
+                **kw,
+            )
+    else:
+        found = the_installation.get_agent_deps_for_room(
+            w_room_id,
+            test_user,
+            **kw,
+        )
+
+        assert isinstance(found, agents.AgentDependencies)
+
+        assert found.the_installation is the_installation
+        assert found.user == test_user
+        assert found.tool_configs == t_configs
+
+        if w_run_agent_input:
+            assert isinstance(found.agui_emitter, hr_agui.AGUIEmitter)
+            assert found.agui_emitter.thread_id == THREAD_ID
+            assert found.agui_emitter.run_id == RUN_ID
+        else:
+            assert found.agui_emitter is None
+
+
+@pytest.mark.parametrize("w_run_agent_input", [False, True])
+@pytest.mark.parametrize(
+    "w_completion_id, raises", [("completion_id", False), ("nonesuch", True)]
+)
+def test_installation_get_agent_deps_for_completion(
+    test_user,
+    w_completion_id,
+    raises,
+    w_run_agent_input,
+):
+    tc_config = mock.create_autospec(config.ToolConfig)
+    sdtc_config = mock.create_autospec(config.SearchDocumentsToolConfig)
+
+    c_config = mock.create_autospec(config.CompletionConfig)
+    t_configs = c_config.tool_configs = {
+        "test_tool": tc_config,
+        "test_sdtc": sdtc_config,
+    }
+
+    c_configs = {"completion_id": c_config}
+    i_config = mock.create_autospec(config.InstallationConfig)
+    i_config.completion_configs = c_configs
+
+    the_installation = installation.Installation(i_config)
+
+    kw = {}
+    if w_run_agent_input:
+        kw["run_agent_input"] = RUN_AGENT_INPUT
+
+    if raises:
+        with pytest.raises(KeyError):
+            the_installation.get_agent_deps_for_completion(
+                w_completion_id,
+                test_user,
+                **kw,
+            )
+    else:
+        found = the_installation.get_agent_deps_for_completion(
+            w_completion_id,
+            test_user,
+            **kw,
+        )
+
+        assert isinstance(found, agents.AgentDependencies)
+
+        assert found.the_installation is the_installation
+        assert found.user == test_user
+        assert found.tool_configs == t_configs
+
+        if w_run_agent_input:
+            assert isinstance(found.agui_emitter, hr_agui.AGUIEmitter)
+            assert found.agui_emitter.thread_id == THREAD_ID
+            assert found.agui_emitter.run_id == RUN_ID
+        else:
+            assert found.agui_emitter is None
 
 
 @pytest.mark.anyio

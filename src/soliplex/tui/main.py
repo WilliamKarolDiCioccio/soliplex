@@ -229,6 +229,11 @@ class SoliplexTUI(t_app.App):
                 elif chunk["type"] == "TEXT_MESSAGE_CONTENT":
                     response_content += chunk["delta"]
 
+                elif chunk["type"] == "ACTIVITY_SNAPSHOT":
+                    response_content += (
+                        f"\n\n** activity **\n\n{chunk['content']}\n\n"
+                    )
+
                 elif chunk["type"] == "RUN_FINISHED":
                     response_content += "\n\n** done **"
 

@@ -4,6 +4,9 @@ import pathlib
 
 import fastapi
 import pydantic_ai
+from ag_ui import core as agui_core
+from haiku.rag import config as hr_config
+from haiku.rag.graph import agui as hr_agui
 
 from soliplex import agents
 from soliplex import config
@@ -29,6 +32,10 @@ class Installation:
 
     def resolve_environment(self):
         self._config.resolve_environment()
+
+    @property
+    def haiku_rag_config(self) -> hr_config.AppConfig:
+        return self._config.haiku_rag_config
 
     @property
     def auth_disabled(self):
@@ -96,6 +103,54 @@ class Installation:
             completion_config.agent_config,
             completion_config.tool_configs,
             completion_config.mcp_client_toolset_configs,
+        )
+
+    def get_agent_deps_for_room(
+        self,
+        room_id: str,
+        user: dict,
+        run_agent_input: agui_core.RunAgentInput = None,
+    ) -> pydantic_ai.Agent:
+        room_config = self.get_room_config(room_id, user)
+
+        kwargs = {}
+
+        if run_agent_input is not None:
+            kwargs["agui_emitter"] = hr_agui.AGUIEmitter(
+                thread_id=run_agent_input.thread_id,
+                run_id=run_agent_input.run_id,
+                use_deltas=False,
+            )
+
+        return agents.AgentDependencies(
+            the_installation=self,
+            user=user,
+            tool_configs=room_config.tool_configs,
+            **kwargs,
+        )
+
+    def get_agent_deps_for_completion(
+        self,
+        completion_id: str,
+        user: dict,
+        run_agent_input: agui_core.RunAgentInput = None,
+    ) -> pydantic_ai.Agent:
+        completion_config = self.get_completion_config(completion_id, user)
+
+        kwargs = {}
+
+        if run_agent_input is not None:
+            kwargs["agui_emitter"] = hr_agui.AGUIEmitter(
+                thread_id=run_agent_input.thread_id,
+                run_id=run_agent_input.run_id,
+                use_deltas=False,
+            )
+
+        return agents.AgentDependencies(
+            the_installation=self,
+            user=user,
+            tool_configs=completion_config.tool_configs,
+            **kwargs,
         )
 
 

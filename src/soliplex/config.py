@@ -356,10 +356,7 @@ class ToolConfig:
 
 
 @dataclasses.dataclass
-class SearchDocumentsToolConfig(ToolConfig):
-    kind: str = "search_documents"
-    tool_name: str = "soliplex.tools.search_documents"
-
+class _RAGToolBase:
     # Set in '__post_init__' below
     _rag_lancedb_path: pathlib.Path = None
 
@@ -367,30 +364,9 @@ class SearchDocumentsToolConfig(ToolConfig):
     rag_lancedb_stem: str = None
     rag_lancedb_override_path: str = None
 
-    expand_context_radius: int = 2
-    search_documents_limit: int = 5
-    return_citations: bool = False
-
-    # Set in 'from_yaml' below
+    # Normally set via subclass 'from_yaml'
     _installation_config: InstallationConfig = _no_repr_none()
     _config_path: pathlib.Path = None
-
-    @classmethod
-    def from_yaml(
-        cls,
-        installation_config: InstallationConfig,
-        config_path: pathlib.Path,
-        config: dict[str, typing.Any],
-    ):
-        try:
-            config["_installation_config"] = installation_config
-            config["_config_path"] = config_path
-
-            instance = cls(**config)
-        except Exception as exc:
-            raise FromYamlException(config_path, "sdtc", config) from exc
-
-        return instance
 
     def __post_init__(self):
         exclusive_required = [
@@ -462,17 +438,69 @@ class SearchDocumentsToolConfig(ToolConfig):
             rag_lancedb_path = f"MISSING: {exc.rag_db_filename}"
 
         return {
-            "expand_context_radius": self.expand_context_radius,
-            "search_documents_limit": self.search_documents_limit,
-            "return_citations": self.return_citations,
             "rag_lancedb_path": rag_lancedb_path,
         }
+
+
+@dataclasses.dataclass
+class SearchDocumentsToolConfig(ToolConfig, _RAGToolBase):
+    kind: str = "search_documents"
+    tool_name: str = "soliplex.tools.search_documents"
+
+    expand_context_radius: int = 2
+    search_documents_limit: int = 5
+    return_citations: bool = False
+
+    # Set in 'from_yaml' below
+    _installation_config: InstallationConfig = _no_repr_none()
+    _config_path: pathlib.Path = None
+
+    @classmethod
+    def from_yaml(
+        cls,
+        installation_config: InstallationConfig,
+        config_path: pathlib.Path,
+        config: dict[str, typing.Any],
+    ):
+        try:
+            config["_installation_config"] = installation_config
+            config["_config_path"] = config_path
+
+            instance = cls(**config)
+        except Exception as exc:
+            raise FromYamlException(config_path, "sdtc", config) from exc
+
+        return instance
+
+    def get_extra_parameters(self) -> dict:
+        return (
+            super().get_extra_parameters()
+            | _RAGToolBase.get_extra_parameters(self)
+            | {
+                "expand_context_radius": self.expand_context_radius,
+                "search_documents_limit": self.search_documents_limit,
+                "return_citations": self.return_citations,
+            }
+        )
+
+
+@dataclasses.dataclass
+class RAGResearchToolConfig(ToolConfig, _RAGToolBase):
+    kind: str = "research_report"
+    tool_name: str = "soliplex.tools.research_report"
+
+    def get_extra_parameters(self) -> dict:
+        return (
+            super().get_extra_parameters()
+            | _RAGToolBase.get_extra_parameters(self)
+        )
 
 
 TOOL_CONFIG_CLASSES_BY_TOOL_NAME = {
     klass.tool_name: klass
     for klass in [
         SearchDocumentsToolConfig,
+        RAGResearchToolConfig,
     ]
 }
 

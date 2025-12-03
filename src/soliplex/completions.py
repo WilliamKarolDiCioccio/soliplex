@@ -6,6 +6,7 @@ import pydantic_ai
 from fastapi import responses
 from pydantic_ai import messages as ai_messages
 
+from soliplex import agents
 from soliplex import models
 
 
@@ -39,7 +40,7 @@ def openai_chunk_repr(model, i_chunk, chunk):
 
 async def stream_chat_responses(
     agent: pydantic_ai.Agent,
-    agent_deps: models.AgentDependencies,
+    agent_deps: agents.AgentDependencies,
     user_question: str,
     message_history: list[ai_messages.ModelMessage],
 ):
@@ -66,7 +67,7 @@ async def stream_chat_responses(
 
 async def openai_chat_completion(
     agent: pydantic_ai.Agent,
-    agent_deps: models.AgentDependencies,
+    agent_deps: agents.AgentDependencies,
     chat_request: models.ChatCompletionRequest,
 ) -> responses.StreamingResponse:
     openai_payload = chat_request.model_dump(exclude_unset=True)

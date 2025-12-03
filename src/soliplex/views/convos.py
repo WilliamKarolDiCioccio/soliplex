@@ -59,8 +59,8 @@ async def post_convos_new_room(
             detail=f"No such room: {room_id}",
         ) from None
 
-    agent_deps = models.AgentDependencies(
-        the_installation=the_installation,
+    agent_deps = the_installation.get_agent_deps_for_room(
+        room_id,
         user=user_profile,
     )
 
@@ -169,8 +169,8 @@ async def post_convo(
             detail=f"No such room: {convo.room_id}",
         ) from None
 
-    agent_deps = models.AgentDependencies(
-        the_installation=the_installation,
+    agent_deps = the_installation.get_agent_deps_for_room(
+        convo.room_id,
         user=user_profile,
     )
 

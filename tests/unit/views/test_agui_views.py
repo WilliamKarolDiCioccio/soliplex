@@ -612,7 +612,7 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
     cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "bad_run_input, expectation",
     [
@@ -622,7 +622,8 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
 )
 @mock.patch("fastapi.responses.StreamingResponse")
 @mock.patch("pydantic_ai.ui.ag_ui.AGUIAdapter")
-@mock.patch("soliplex.agui.parser.EventStreamParser")
+@mock.patch("soliplex.agui.parser.agui_events_from_dicts")
+@mock.patch("soliplex.agui.mpx.multiplex_streams")
 @mock.patch("soliplex.views.agui._check_user_thread_run")
 @mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_room_agent")
@@ -630,7 +631,8 @@ async def test_post_room_agui_thread_id_run_id(
     cura,
     cut,
     cutr,
-    esp,
+    mpx,
+    aefd,
     aga,
     sr,
     run_input,
@@ -645,6 +647,11 @@ async def test_post_room_agui_thread_id_run_id(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_installation.get_agent_for_room.return_value = agent
+
+    exp_deps = the_installation.get_agent_deps_for_room.return_value
+    exp_emitter = exp_deps.agui_emitter = mock.Mock(spec_set=["close"])
+    exp_emitter.close = mock.AsyncMock(spec_set=())
+
     the_threads = mock.create_autospec(agui_thread.Threads)
     token = object()
 
@@ -661,19 +668,13 @@ async def test_post_room_agui_thread_id_run_id(
     else:
         exp_run.check_run_input.return_value = None
 
-    exp_deps = models.AgentDependencies(
-        the_installation=the_installation,
-        user=USER_PROFILE,
-    )
-
     aga.from_request = mock.AsyncMock()
     exp_adapter = aga.from_request.return_value
     exp_adapter.run_input = run_input
     exp_adapter.encode_stream = mock.MagicMock()
     exp_adapter.run_stream = mock.MagicMock()
     exp_agent_stream = exp_adapter.run_stream.return_value
-    exp_esp = esp.return_value
-    exp_esp_stream = exp_esp.parse_stream.return_value
+    exp_mpx = mpx.return_value
     exp_sse_stream = exp_adapter.encode_stream.return_value
 
     with expectation as expected:
@@ -695,13 +696,35 @@ async def test_post_room_agui_thread_id_run_id(
             media_type=exp_adapter.accept,
         )
 
-        exp_adapter.encode_stream.assert_called_once_with(exp_esp_stream)
+        exp_adapter.encode_stream.assert_called_once_with(exp_mpx)
 
-        exp_esp.parse_stream.assert_called_once_with(exp_agent_stream)
+        mpx.assert_called_once_with(
+            exp_agent_stream,
+            aefd.return_value,
+        )
 
-        esp.assert_called_once_with(exp_adapter.run_input, run=exp_run)
+        aefd.assert_called_once_with(exp_emitter)
 
-        exp_adapter.run_stream.assert_called_once_with(deps=exp_deps)
+        exp_adapter.run_stream.assert_called_once()
+        (rs_call_0,) = exp_adapter.run_stream.call_args_list
+        assert rs_call_0.args == ()
+        assert rs_call_0.kwargs["deps"] is exp_deps
+
+        # the 'agui_emitter' stream does not get closed until the
+        # adapter's 'run_stream' calls its 'on_complete' callback.
+        exp_emitter.close.assert_not_awaited()
+
+        rs_on_complete = rs_call_0.kwargs["on_complete"]
+        faux_result = object()
+        await rs_on_complete(faux_result)
+
+        exp_emitter.close.assert_awaited_once_with()
+
+        the_installation.get_agent_deps_for_room.assert_called_once_with(
+            TEST_ROOM_ID,
+            USER_PROFILE,
+            exp_adapter.run_input,
+        )
 
         aga.from_request.assert_called_once_with(
             request=request,

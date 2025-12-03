@@ -1,6 +1,7 @@
 import typing
 from collections import abc
 
+import pydantic
 import pydantic_ai
 from pydantic_ai import agent as ai_agent
 from pydantic_ai import mcp as ai_mcp
@@ -13,7 +14,15 @@ from soliplex import config
 from soliplex import mcp_client
 from soliplex import models
 
-SoliplexAgent = ai_agent.AbstractAgent[models.AgentDependencies, typing.Any]
+
+class AgentDependencies(pydantic.BaseModel):
+    the_installation: typing.Any  # installation.Installation
+    user: models.UserProfile = None  # TBD make required
+    tool_configs: config.ToolConfigMap = None
+    agui_emitter: typing.Any = None
+
+
+SoliplexAgent = ai_agent.AbstractAgent[AgentDependencies, typing.Any]
 AgentFactory = abc.Callable[
     [
         config.AgentConfig,
@@ -73,7 +82,7 @@ def _get_default_agent_from_configs(
         tools=tools,
         toolsets=toolsets,
         instructions=agent_config.get_system_prompt(),
-        deps_type=models.AgentDependencies,
+        deps_type=AgentDependencies,
     )
 
 

@@ -90,8 +90,8 @@ async def post_chat_completion(
             status_code=404, detail=f"No such completion: {completion_id}"
         ) from None
 
-    agent_deps = models.AgentDependencies(
-        the_installation=the_installation,
+    agent_deps = the_installation.get_agent_deps_for_completion(
+        completion_id,
         user=user_profile,
     )
 
