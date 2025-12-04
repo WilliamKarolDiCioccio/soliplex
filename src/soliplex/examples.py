@@ -5,6 +5,7 @@ import dataclasses
 import random
 import time
 import typing
+import uuid
 from collections import abc
 
 import pydantic_ai
@@ -77,8 +78,19 @@ NativeEvent = (
 MessageHistory = typing.Sequence[ai_messages.ModelMessage]
 
 
-async def faux_tool() -> str:
+async def faux_tool(ctx: pydantic_ai.RunContext) -> str:
     """Return something random"""
+    agui_emitter = ctx.deps.agui_emitter
+    activity_id = str(uuid.uuid4())
+
+    time.sleep(random.uniform(0.25, 0.5))
+
+    agui_emitter.update_activity(
+        "idling", {"how": "head scratching"}, activity_id,
+    )
+
+    time.sleep(random.uniform(0.25, 0.5))
+
     return "something random"
 
 
@@ -193,7 +205,14 @@ class FauxAgent:
             part=think_part,
         )
 
-        for tool_name in self.tool_configs:
+        ctx = pydantic_ai.RunContext(
+            deps=deps,
+            model=None,
+            usage=None,
+        )
+
+        for tool_name, tool_config in self.tool_configs.items():
+
             tc_part = ai_messages.ToolCallPart(tool_name)
             part_index += 1
 
@@ -201,6 +220,8 @@ class FauxAgent:
                 index=part_index,
                 part=tc_part,
             )
+
+            await tool_config.tool(ctx)
 
             time.sleep(random.uniform(0.5, 2.0))
 
@@ -212,14 +233,17 @@ class FauxAgent:
         time.sleep(random.uniform(2.5, 3.0))
 
         text_part = ai_messages.TextPart("I don't know!")
+        part_index += 1
         yield ai_messages.PartStartEvent(
-            index=1,
+            index=part_index,
             part=text_part,
         )
         yield ai_messages.PartEndEvent(
-            index=1,
+            index=part_index,
             part=text_part,
         )
+
+        yield ai_run.AgentRunResultEvent(result = text_part.content)
 
 
 def faux_agent_factory(
