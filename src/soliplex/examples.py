@@ -86,7 +86,9 @@ async def faux_tool(ctx: pydantic_ai.RunContext) -> str:
     time.sleep(random.uniform(0.25, 0.5))
 
     agui_emitter.update_activity(
-        "idling", {"how": "head scratching"}, activity_id,
+        "idling",
+        {"how": "head scratching"},
+        activity_id,
     )
 
     time.sleep(random.uniform(0.25, 0.5))
@@ -212,7 +214,6 @@ class FauxAgent:
         )
 
         for tool_name, tool_config in self.tool_configs.items():
-
             tc_part = ai_messages.ToolCallPart(tool_name)
             part_index += 1
 
@@ -243,7 +244,7 @@ class FauxAgent:
             part=text_part,
         )
 
-        yield ai_run.AgentRunResultEvent(result = text_part.content)
+        yield ai_run.AgentRunResultEvent(result=text_part.content)
 
 
 def faux_agent_factory(
