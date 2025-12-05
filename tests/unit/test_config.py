@@ -244,7 +244,7 @@ FULL_HTTP_MCTC_CONFIG_YAML = """
 """
 
 
-AGENT_ID = "testing"
+AGENT_ID = "testing-agent"
 TEMPLATE_AGENT_ID = "testing-template"
 BOGUS_TEMPLATE_AGENT_ID = "BOGUS"
 SYSTEM_PROMPT = "You are a test"
@@ -371,10 +371,6 @@ EMPTY_W_KIND_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
     kind="testing",
 )
-EMPTY_W_KIND_AGENT_CONFIG_YAML = f"""
-id: "{AGENT_ID}"
-kind: "testing"
-"""
 
 BARE_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
@@ -574,6 +570,7 @@ BARE_ROOM_CONFIG_KW = {
     "description": ROOM_DESCRIPTION,
     "agent_config": config.AgentConfig(
         id=f"room-{ROOM_ID}",
+        model_name=MODEL_NAME,
         system_prompt=SYSTEM_PROMPT,
     ),
 }
@@ -582,6 +579,7 @@ id: "{ROOM_ID}"
 name: "{ROOM_NAME}"
 description: "{ROOM_DESCRIPTION}"
 agent:
+    model_name: "{MODEL_NAME}"
     system_prompt: "{SYSTEM_PROMPT}"
 """
 
@@ -597,6 +595,7 @@ FULL_ROOM_CONFIG_KW = {
     "logo_image": f"./{IMAGE_FILENAME}",
     "agent_config": config.AgentConfig(
         id=f"room-{ROOM_ID}",
+        model_name=MODEL_NAME,
         system_prompt=SYSTEM_PROMPT,
     ),
     "quizzes": [
@@ -651,6 +650,7 @@ suggestions:
 enable_attachments: true
 logo_image: "./{IMAGE_FILENAME}"
 agent:
+    model_name: "{MODEL_NAME}"
     system_prompt: "{SYSTEM_PROMPT}"
 tools:
     - tool_name: "soliplex.tools.get_current_datetime"
@@ -691,12 +691,14 @@ BARE_COMPLETION_CONFIG_KW = {
     "id": COMPLETION_ID,
     "agent_config": config.AgentConfig(
         id=f"completion-{COMPLETION_ID}",
+        model_name=MODEL_NAME,
         system_prompt=SYSTEM_PROMPT,
     ),
 }
 BARE_COMPLETION_CONFIG_YAML = f"""\
 id: "{COMPLETION_ID}"
 agent:
+    model_name: "{MODEL_NAME}"
     system_prompt: "{SYSTEM_PROMPT}"
 """
 
@@ -705,6 +707,7 @@ FULL_COMPLETION_CONFIG_KW = {
     "name": COMPLETION_NAME,
     "agent_config": config.AgentConfig(
         id=f"completion-{COMPLETION_ID}",
+        model_name=MODEL_NAME,
         system_prompt=SYSTEM_PROMPT,
     ),
     "tool_configs": {
@@ -739,6 +742,7 @@ FULL_COMPLETION_CONFIG_YAML = f"""\
 id: "{COMPLETION_ID}"
 name: "{COMPLETION_NAME}"
 agent:
+    model_name: "{MODEL_NAME}"
     system_prompt: "{SYSTEM_PROMPT}"
 tools:
     - tool_name: "soliplex.tools.get_current_datetime"
@@ -2687,7 +2691,7 @@ def test_factoryagentconfig_as_yaml(
 @pytest.mark.parametrize(
     "agent_config, expected_kw",
     [
-        (EMPTY_AGENT_CONFIG_KW.copy(), EMPTY_AGENT_CONFIG_KW),
+        (BARE_AGENT_CONFIG_KW.copy(), BARE_AGENT_CONFIG_KW),
         (EMPTY_W_KIND_AGENT_CONFIG_KW.copy(), EMPTY_W_KIND_AGENT_CONFIG_KW),
     ],
 )
