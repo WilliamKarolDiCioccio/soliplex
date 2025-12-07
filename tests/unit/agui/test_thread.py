@@ -224,8 +224,9 @@ async def test_threads_get_thread(w_threads, expectation):
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("w_already", [False, True])
+@pytest.mark.parametrize("w_initial_run", [None, False, True])
 @mock.patch("soliplex.agui.thread._make_uuid_str")
-async def test_threads_new_thread(mus, w_already):
+async def test_threads_new_thread(mus, w_initial_run, w_already):
     mus.return_value = TEST_THREAD_ID
     the_threads = agui_thread.Threads()
 
@@ -233,12 +234,18 @@ async def test_threads_new_thread(mus, w_already):
     if w_already:
         before = user_threads_patch[TEST_USER] = {"already": object()}
 
+    kw = {}
+
+    if w_initial_run is not None:
+        kw["initial_run"] = w_initial_run
+
     with (
         mock.patch.dict(the_threads._threads, **user_threads_patch),
     ):
         found = await the_threads.new_thread(
             user_name=TEST_USER,
             room_id=TEST_THREAD_ROOMID,
+            **kw,
         )
         if w_already:
             assert the_threads._threads[TEST_USER] is before
@@ -247,6 +254,13 @@ async def test_threads_new_thread(mus, w_already):
 
     assert found.thread_id == TEST_THREAD_ID
     assert found.room_id == TEST_THREAD_ROOMID
+
+    if w_initial_run in (None, True):
+        (found_run,) = found.runs.values()
+        assert found_run.run_input.thread_id == TEST_THREAD_ID
+        assert found_run.run_input.run_id == found_run.run_id
+    else:
+        assert len(found.runs) == 0
 
 
 @pytest.mark.anyio

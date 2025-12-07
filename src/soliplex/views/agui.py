@@ -254,12 +254,7 @@ async def post_room_agui(
         room_id=room_id,
         user_name=user_name,
         metadata=t_metadata,
-    )
-
-    run = await the_threads.new_run(
-        room_id=room_id,
-        user_name=user_name,
-        thread_id=thread.thread_id,
+        initial_run=True,
     )
 
     return models.AGUI_Thread(
@@ -268,7 +263,8 @@ async def post_room_agui(
         runs={
             run.run_id: models.AGUI_Run.from_run_and_thread(
                 a_run=run, a_thread=thread
-            ),
+            )
+            for run in thread.runs.values()
         },
         created=thread.created,
         metadata=new_thread_request.metadata,

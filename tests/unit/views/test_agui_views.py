@@ -467,10 +467,9 @@ async def test_post_room_agui(
     the_threads = mock.create_autospec(agui_thread.Threads)
     the_threads.new_thread.return_value = dataclasses.replace(
         TEST_THREAD,
-        runs={},
-    )
-    the_threads.new_run.return_value = dataclasses.replace(
-        TEST_RUN,
+        runs={
+            TEST_RUN_ID: dataclasses.replace(TEST_RUN),
+        },
     )
 
     found = await agui_views.post_room_agui(
@@ -489,18 +488,14 @@ async def test_post_room_agui(
     (m_run,) = found.runs.values()
     assert m_run.room_id == TEST_ROOM_ID
     assert m_run.thread_id == TEST_THREAD_ID
+    assert m_run.run_id == TEST_RUN_ID
     assert m_run.parent_run_id is None
-
-    the_threads.new_run.assert_called_once_with(
-        room_id=TEST_ROOM_ID,
-        user_name=USER_NAME,
-        thread_id=TEST_THREAD_ID,
-    )
 
     the_threads.new_thread.assert_called_once_with(
         room_id=TEST_ROOM_ID,
         user_name=USER_NAME,
         metadata=exp_meta,
+        initial_run=True,
     )
 
     cuir.assert_called_once_with(

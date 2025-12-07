@@ -205,6 +205,7 @@ class Threads:
         user_name: str,
         room_id: str,
         metadata: ThreadMetadata = None,
+        initial_run: bool = True,
     ) -> Thread:
         """Create a new thread"""
         thread_id = _make_uuid_str()
@@ -214,6 +215,22 @@ class Threads:
             room_id=room_id,
             metadata=metadata,
         )
+
+        if initial_run:
+            run_id = _make_uuid_str()
+            thread.runs[run_id] = Run(
+                run_id=run_id,
+                run_input=agui_core.RunAgentInput(
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    parent_run_id=None,
+                    state=None,
+                    messages=[],
+                    tools=[],
+                    context=[],
+                    forwarded_props=None,
+                ),
+            )
 
         async with self._lock:
             user_threads = self._threads.setdefault(user_name, {})
