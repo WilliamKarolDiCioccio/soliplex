@@ -290,7 +290,11 @@ async def test_get_room_agui(cuir, w_meta):
         room_id=TEST_ROOM_ID,
     )
 
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -341,12 +345,16 @@ async def test_get_room_agui_thread_id(cuir, cut, w_meta):
         assert found.metadata is None
 
     cut.assert_called_once_with(
-        TEST_ROOM_ID,
-        TEST_THREAD_ID,
-        USER_NAME,
-        the_threads,
+        room_id=TEST_ROOM_ID,
+        thread_id=TEST_THREAD_ID,
+        user_name=USER_NAME,
+        the_threads=the_threads,
     )
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -396,14 +404,21 @@ async def test_get_room_agui_thread_id_run_id(cuir, cut, cutr, w_room_meta):
     else:
         assert found.metadata is None
 
-    cutr.assert_called_once_with(exp_thread, TEST_RUN_ID)
-    cut.assert_called_once_with(
-        TEST_ROOM_ID,
-        TEST_THREAD_ID,
-        USER_NAME,
-        the_threads,
+    cutr.assert_called_once_with(
+        thread=exp_thread,
+        run_id=TEST_RUN_ID,
     )
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cut.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        thread_id=TEST_THREAD_ID,
+        user_name=USER_NAME,
+        the_threads=the_threads,
+    )
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -467,7 +482,11 @@ async def test_post_room_agui(
         metadata=exp_meta,
     )
 
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -562,12 +581,16 @@ async def test_post_room_agui_thread_id(
         )
 
         cut.assert_called_once_with(
-            TEST_ROOM_ID,
-            TEST_THREAD_ID,
-            USER_NAME,
-            the_threads,
+            room_id=TEST_ROOM_ID,
+            thread_id=TEST_THREAD_ID,
+            user_name=USER_NAME,
+            the_threads=the_threads,
         )
-        cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+        cuir.assert_called_once_with(
+            room_id=TEST_ROOM_ID,
+            the_installation=the_installation,
+            token=token,
+        )
 
 
 @pytest.mark.anyio
@@ -614,7 +637,11 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
         thread_id=TEST_THREAD_ID,
         metadata=exp_t_meta,
     )
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.asyncio
@@ -736,14 +763,21 @@ async def test_post_room_agui_thread_id_run_id(
             agent=agent,
         )
 
-        cutr.assert_called_once_with(exp_thread, TEST_RUN_ID)
-        cut.assert_called_once_with(
-            TEST_ROOM_ID,
-            TEST_THREAD_ID,
-            USER_NAME,
-            the_threads,
+        cutr.assert_called_once_with(
+            thread=exp_thread,
+            run_id=TEST_RUN_ID,
         )
-        cura.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+        cut.assert_called_once_with(
+            room_id=TEST_ROOM_ID,
+            thread_id=TEST_THREAD_ID,
+            user_name=USER_NAME,
+            the_threads=the_threads,
+        )
+        cura.assert_called_once_with(
+            room_id=TEST_ROOM_ID,
+            the_installation=the_installation,
+            token=token,
+        )
 
 
 @pytest.mark.anyio
@@ -796,12 +830,16 @@ async def test_post_room_agui_thread_id_run_id_meta(cuir, cut, w_meta):
         metadata=exp_t_meta,
     )
     cut.assert_called_once_with(
-        TEST_ROOM_ID,
-        TEST_THREAD_ID,
-        USER_NAME,
-        the_threads,
+        room_id=TEST_ROOM_ID,
+        thread_id=TEST_THREAD_ID,
+        user_name=USER_NAME,
+        the_threads=the_threads,
     )
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -837,9 +875,13 @@ async def test_delete_room_agui_thread_id(cuir, cut):
         thread_id=TEST_THREAD_ID,
     )
     cut.assert_called_once_with(
-        TEST_ROOM_ID,
-        TEST_THREAD_ID,
-        USER_NAME,
-        the_threads,
+        room_id=TEST_ROOM_ID,
+        thread_id=TEST_THREAD_ID,
+        user_name=USER_NAME,
+        the_threads=the_threads,
     )
-    cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )

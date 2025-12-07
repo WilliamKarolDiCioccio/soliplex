@@ -21,6 +21,7 @@ depend_the_threads = agui_thread.depend_the_threads
 
 
 async def _check_user_in_room(
+    *,
     room_id: str,
     the_installation: installation.Installation = depend_the_installation,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
@@ -45,6 +46,7 @@ async def _check_user_in_room(
 
 
 async def _check_user_room_agent(
+    *,
     room_id: str,
     the_installation: installation.Installation = depend_the_installation,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
@@ -75,10 +77,11 @@ async def _check_user_room_agent(
 
 
 async def _check_user_thread(
+    *,
     room_id: str,
     thread_id: str,
     user_name: str,
-    the_threads: installation.Installation = depend_the_installation,
+    the_threads: agui_thread.Threads,
 ) -> agui_thread.Thread:
     """Check for an existing thread for the user within the given room"""
     try:
@@ -103,6 +106,7 @@ async def _check_user_thread(
 
 
 async def _check_user_thread_run(
+    *,
     thread: agui_thread.Thread,
     run_id: str,
 ) -> agui_thread.Run:
@@ -127,9 +131,9 @@ async def get_room_agui(
 ) -> models.AGUI_Threads:
     """Return user's extant AGUI threads within the given room"""
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     user_threads = await the_threads.user_threads(
         user_name=user_name,
@@ -155,15 +159,15 @@ async def get_room_agui_thread_id(
 ) -> models.AGUI_Thread:
     """Return metadata about a specific thread and its runs"""
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     thread = await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
 
     return models.AGUI_Thread.from_thread(thread, include_runs=True)
@@ -182,19 +186,19 @@ async def get_room_agui_thread_id_run_id(
 ) -> models.AGUI_Run:
     """Return metadata about a specific run"""
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     thread = await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
     run = await _check_user_thread_run(
-        thread,
-        run_id,
+        thread=thread,
+        run_id=run_id,
     )
 
     return models.AGUI_Run.from_run_and_thread(
@@ -221,9 +225,9 @@ async def post_room_agui(
     Body of request, if passed, must validate to 'models.AGUI_ThreadMetadata'.
     """
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
 
     if new_thread_request.metadata is not None:
@@ -270,15 +274,15 @@ async def post_room_agui_thread_id(
     Body of request, if passed, must validate to 'models.AGUI_RunMetadata'.
     """
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     thread = await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
 
     parent_run_id = new_run_request.parent_run_id
@@ -333,9 +337,9 @@ async def post_room_agui_thread_id_meta(
     Returns an HTTP 205 (Reset Content) on success.
     """
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
 
     new_md_dict = {
@@ -373,19 +377,19 @@ async def post_room_agui_thread_id_run_id(
     Stream AGUI events in the response.
     """
     user_name, user, agent = await _check_user_room_agent(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     thread = await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
     run = await _check_user_thread_run(
-        thread,
-        run_id,
+        thread=thread,
+        run_id=run_id,
     )
 
     agui_adapter = await ai_ag_ui.AGUIAdapter.from_request(
@@ -448,15 +452,15 @@ async def post_room_agui_thread_id_run_id_meta(
     Returns an HTTP 205 (Reset Content) on success.
     """
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     thread = await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
 
     new_md_dict = {
@@ -489,15 +493,15 @@ async def delete_room_agui_thread_id(
 ) -> models.AGUI_Run:
     """Delete an AGUI thread within the given room"""
     user_name = await _check_user_in_room(
-        room_id,
-        the_installation,
-        token,
+        room_id=room_id,
+        the_installation=the_installation,
+        token=token,
     )
     await _check_user_thread(
-        room_id,
-        thread_id,
-        user_name,
-        the_threads,
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
     )
 
     await the_threads.delete_thread(
