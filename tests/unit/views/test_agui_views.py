@@ -221,28 +221,40 @@ async def test__check_user_thread(w_miss, w_room_id, expectation):
         (True, raises_httpexc(code=404, match="No such run")),
     ],
 )
-async def test__check_user_thread_run(w_miss, expectation):
-    thread = mock.create_autospec(agui_thread.Thread)
+@mock.patch("soliplex.views.agui._check_user_thread")
+async def test__check_user_thread_run(cut, w_miss, expectation):
+    the_threads = mock.create_autospec(agui_thread.Threads)
+    exp_thread = cut.return_value = mock.create_autospec(agui_thread.Thread)
 
     if w_miss:
-        thread.get_run.side_effect = agui_thread.UnknownRunId(
+        exp_thread.get_run.side_effect = agui_thread.UnknownRunId(
             run_id=TEST_RUN_ID,
         )
     else:
-        thread.get_run.return_value = agui_thread.Run(
+        exp_thread.get_run.return_value = agui_thread.Run(
             run_id=TEST_RUN_ID,
         )
 
     with expectation as expected:
-        found = await agui_views._check_user_thread_run(
+        found_thread, found_run = await agui_views._check_user_thread_run(
+            room_id=TEST_ROOM_ID,
+            user_name=USER_NAME,
+            thread_id=TEST_THREAD_ID,
             run_id=TEST_RUN_ID,
-            thread=thread,
+            the_threads=the_threads,
         )
 
     if expected is None:
-        assert found is thread.get_run.return_value
+        assert found_thread is exp_thread
+        assert found_run is exp_thread.get_run.return_value
 
-    thread.get_run.assert_called_once_with(run_id=TEST_RUN_ID)
+    exp_thread.get_run.assert_called_once_with(run_id=TEST_RUN_ID)
+    cut.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        thread_id=TEST_THREAD_ID,
+        user_name=USER_NAME,
+        the_threads=the_threads,
+    )
 
 
 @pytest.mark.anyio
@@ -360,9 +372,8 @@ async def test_get_room_agui_thread_id(cuir, cut, w_meta):
 @pytest.mark.anyio
 @pytest.mark.parametrize("w_room_meta", [False, True])
 @mock.patch("soliplex.views.agui._check_user_thread_run")
-@mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_in_room")
-async def test_get_room_agui_thread_id_run_id(cuir, cut, cutr, w_room_meta):
+async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
     cuir.return_value = USER_NAME
 
     run_replace = {"events": AGUI_EVENTS}
@@ -372,11 +383,12 @@ async def test_get_room_agui_thread_id_run_id(cuir, cut, cutr, w_room_meta):
             label=TEST_RUN_LABEL,
         )
 
-    run = dataclasses.replace(TEST_RUN, **run_replace)
-    cutr.return_value = run
-
-    exp_thread = dataclasses.replace(TEST_THREAD, runs={TEST_RUN_ID: TEST_RUN})
-    cut.return_value = exp_thread
+    exp_thread = dataclasses.replace(
+        TEST_THREAD,
+        runs={TEST_RUN_ID: TEST_RUN},
+    )
+    exp_run = dataclasses.replace(TEST_RUN, **run_replace)
+    cutr.return_value = exp_thread, exp_run
 
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
@@ -405,13 +417,10 @@ async def test_get_room_agui_thread_id_run_id(cuir, cut, cutr, w_room_meta):
         assert found.metadata is None
 
     cutr.assert_called_once_with(
-        thread=exp_thread,
-        run_id=TEST_RUN_ID,
-    )
-    cut.assert_called_once_with(
         room_id=TEST_ROOM_ID,
         thread_id=TEST_THREAD_ID,
         user_name=USER_NAME,
+        run_id=TEST_RUN_ID,
         the_threads=the_threads,
     )
     cuir.assert_called_once_with(
@@ -657,11 +666,9 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
 @mock.patch("soliplex.agui.parser.agui_events_from_dicts")
 @mock.patch("soliplex.agui.mpx.multiplex_streams")
 @mock.patch("soliplex.views.agui._check_user_thread_run")
-@mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_room_agent")
 async def test_post_room_agui_thread_id_run_id(
     cura,
-    cut,
     cutr,
     mpx,
     aefd,
@@ -688,10 +695,8 @@ async def test_post_room_agui_thread_id_run_id(
     token = object()
 
     exp_thread = mock.create_autospec(agui_thread.Thread)
-    cut.return_value = exp_thread
-
     exp_run = mock.create_autospec(agui_thread.Run)
-    cutr.return_value = exp_run
+    cutr.return_value = exp_thread, exp_run
 
     if bad_run_input:
         exp_run.check_run_input.side_effect = agui_thread.RunInputMismatch(
@@ -764,13 +769,10 @@ async def test_post_room_agui_thread_id_run_id(
         )
 
         cutr.assert_called_once_with(
-            thread=exp_thread,
-            run_id=TEST_RUN_ID,
-        )
-        cut.assert_called_once_with(
             room_id=TEST_ROOM_ID,
-            thread_id=TEST_THREAD_ID,
             user_name=USER_NAME,
+            thread_id=TEST_THREAD_ID,
+            run_id=TEST_RUN_ID,
             the_threads=the_threads,
         )
         cura.assert_called_once_with(

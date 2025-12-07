@@ -107,12 +107,21 @@ async def _check_user_thread(
 
 async def _check_user_thread_run(
     *,
-    thread: agui_thread.Thread,
+    room_id: str,
+    thread_id: str,
+    user_name: str,
     run_id: str,
-) -> agui_thread.Run:
-    """Check for an existing thread run for the user within the given room"""
+    the_threads: agui_thread.Threads,
+) -> tuple[agui_thread.Thread, agui_thread.Run]:
+    """Check for an existing thread / run for the user within the given room"""
+    thread = await _check_user_thread(
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
+        the_threads=the_threads,
+    )
     try:
-        return await thread.get_run(run_id=run_id)
+        return thread, await thread.get_run(run_id=run_id)
     except agui_thread.UnknownRunId:
         raise fastapi.HTTPException(
             status_code=404,
@@ -190,15 +199,12 @@ async def get_room_agui_thread_id_run_id(
         the_installation=the_installation,
         token=token,
     )
-    thread = await _check_user_thread(
+    thread, run = await _check_user_thread_run(
         room_id=room_id,
         thread_id=thread_id,
         user_name=user_name,
-        the_threads=the_threads,
-    )
-    run = await _check_user_thread_run(
-        thread=thread,
         run_id=run_id,
+        the_threads=the_threads,
     )
 
     return models.AGUI_Run.from_run_and_thread(
@@ -381,15 +387,12 @@ async def post_room_agui_thread_id_run_id(
         the_installation=the_installation,
         token=token,
     )
-    thread = await _check_user_thread(
+    _thread, run = await _check_user_thread_run(
         room_id=room_id,
         thread_id=thread_id,
         user_name=user_name,
-        the_threads=the_threads,
-    )
-    run = await _check_user_thread_run(
-        thread=thread,
         run_id=run_id,
+        the_threads=the_threads,
     )
 
     agui_adapter = await ai_ag_ui.AGUIAdapter.from_request(
