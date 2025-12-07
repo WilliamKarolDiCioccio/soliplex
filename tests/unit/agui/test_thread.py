@@ -15,6 +15,7 @@ NOW = datetime.datetime.now(datetime.UTC)
 
 TEST_USER = "test-user"
 TEST_THREAD_ROOMID = "test-room"
+TEST_OTHER_ROOMID = "other-room"
 TEST_THREAD_ID = str(UUID4)
 OTHER_THREAD_ID = "thread-123"
 TEST_THREAD_NAME = f"Test Thread {UUID4}"
@@ -23,8 +24,13 @@ TEST_THREAD = agui_thread.Thread(
     thread_id=TEST_THREAD_ID,
     room_id=TEST_THREAD_ROOMID,
 )
+OTHER_THREAD = agui_thread.Thread(
+    thread_id=OTHER_THREAD_ID,
+    room_id=TEST_OTHER_ROOMID,
+)
 TEST_THREADS = {
     TEST_THREAD_ID: TEST_THREAD,
+    OTHER_THREAD_ID: OTHER_THREAD,
 }
 TEST_PARENT_RUN_ID = "run-012"
 OTHER_PARENT_RUN_ID = "run-789"
@@ -275,6 +281,7 @@ async def test_thread_update_run(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("w_room_id", [False, True])
 @pytest.mark.parametrize(
     "w_threads, expected",
     [
@@ -282,11 +289,21 @@ async def test_thread_update_run(
         ({TEST_USER: TEST_THREADS}, TEST_THREADS),
     ],
 )
-async def test_threads_user_threads(w_threads, expected):
+async def test_threads_user_threads(w_threads, expected, w_room_id):
     the_threads = agui_thread.Threads()
     the_threads._threads.update(w_threads)
 
-    found = await the_threads.user_threads(user_name=TEST_USER)
+    kw = {}
+
+    if w_room_id:
+        kw["room_id"] = TEST_THREAD_ROOMID
+        expected = {
+            t_id: thread
+            for (t_id, thread) in expected.items()
+            if thread.room_id == TEST_THREAD_ROOMID
+        }
+
+    found = await the_threads.user_threads(user_name=TEST_USER, **kw)
 
     assert found == expected
 
@@ -442,7 +459,9 @@ async def test_threads_delete_thread(w_threads, expectation):
         )
 
     if expected is None:
-        assert the_threads._threads[TEST_USER] == {}
+        assert the_threads._threads[TEST_USER] == {
+            OTHER_THREAD_ID: OTHER_THREAD,
+        }
 
 
 @pytest.mark.anyio

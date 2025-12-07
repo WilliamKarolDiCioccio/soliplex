@@ -131,15 +131,16 @@ async def get_room_agui(
         the_installation,
         token,
     )
-    user_threads = await the_threads.user_threads(user_name=user_name)
-
-    room_threads = [
+    user_threads = await the_threads.user_threads(
+        user_name=user_name,
+        room_id=room_id,
+    )
+    model_threads = [
         models.AGUI_Thread.from_thread(a_thread, include_runs=False)
         for a_thread in user_threads.values()
-        if a_thread.room_id == room_id
     ]
 
-    return models.AGUI_Threads(threads=room_threads)
+    return models.AGUI_Threads(threads=model_threads)
 
 
 @util.logfire_span("GET /v1/rooms/{room_id}/agui/{thread_id}")

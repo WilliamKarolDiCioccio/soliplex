@@ -207,13 +207,18 @@ class Threads:
     async def _find_user_threads(
         self,
         user_name: str,
+        room_id: str = None,
     ) -> ThreadsByID:
         user_threads = self._threads.get(user_name)
 
         if user_threads is None:
             return {}
 
-        return user_threads.copy()
+        return {
+            thread_id: thread
+            for thread_id, thread in user_threads.items()
+            if room_id is None or thread.room_id == room_id
+        }
 
     async def _find_thread(
         self,
@@ -232,9 +237,14 @@ class Threads:
 
         return thread
 
-    async def user_threads(self, *, user_name: str) -> ThreadsByID:
+    async def user_threads(
+        self,
+        *,
+        user_name: str,
+        room_id: str = None,
+    ) -> ThreadsByID:
         async with self._lock:
-            return await self._find_user_threads(user_name)
+            return await self._find_user_threads(user_name, room_id=room_id)
 
     async def get_thread(
         self,

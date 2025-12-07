@@ -285,6 +285,11 @@ async def test_get_room_agui(cuir, w_meta):
     else:
         assert m_thread.metadata is None
 
+    the_threads.user_threads.assert_called_once_with(
+        user_name=USER_NAME,
+        room_id=TEST_ROOM_ID,
+    )
+
     cuir.assert_called_once_with(TEST_ROOM_ID, the_installation, token)
 
 
