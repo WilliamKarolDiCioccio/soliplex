@@ -9,6 +9,7 @@ import sqlalchemy
 from ag_ui import core as agui_core
 from sqlalchemy import orm as sqla_orm
 from sqlalchemy import schema as sqla_schema
+from sqlalchemy.ext import asyncio as sqla_asyncio
 from sqlalchemy.sql import sqltypes as sqla_sqltypes
 
 from soliplex.agui import util as agui_util
@@ -21,7 +22,8 @@ relationship = sqla_orm.relationship
 
 MESSAGE_DESERIALIZER = pydantic.TypeAdapter(agui_core.Message)
 
-MEMORY_ENGINE_URL = "sqlite://"
+SYNC_MEMORY_ENGINE_URL = "sqlite://"
+ASYNC_MEMORY_ENGINE_URL = "sqlite+aiosqlite://"
 
 # Recommended naming convention used by Alembic, as various different database
 # providers will autogenerate vastly different names making migrations more
@@ -319,7 +321,7 @@ class RunEvent(Base):
 
 
 def get_session(
-    engine_url=MEMORY_ENGINE_URL,
+    engine_url=SYNC_MEMORY_ENGINE_URL,
     init_schema=False,
     **engine_kwargs,
 ):
@@ -330,3 +332,17 @@ def get_session(
             Base.metadata.create_all(connection)
 
     return sqla_orm.Session(bind=engine)
+
+
+async def get_async_session(
+    engine_url=ASYNC_MEMORY_ENGINE_URL,
+    init_schema=False,
+    **engine_kwargs,
+):
+    engine = sqla_asyncio.create_async_engine(engine_url, **engine_kwargs)
+
+    if init_schema:
+        async with engine.begin() as connection:
+            await connection.run_sync(Base.metadata.create_all)
+
+    return sqla_asyncio.AsyncSession(bind=engine)

@@ -5,6 +5,7 @@ import pytest
 import sqlalchemy
 from ag_ui import core as agui_core
 from sqlalchemy import orm as sqla_orm
+from sqlalchemy.ext import asyncio as sqla_asyncio
 
 from soliplex.agui import persistence as agui_persistence
 
@@ -316,35 +317,9 @@ def test_runevent_from_agui_event(agui_event):
     assert found.type == agui_event.type
 
 
-@pytest.mark.parametrize("init_schema", [False, True])
-@mock.patch("sqlalchemy.create_engine")
-@mock.patch("soliplex.agui.persistence.metadata.create_all")
-def test_get_session(
-    ca,
-    ce,
-    init_schema,
-):
-    kwargs = {}
-
-    if init_schema:
-        kwargs["init_schema"] = True
-
-    with agui_persistence.get_session(**kwargs) as session:
-        assert isinstance(session, sqla_orm.Session)
-        assert session.bind is ce.return_value
-
-        ce.assert_called_once_with(agui_persistence.MEMORY_ENGINE_URL)
-
-        if init_schema:
-            connection = ce.return_value.connect.return_value
-            ca.assert_called_once_with(connection.__enter__.return_value)
-        else:
-            ca.assert_not_called()
-
-
 @pytest.fixture
 def the_engine():
-    engine = sqlalchemy.create_engine(agui_persistence.MEMORY_ENGINE_URL)
+    engine = sqlalchemy.create_engine(agui_persistence.SYNC_MEMORY_ENGINE_URL)
 
     yield engine
 
@@ -371,7 +346,6 @@ def test_sqla_thread_ctor(the_session):
     the_session.commit()
 
 
-@pytest.mark.anyio
 @pytest.mark.parametrize(
     "agui_rai",
     [
@@ -487,3 +461,61 @@ def test_sqla_run_events(the_session):
             strict=True,
         ):
             assert db_event.type == agui_event.type
+
+
+@pytest.mark.parametrize("init_schema", [False, True])
+@mock.patch("sqlalchemy.create_engine")
+@mock.patch("soliplex.agui.persistence.metadata.create_all")
+def test_get_session(
+    ca,
+    ce,
+    init_schema,
+):
+    kwargs = {}
+
+    if init_schema:
+        kwargs["init_schema"] = True
+
+    with agui_persistence.get_session(**kwargs) as session:
+        assert isinstance(session, sqla_orm.Session)
+        assert session.bind is ce.return_value
+
+        ce.assert_called_once_with(agui_persistence.SYNC_MEMORY_ENGINE_URL)
+
+        if init_schema:
+            connection = ce.return_value.connect.return_value
+            ca.assert_called_once_with(connection.__enter__.return_value)
+        else:
+            ca.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_schema", [False, True])
+@mock.patch("sqlalchemy.ext.asyncio.create_async_engine")
+@mock.patch("soliplex.agui.persistence.metadata.create_all")
+async def test_get_async_session(
+    ca,
+    cae,
+    init_schema,
+):
+    engine = cae.return_value
+
+    kwargs = {}
+
+    if init_schema:
+        kwargs["init_schema"] = True
+
+    session_maker = await agui_persistence.get_async_session(**kwargs)
+
+    async with session_maker as session:
+        assert isinstance(session, sqla_asyncio.AsyncSession)
+        assert session.bind is engine
+
+        cae.assert_called_once_with(agui_persistence.ASYNC_MEMORY_ENGINE_URL)
+
+        if init_schema:
+            engine.begin.assert_called_once_with()
+            connection = engine.begin.return_value.__aenter__.return_value
+            connection.run_sync.assert_called_once_with(ca)
+        else:
+            engine.begin.assert_not_called()
