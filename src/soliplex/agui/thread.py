@@ -134,66 +134,6 @@ class Thread:
     def created(self) -> datetime.datetime:
         return self._created
 
-    async def get_run(self, run_id: str) -> Run:
-        async with self._lock:
-            try:
-                return self.runs[run_id]
-            except KeyError:
-                raise UnknownRunId(run_id) from None
-
-    async def new_run(
-        self,
-        *,
-        metadata: RunMetadata = None,
-        parent_run_id: str = None,
-    ) -> Run:
-        """Create a new run for the thread
-
-        If 'parent_run_id' is passed, ensure it is valid.
-        """
-        if parent_run_id is not None and parent_run_id not in self.runs:
-            raise MissingParentRunId(parent_run_id)
-
-        run_id = _make_uuid_str()
-
-        async with self._lock:
-            assert run_id not in self.runs
-
-            run = self.runs[run_id] = Run(
-                run_id=run_id,
-                metadata=metadata,
-                run_input=agui_core.RunAgentInput(
-                    thread_id=self.thread_id,
-                    run_id=run_id,
-                    parent_run_id=parent_run_id,
-                    state=None,
-                    messages=[],
-                    tools=[],
-                    context=[],
-                    forwarded_props=None,
-                ),
-            )
-
-        return run
-
-    async def update_run(
-        self,
-        *,
-        run_id: str,
-        metadata: RunMetadata = None,
-    ) -> Run:
-        """Update run instance with the given metadata, or None"""
-        async with self._lock:
-            try:
-                before = self.runs[run_id]
-            except KeyError:
-                raise UnknownRunId(run_id) from None
-
-            after = dataclasses.replace(before, metadata=metadata)
-            self.runs[run_id] = after
-
-            return after
-
 
 ThreadsByID = dict[str, Thread]
 
@@ -313,6 +253,108 @@ class Threads:
                 raise UnknownThread(user_name, thread_id) from None
 
             self._threads[user_name] = threads
+
+    async def new_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        metadata: RunMetadata = None,
+        parent_run_id: str = None,
+    ) -> Run:
+        """Create a new run for the thread
+
+        If 'parent_run_id' is passed, ensure it is valid.
+        """
+        async with self._lock:
+            user_threads = await self._find_user_threads(
+                room_id=room_id,
+                user_name=user_name,
+            )
+
+            try:
+                thread = user_threads[thread_id]
+            except KeyError:
+                raise UnknownThread(user_name, thread_id) from None
+
+            if parent_run_id is not None and parent_run_id not in thread.runs:
+                raise MissingParentRunId(parent_run_id)
+
+            run_id = _make_uuid_str()
+
+            assert run_id not in thread.runs
+
+            run = thread.runs[run_id] = Run(
+                run_id=run_id,
+                metadata=metadata,
+                run_input=agui_core.RunAgentInput(
+                    thread_id=thread.thread_id,
+                    run_id=run_id,
+                    parent_run_id=parent_run_id,
+                    state=None,
+                    messages=[],
+                    tools=[],
+                    context=[],
+                    forwarded_props=None,
+                ),
+            )
+
+            return run
+
+    async def get_run(
+        self,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+    ) -> Run:
+        async with self._lock:
+            user_threads = await self._find_user_threads(
+                room_id=room_id,
+                user_name=user_name,
+            )
+
+            try:
+                thread = user_threads[thread_id]
+            except KeyError:
+                raise UnknownThread(user_name, thread_id) from None
+
+            try:
+                return thread.runs[run_id]
+            except KeyError:
+                raise UnknownRunId(run_id) from None
+
+    async def update_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+        metadata: RunMetadata = None,
+    ) -> Run:
+        """Update run instance with the given metadata, or None"""
+        async with self._lock:
+            user_threads = await self._find_user_threads(
+                room_id=room_id,
+                user_name=user_name,
+            )
+
+            try:
+                thread = user_threads[thread_id]
+            except KeyError:
+                raise UnknownThread(user_name, thread_id) from None
+
+            try:
+                before = thread.runs[run_id]
+            except KeyError:
+                raise UnknownRunId(run_id) from None
+
+            after = dataclasses.replace(before, metadata=metadata)
+            thread.runs[run_id] = after
+
+            return after
 
 
 async def get_the_threads(request: fastapi.Request) -> Threads:

@@ -121,12 +121,19 @@ async def _check_user_thread_run(
         the_threads=the_threads,
     )
     try:
-        return thread, await thread.get_run(run_id=run_id)
+        run = await the_threads.get_run(
+            room_id=room_id,
+            thread_id=thread_id,
+            user_name=user_name,
+            run_id=run_id,
+        )
     except agui_thread.UnknownRunId:
         raise fastapi.HTTPException(
             status_code=404,
             detail=f"No such run: {run_id}",
         ) from None
+
+    return thread, run
 
 
 @util.logfire_span("GET /v1/rooms/{room_id}/agui")
@@ -249,7 +256,11 @@ async def post_room_agui(
         metadata=t_metadata,
     )
 
-    run = await thread.new_run()
+    run = await the_threads.new_run(
+        room_id=room_id,
+        user_name=user_name,
+        thread_id=thread.thread_id,
+    )
 
     return models.AGUI_Thread(
         room_id=room_id,
@@ -284,12 +295,6 @@ async def post_room_agui_thread_id(
         the_installation=the_installation,
         token=token,
     )
-    thread = await _check_user_thread(
-        room_id=room_id,
-        thread_id=thread_id,
-        user_name=user_name,
-        the_threads=the_threads,
-    )
 
     parent_run_id = new_run_request.parent_run_id
 
@@ -301,7 +306,10 @@ async def post_room_agui_thread_id(
         r_metadata = None
 
     try:
-        run = await thread.new_run(
+        run = await the_threads.new_run(
+            room_id=room_id,
+            user_name=user_name,
+            thread_id=thread_id,
             parent_run_id=parent_run_id,
             metadata=r_metadata,
         )
@@ -459,12 +467,6 @@ async def post_room_agui_thread_id_run_id_meta(
         the_installation=the_installation,
         token=token,
     )
-    thread = await _check_user_thread(
-        room_id=room_id,
-        thread_id=thread_id,
-        user_name=user_name,
-        the_threads=the_threads,
-    )
 
     new_md_dict = {
         key: value
@@ -477,7 +479,10 @@ async def post_room_agui_thread_id_run_id_meta(
     else:
         t_metadata = None
 
-    await thread.update_run(
+    await the_threads.update_run(
+        room_id=room_id,
+        thread_id=thread_id,
+        user_name=user_name,
         run_id=run_id,
         metadata=t_metadata,
     )

@@ -169,118 +169,6 @@ def test_thread_created():
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_run_id, expectation",
-    [
-        ("BOGUS", pytest.raises(agui_thread.UnknownRunId)),
-        (TEST_RUN_ID, no_error()),
-    ],
-)
-async def test_thread_get_run(w_run_id, expectation):
-    thread = dataclasses.replace(
-        TEST_THREAD,
-        runs={TEST_RUN_ID: TEST_RUN},
-    )
-
-    with expectation as expected:
-        found = await thread.get_run(w_run_id)
-
-    if expected is None:
-        assert found is TEST_RUN
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_parent_id, expectation",
-    [
-        ("BOGUS", pytest.raises(agui_thread.MissingParentRunId)),
-        (None, no_error()),
-        (TEST_PARENT_RUN_ID, no_error()),
-    ],
-)
-@pytest.mark.parametrize(
-    "w_metadata, exp_label",
-    [
-        (None, None),
-        (TEST_RUN_METADATA, TEST_RUN_LABEL),
-    ],
-)
-@mock.patch("soliplex.agui.thread._make_uuid_str")
-async def test_thread_new_run(
-    mus,
-    w_parent_id,
-    expectation,
-    w_metadata,
-    exp_label,
-):
-    mus.return_value = TEST_RUN_ID
-
-    thread = dataclasses.replace(
-        TEST_THREAD,
-        runs={TEST_PARENT_RUN_ID: TEST_PARENT_RUN},
-    )
-
-    kwargs = {}
-
-    if w_parent_id is not None:
-        kwargs["parent_run_id"] = w_parent_id
-
-    if w_metadata is not None:
-        kwargs["metadata"] = w_metadata
-
-    with expectation as expected:
-        found = await thread.new_run(**kwargs)
-
-    if expected is None:
-        assert found.thread_id == TEST_THREAD_ID
-        assert found.run_id == TEST_RUN_ID
-        assert found.parent_run_id == w_parent_id
-        assert found.label == exp_label
-
-        assert found is thread.runs[TEST_RUN_ID]
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    "w_run_id, expectation",
-    [
-        ("BOGUS", pytest.raises(agui_thread.UnknownRunId)),
-        (TEST_RUN_ID, no_error()),
-    ],
-)
-@pytest.mark.parametrize(
-    "w_metadata, exp_label",
-    [
-        (None, None),
-        (TEST_RUN_METADATA, TEST_RUN_LABEL),
-    ],
-)
-async def test_thread_update_run(
-    w_run_id,
-    expectation,
-    w_metadata,
-    exp_label,
-):
-    md_before = object()
-    run_before = dataclasses.replace(TEST_RUN, metadata=md_before)
-
-    thread = dataclasses.replace(
-        TEST_THREAD,
-        runs={TEST_RUN_ID: run_before},
-    )
-
-    with expectation as expected:
-        found = await thread.update_run(run_id=w_run_id, metadata=w_metadata)
-
-    if expected is None:
-        assert found is thread.runs[TEST_RUN_ID]
-        if exp_label is not None:
-            assert found.metadata.label == exp_label
-        else:
-            assert found.metadata is None
-
-
-@pytest.mark.anyio
 @pytest.mark.parametrize("w_room_id", [False, True])
 @pytest.mark.parametrize(
     "w_threads, expected",
@@ -462,6 +350,260 @@ async def test_threads_delete_thread(w_threads, expectation):
         assert the_threads._threads[TEST_USER] == {
             OTHER_THREAD_ID: OTHER_THREAD,
         }
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "w_metadata, exp_label",
+    [
+        (None, None),
+        (TEST_RUN_METADATA, TEST_RUN_LABEL),
+    ],
+)
+@pytest.mark.parametrize(
+    "w_room_id, w_user_name, w_thread_id, w_parent_id, expectation",
+    [
+        (
+            "BOGUS_ROOMID",
+            TEST_USER,
+            TEST_THREAD_ID,
+            None,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            "BOGUS_USERNAME",
+            TEST_THREAD_ID,
+            None,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            "BOGUS_THREAD_ID",
+            None,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            "BOGUS_PARENT_ID",
+            pytest.raises(agui_thread.MissingParentRunId),
+        ),
+        (TEST_THREAD_ROOMID, TEST_USER, TEST_THREAD_ID, None, no_error()),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            TEST_PARENT_RUN_ID,
+            no_error(),
+        ),
+    ],
+)
+@mock.patch("soliplex.agui.thread._make_uuid_str")
+async def test_threads_new_run(
+    mus,
+    w_room_id,
+    w_user_name,
+    w_thread_id,
+    w_parent_id,
+    expectation,
+    w_metadata,
+    exp_label,
+):
+    mus.return_value = TEST_RUN_ID
+
+    exp_thread = dataclasses.replace(
+        TEST_THREAD,
+        runs={TEST_PARENT_RUN_ID: TEST_PARENT_RUN},
+    )
+
+    the_threads = agui_thread.Threads()
+    the_threads._threads[TEST_USER] = {
+        TEST_THREAD_ID: exp_thread,
+    }
+
+    kwargs = {}
+
+    if w_parent_id is not None:
+        kwargs["parent_run_id"] = w_parent_id
+
+    if w_metadata is not None:
+        kwargs["metadata"] = w_metadata
+
+    with expectation as expected:
+        found = await the_threads.new_run(
+            room_id=w_room_id,
+            user_name=w_user_name,
+            thread_id=w_thread_id,
+            **kwargs,
+        )
+
+    if expected is None:
+        assert found.thread_id == TEST_THREAD_ID
+        assert found.run_id == TEST_RUN_ID
+        assert found.parent_run_id == w_parent_id
+        assert found.label == exp_label
+
+        assert found is exp_thread.runs[TEST_RUN_ID]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "w_room_id, w_user_name, w_thread_id, w_run_id, expectation",
+    [
+        (
+            "BOGUS_ROOMID",
+            TEST_USER,
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            "BOGUS_USERNAME",
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            "BOGUS_THREAD_ID",
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            "BOGUS_RUN_ID",
+            pytest.raises(agui_thread.UnknownRunId),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            no_error(),
+        ),
+    ],
+)
+async def test_threads_get_run(
+    w_room_id,
+    w_user_name,
+    w_thread_id,
+    w_run_id,
+    expectation,
+):
+    exp_thread = dataclasses.replace(
+        TEST_THREAD,
+        runs={TEST_RUN_ID: TEST_RUN},
+    )
+
+    the_threads = agui_thread.Threads()
+    the_threads._threads[TEST_USER] = {
+        TEST_THREAD_ID: exp_thread,
+    }
+
+    with expectation as expected:
+        found = await the_threads.get_run(
+            room_id=w_room_id,
+            user_name=w_user_name,
+            thread_id=w_thread_id,
+            run_id=w_run_id,
+        )
+
+    if expected is None:
+        assert found is TEST_RUN
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "w_metadata, exp_label",
+    [
+        (None, None),
+        (TEST_RUN_METADATA, TEST_RUN_LABEL),
+    ],
+)
+@pytest.mark.parametrize(
+    "w_room_id, w_user_name, w_thread_id, w_run_id, expectation",
+    [
+        (
+            "BOGUS_ROOMID",
+            TEST_USER,
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            "BOGUS_USERNAME",
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            "BOGUS_THREAD_ID",
+            TEST_RUN_ID,
+            pytest.raises(agui_thread.UnknownThread),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            "BOGUS_RUN_ID",
+            pytest.raises(agui_thread.UnknownRunId),
+        ),
+        (
+            TEST_THREAD_ROOMID,
+            TEST_USER,
+            TEST_THREAD_ID,
+            TEST_RUN_ID,
+            no_error(),
+        ),
+    ],
+)
+async def test_threads_update_run(
+    w_room_id,
+    w_user_name,
+    w_thread_id,
+    w_run_id,
+    expectation,
+    w_metadata,
+    exp_label,
+):
+    md_before = object()
+    run_before = dataclasses.replace(TEST_RUN, metadata=md_before)
+
+    exp_thread = dataclasses.replace(
+        TEST_THREAD,
+        runs={TEST_RUN_ID: run_before},
+    )
+
+    the_threads = agui_thread.Threads()
+    the_threads._threads[TEST_USER] = {
+        TEST_THREAD_ID: exp_thread,
+    }
+
+    with expectation as expected:
+        found = await the_threads.update_run(
+            room_id=w_room_id,
+            user_name=w_user_name,
+            thread_id=w_thread_id,
+            run_id=w_run_id,
+            metadata=w_metadata,
+        )
+
+    if expected is None:
+        assert found is exp_thread.runs[TEST_RUN_ID]
+        if exp_label is not None:
+            assert found.metadata.label == exp_label
+        else:
+            assert found.metadata is None
 
 
 @pytest.mark.anyio

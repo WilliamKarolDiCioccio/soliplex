@@ -227,11 +227,11 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
     exp_thread = cut.return_value = mock.create_autospec(agui_thread.Thread)
 
     if w_miss:
-        exp_thread.get_run.side_effect = agui_thread.UnknownRunId(
+        the_threads.get_run.side_effect = agui_thread.UnknownRunId(
             run_id=TEST_RUN_ID,
         )
     else:
-        exp_thread.get_run.return_value = agui_thread.Run(
+        the_threads.get_run.return_value = agui_thread.Run(
             run_id=TEST_RUN_ID,
         )
 
@@ -246,9 +246,14 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
 
     if expected is None:
         assert found_thread is exp_thread
-        assert found_run is exp_thread.get_run.return_value
+        assert found_run is the_threads.get_run.return_value
 
-    exp_thread.get_run.assert_called_once_with(run_id=TEST_RUN_ID)
+    the_threads.get_run.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        user_name=USER_NAME,
+        thread_id=TEST_THREAD_ID,
+        run_id=TEST_RUN_ID,
+    )
     cut.assert_called_once_with(
         room_id=TEST_ROOM_ID,
         thread_id=TEST_THREAD_ID,
@@ -460,9 +465,12 @@ async def test_post_room_agui(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_threads = mock.create_autospec(agui_thread.Threads)
-    exp_thread = the_threads.new_thread.return_value = dataclasses.replace(
+    the_threads.new_thread.return_value = dataclasses.replace(
         TEST_THREAD,
         runs={},
+    )
+    the_threads.new_run.return_value = dataclasses.replace(
+        TEST_RUN,
     )
 
     found = await agui_views.post_room_agui(
@@ -478,12 +486,16 @@ async def test_post_room_agui(
     assert found.thread_id == TEST_THREAD_ID
     assert found.metadata == new_thread_request.metadata
 
-    ((first_run_id, first_run),) = list(exp_thread.runs.items())
-
-    m_run = found.runs[first_run_id]
+    (m_run,) = found.runs.values()
     assert m_run.room_id == TEST_ROOM_ID
     assert m_run.thread_id == TEST_THREAD_ID
     assert m_run.parent_run_id is None
+
+    the_threads.new_run.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        user_name=USER_NAME,
+        thread_id=TEST_THREAD_ID,
+    )
 
     the_threads.new_thread.assert_called_once_with(
         room_id=TEST_ROOM_ID,
@@ -518,11 +530,9 @@ async def test_post_room_agui(
         {"label": "LABEL"},
     ],
 )
-@mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_in_room")
 async def test_post_room_agui_thread_id(
     cuir,
-    cut,
     run_input,
     w_meta,
     w_parent_id,
@@ -549,18 +559,12 @@ async def test_post_room_agui_thread_id(
     the_threads = mock.create_autospec(agui_thread.Threads)
     token = object()
 
-    exp_thread = mock.create_autospec(
-        agui_thread.Thread,
-        room_id=TEST_ROOM_ID,
-    )
-    cut.return_value = exp_thread
-
     if missing_parent:
-        exp_thread.new_run.side_effect = agui_thread.MissingParentRunId(
+        the_threads.new_run.side_effect = agui_thread.MissingParentRunId(
             TEST_PARENT_RUN_ID,
         )
     else:
-        exp_thread.new_run.return_value = mock.create_autospec(
+        the_threads.new_run.return_value = mock.create_autospec(
             agui_thread.Run,
             run_id=TEST_RUN_ID,
             run_input=run_input,
@@ -584,22 +588,19 @@ async def test_post_room_agui_thread_id(
         assert found.metadata == new_run_request.metadata
         assert found.parent_run_id == w_parent_id
 
-        exp_thread.new_run.assert_called_once_with(
+        the_threads.new_run.assert_called_once_with(
+            room_id=TEST_ROOM_ID,
+            user_name=USER_NAME,
+            thread_id=TEST_THREAD_ID,
             metadata=exp_meta,
             parent_run_id=w_parent_id,
         )
 
-        cut.assert_called_once_with(
-            room_id=TEST_ROOM_ID,
-            thread_id=TEST_THREAD_ID,
-            user_name=USER_NAME,
-            the_threads=the_threads,
-        )
-        cuir.assert_called_once_with(
-            room_id=TEST_ROOM_ID,
-            the_installation=the_installation,
-            token=token,
-        )
+    cuir.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        the_installation=the_installation,
+        token=token,
+    )
 
 
 @pytest.mark.anyio
@@ -790,15 +791,9 @@ async def test_post_room_agui_thread_id_run_id(
         {"label": TEST_RUN_LABEL},
     ],
 )
-@mock.patch("soliplex.views.agui._check_user_thread")
 @mock.patch("soliplex.views.agui._check_user_in_room")
-async def test_post_room_agui_thread_id_run_id_meta(cuir, cut, w_meta):
+async def test_post_room_agui_thread_id_run_id_meta(cuir, w_meta):
     cuir.return_value = USER_NAME
-    exp_thread = mock.create_autospec(
-        agui_thread.Thread,
-        room_id=TEST_ROOM_ID,
-    )
-    cut.return_value = exp_thread
 
     request = fastapi.Request(scope={"type": "http"})
 
@@ -827,15 +822,12 @@ async def test_post_room_agui_thread_id_run_id_meta(cuir, cut, w_meta):
     assert isinstance(found, fastapi.Response)
     assert found.status_code == 205
 
-    exp_thread.update_run.assert_called_once_with(
+    the_threads.update_run.assert_called_once_with(
+        room_id=TEST_ROOM_ID,
+        user_name=USER_NAME,
+        thread_id=TEST_THREAD_ID,
         run_id=TEST_RUN_ID,
         metadata=exp_t_meta,
-    )
-    cut.assert_called_once_with(
-        room_id=TEST_ROOM_ID,
-        thread_id=TEST_THREAD_ID,
-        user_name=USER_NAME,
-        the_threads=the_threads,
     )
     cuir.assert_called_once_with(
         room_id=TEST_ROOM_ID,
