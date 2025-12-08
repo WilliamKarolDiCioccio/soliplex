@@ -64,6 +64,8 @@ Implementation of an Agentic Generative User Interface (AG-UI) chat application 
 - **RFW widget rendering** - Agent can now send dynamic UI widgets that render in chat
 - **Button events working** - RFW `onEvent` callbacks fire when user interacts with widgets
 - **Fixed typing indicator** - Clears after GenUI rendering completes
+- **Fixed macOS permission race** - Retry mechanism for freshly granted location permissions
+- **Fixed DynamicContent data access** - Data stored at root level so RFW `data.fieldName` works correctly
 
 ### Test Results:
 ```
@@ -120,349 +122,32 @@ Create more complex widgets: forms, charts, data cards.
 
 ## GenUI Rendering with RFW
 
+> **📄 Full Documentation: See [GENUI-RFW.md](./GENUI-RFW.md)**
+
 The `genui_render` tool allows the AI agent to render dynamic UI widgets in the chat using Remote Flutter Widgets (RFW).
 
-### Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         AG-UI Server                            │
-│  Agent decides to show UI → calls genui_render tool             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼ SSE: TOOL_CALL_START/ARGS/END
-┌─────────────────────────────────────────────────────────────────┐
-│                      Flutter Client                             │
-│  1. Intercepts genui_render tool call                          │
-│  2. Parses RFW library_text                                     │
-│  3. Renders widget in chat (NO result sent back)                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Tool Categories
+### Quick Summary
 
 | Tool | Registered | Sent to Server | Result Sent Back | Purpose |
 |------|------------|----------------|------------------|---------|
 | `get_my_location` | LocalToolsService | ✅ Yes | ✅ Yes | Device capabilities |
 | `genui_render` | LocalToolsService | ✅ Yes | ❌ No | UI rendering only |
 
-### genui_render Tool Schema
+### Key Points
 
-```json
-{
-  "name": "genui_render",
-  "description": "Render a dynamic UI widget in the chat...",
-  "parameters": {
-    "type": "object",
-    "properties": {
-      "widget_name": {
-        "type": "string",
-        "description": "Name of the widget to render (must match widget in library_text)"
-      },
-      "library_text": {
-        "type": "string",
-        "description": "RFW library text defining the widget"
-      },
-      "library_name": {
-        "type": "string",
-        "description": "Namespace for the library (default: 'agent')"
-      },
-      "data": {
-        "type": "object",
-        "description": "Dynamic data to pass to the widget"
-      }
-    },
-    "required": ["widget_name", "library_text"]
-  }
-}
-```
+1. **RFW is NOT Dart** - Uses similar syntax but with critical differences
+2. **Enums are strings** - `"min"` not `MainAxisSize.min`
+3. **Padding is arrays** - `[16.0, 16.0, 16.0, 16.0]` not `EdgeInsets.all(16.0)`
+4. **Colors are hex** - `0xFF2196F3` not `Colors.blue`
+5. **Events fire on client** - Currently logged; future: send to agent
 
-### RFW Library Text Format
-
-RFW uses a declarative syntax similar to Flutter but in text form:
-
-```
-import core.widgets;
-import material;
-
-widget MyWidget = Container(
-  padding: [16.0, 16.0, 16.0, 16.0],
-  child: Column(
-    mainAxisSize: "min",
-    children: [
-      Text(text: "Hello World"),
-      ElevatedButton(
-        onPressed: event "button_clicked" { "action": "submit" },
-        child: Text(text: "Click Me"),
-      ),
-    ],
-  ),
-);
-```
-
-### Available Imports
-
-| Import | Widgets Available |
-|--------|-------------------|
-| `core.widgets` | Container, Column, Row, Text, SizedBox, Padding, Center, Expanded, etc. |
-| `material` | ElevatedButton, TextButton, Card, Icon, Checkbox, Switch, TextField, etc. |
-
-### RFW Syntax Reference
-
-#### Layout Widgets
-```
-// Container with padding (LTRB format)
-Container(
-  padding: [16.0, 8.0, 16.0, 8.0],  // left, top, right, bottom
-  child: ...
-)
-
-// Column/Row
-Column(
-  mainAxisSize: "min",              // "min" or "max"
-  mainAxisAlignment: "start",       // "start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"
-  crossAxisAlignment: "center",     // "start", "center", "end", "stretch"
-  children: [ ... ]
-)
-
-// SizedBox for spacing
-SizedBox(height: 16.0)
-SizedBox(width: 8.0)
-```
-
-#### Text Styling
-```
-Text(
-  text: "Hello World",
-  style: {
-    fontSize: 18.0,
-    fontWeight: "bold",             // "normal", "bold", "w100"-"w900"
-    color: 0xFF2196F3,              // ARGB hex format
-    fontStyle: "italic",            // "normal", "italic"
-  }
-)
-```
-
-#### Buttons with Events
-```
-ElevatedButton(
-  onPressed: event "my_event_name" { "key": "value" },
-  child: Text(text: "Submit"),
-)
-
-TextButton(
-  onPressed: event "cancel" {},
-  child: Text(text: "Cancel"),
-)
-```
-
-#### Colors
-Colors use ARGB hex format (0xAARRGGBB):
-- `0xFF2196F3` - Blue (full opacity)
-- `0x80FF0000` - Red (50% opacity)
-- `0xFFFFFFFF` - White
-- `0xFF000000` - Black
-
-#### BoxDecoration
-```
-Container(
-  decoration: {
-    color: 0xFFE3F2FD,
-    borderRadius: [12.0, 12.0, 12.0, 12.0],  // all corners
-    border: {
-      color: 0xFF2196F3,
-      width: 1.0,
-    },
-  },
-  child: ...
-)
-```
-
-### Form Elements in RFW
-
-#### Text Input (Basic)
-```
-widget FormExample = Container(
-  padding: [16.0, 16.0, 16.0, 16.0],
-  child: Column(
-    mainAxisSize: "min",
-    crossAxisAlignment: "stretch",
-    children: [
-      Text(text: "Enter your name:"),
-      SizedBox(height: 8.0),
-      TextField(
-        decoration: {
-          hintText: "Name",
-          border: "outline",
-        },
-        onChanged: event "name_changed" {},
-      ),
-      SizedBox(height: 16.0),
-      ElevatedButton(
-        onPressed: event "form_submit" {},
-        child: Text(text: "Submit"),
-      ),
-    ],
-  ),
-);
-```
-
-#### Checkbox
-```
-Row(
-  children: [
-    Checkbox(
-      value: data.agreed,
-      onChanged: event "checkbox_toggled" {},
-    ),
-    Text(text: "I agree to the terms"),
-  ],
-)
-```
-
-#### Switch
-```
-Row(
-  mainAxisAlignment: "spaceBetween",
-  children: [
-    Text(text: "Enable notifications"),
-    Switch(
-      value: data.notifications_enabled,
-      onChanged: event "notifications_toggled" {},
-    ),
-  ],
-)
-```
-
-#### Radio Buttons (via Material)
-```
-Column(
-  children: [
-    RadioListTile(
-      title: Text(text: "Option A"),
-      value: "a",
-      groupValue: data.selected_option,
-      onChanged: event "option_selected" { "value": "a" },
-    ),
-    RadioListTile(
-      title: Text(text: "Option B"),
-      value: "b",
-      groupValue: data.selected_option,
-      onChanged: event "option_selected" { "value": "b" },
-    ),
-  ],
-)
-```
-
-### Complete Form Example
-
-```
-import core.widgets;
-import material;
-
-widget ContactForm = Card(
-  child: Padding(
-    padding: [16.0, 16.0, 16.0, 16.0],
-    child: Column(
-      mainAxisSize: "min",
-      crossAxisAlignment: "stretch",
-      children: [
-        Text(
-          text: "Contact Us",
-          style: { fontSize: 20.0, fontWeight: "bold" },
-        ),
-        SizedBox(height: 16.0),
-
-        TextField(
-          decoration: {
-            labelText: "Name",
-            hintText: "Enter your name",
-            border: "outline",
-          },
-          onChanged: event "name_input" {},
-        ),
-        SizedBox(height: 12.0),
-
-        TextField(
-          decoration: {
-            labelText: "Email",
-            hintText: "your@email.com",
-            border: "outline",
-          },
-          keyboardType: "emailAddress",
-          onChanged: event "email_input" {},
-        ),
-        SizedBox(height: 12.0),
-
-        TextField(
-          decoration: {
-            labelText: "Message",
-            hintText: "How can we help?",
-            border: "outline",
-          },
-          maxLines: 4,
-          onChanged: event "message_input" {},
-        ),
-        SizedBox(height: 16.0),
-
-        Row(
-          mainAxisAlignment: "end",
-          children: [
-            TextButton(
-              onPressed: event "form_cancel" {},
-              child: Text(text: "Cancel"),
-            ),
-            SizedBox(width: 8.0),
-            ElevatedButton(
-              onPressed: event "form_submit" {},
-              child: Text(text: "Send"),
-            ),
-          ],
-        ),
-      ],
-    ),
-  ),
-);
-```
-
-### Using Dynamic Data
-
-The `data` parameter in genui_render can pass values to the widget:
-
-```json
-{
-  "widget_name": "UserCard",
-  "library_text": "...",
-  "data": {
-    "user_name": "John Doe",
-    "user_email": "john@example.com",
-    "avatar_url": "https://..."
-  }
-}
-```
-
-Access in RFW via `data.field_name`:
-```
-Text(text: data.user_name)
-```
-
-### Event Handling
-
-When a user interacts with an RFW widget, events are emitted:
-
-```dart
-// In RFW
-ElevatedButton(
-  onPressed: event "submit_order" { "item_id": "123", "quantity": 2 },
-  child: Text(text: "Order"),
-)
-
-// Client receives in onEvent callback:
-// eventName: "submit_order"
-// arguments: {"item_id": "123", "quantity": 2}
-```
-
-Current status: Events fire on client, logged to console. Future work: send events back to agent for human-in-the-loop interactions.
+See [GENUI-RFW.md](./GENUI-RFW.md) for:
+- Complete syntax reference
+- Dart vs RFW comparison
+- 3 examples of increasing complexity
+- System prompt template for AI agents
+- Troubleshooting guide
+- Color reference
 
 ---
 
