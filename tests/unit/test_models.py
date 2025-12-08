@@ -790,11 +790,6 @@ def test_aguirun_from_run_and_thread(
     run_metadata,
     exp_label,
 ):
-    a_thread = agui_thread.Thread(
-        room_id=ROOM_ID,
-        thread_id=AGUI_THREAD_ID,
-    )
-
     if w_events:
         a_run = agui_thread.Run(
             run_id=AGUI_RUN_ID,
@@ -814,13 +809,8 @@ def test_aguirun_from_run_and_thread(
     if w_include_events:
         kw["include_events"] = True
 
-    found = models.AGUI_Run.from_run_and_thread(
-        a_run=a_run,
-        a_thread=a_thread,
-        **kw,
-    )
+    found = models.AGUI_Run.from_run(a_run=a_run, **kw)
 
-    assert found.room_id == ROOM_ID
     assert found.thread_id == AGUI_THREAD_ID
     assert found.run_id == AGUI_RUN_ID
     assert found.created == a_run.created
@@ -909,10 +899,7 @@ def test_aguithread_from_thread(
     assert found.created == a_thread.created
 
     exp_runs = {
-        run_id: models.AGUI_Run.from_run_and_thread(
-            a_run=a_run,
-            a_thread=a_thread,
-        )
+        run_id: models.AGUI_Run.from_run(a_run=a_run)
         for run_id, a_run in AGUI_RUNS.items()
     }
 

@@ -214,11 +214,7 @@ async def get_room_agui_thread_id_run_id(
         the_threads=the_threads,
     )
 
-    return models.AGUI_Run.from_run_and_thread(
-        a_run=run,
-        a_thread=thread,
-        include_events=True,
-    )
+    return models.AGUI_Run.from_run(a_run=run, include_events=True)
 
 
 @util.logfire_span("POST /v1/rooms/{room_id}/agui")
@@ -261,9 +257,7 @@ async def post_room_agui(
         room_id=room_id,
         thread_id=thread.thread_id,
         runs={
-            run.run_id: models.AGUI_Run.from_run_and_thread(
-                a_run=run, a_thread=thread
-            )
+            run.run_id: models.AGUI_Run.from_run(a_run=run)
             for run in thread.list_runs()
         },
         created=thread.created,

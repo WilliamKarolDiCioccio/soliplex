@@ -351,10 +351,7 @@ async def test_get_room_agui_thread_id(cuir, cut, w_meta):
     assert found.thread_id == TEST_THREAD_ID
 
     assert found.runs == {
-        TEST_RUN_ID: models.AGUI_Run.from_run_and_thread(
-            a_run=TEST_RUN,
-            a_thread=TEST_THREAD,
-        ),
+        TEST_RUN_ID: models.AGUI_Run.from_run(a_run=TEST_RUN),
     }
 
     if w_meta:
@@ -411,7 +408,6 @@ async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
         token=token,
     )
 
-    assert found.room_id == TEST_ROOM_ID
     assert found.thread_id == TEST_THREAD_ID
     assert found.run_id == TEST_RUN_ID
 
@@ -487,7 +483,6 @@ async def test_post_room_agui(
     assert found.metadata == new_thread_request.metadata
 
     (m_run,) = found.runs.values()
-    assert m_run.room_id == TEST_ROOM_ID
     assert m_run.thread_id == TEST_THREAD_ID
     assert m_run.run_id == TEST_RUN_ID
     assert m_run.parent_run_id is None
@@ -579,7 +574,6 @@ async def test_post_room_agui_thread_id(
         )
 
     if expected is None:
-        assert found.room_id == TEST_ROOM_ID
         assert found.thread_id == TEST_THREAD_ID
         assert found.metadata == new_run_request.metadata
         assert found.parent_run_id == w_parent_id

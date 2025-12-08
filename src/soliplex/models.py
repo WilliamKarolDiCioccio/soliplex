@@ -400,7 +400,6 @@ class AGUI_NewRunRequest(pydantic.BaseModel):
 
 
 class AGUI_Run(pydantic.BaseModel):
-    room_id: str = KW_ONLY
     thread_id: str = KW_ONLY
     run_id: str = KW_ONLY
 
@@ -416,16 +415,14 @@ class AGUI_Run(pydantic.BaseModel):
     metadata: AGUI_RunMetadata | None = KW_ONLY_NONE
 
     @classmethod
-    def from_run_and_thread(
+    def from_run(
         cls,
         *,
         a_run: agui_package.Run,
-        a_thread: agui_package.Thread,
         include_events: bool = False,
     ):
         return cls(
-            room_id=a_thread.room_id,
-            thread_id=a_thread.thread_id,
+            thread_id=a_run.thread_id,
             run_id=a_run.run_id,
             created=a_run.created,
             parent_run_id=a_run.parent_run_id,
@@ -483,9 +480,8 @@ class AGUI_Thread(pydantic.BaseModel):
     ):
         runs = (
             {
-                a_run.run_id: AGUI_Run.from_run_and_thread(
+                a_run.run_id: AGUI_Run.from_run(
                     a_run=a_run,
-                    a_thread=a_thread,
                     include_events=False,
                 )
                 for a_run in a_thread.list_runs()
