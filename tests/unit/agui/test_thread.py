@@ -21,6 +21,13 @@ TEST_THREAD_ID = str(UUID4)
 OTHER_THREAD_ID = "thread-123"
 TEST_THREAD_NAME = f"Test Thread {UUID4}"
 TEST_THREAD_DESC = "Test thread description"
+TEST_THREAD_METADATA = agui_thread.ThreadMetadata(
+    name=TEST_THREAD_NAME,
+    description=TEST_THREAD_DESC,
+)
+NO_DESC_THREAD_METADATA = agui_thread.ThreadMetadata(
+    name=TEST_THREAD_NAME,
+)
 TEST_THREAD = agui_thread.Thread(
     thread_id=TEST_THREAD_ID,
     room_id=TEST_THREAD_ROOMID,
@@ -268,25 +275,18 @@ async def test_threads_new_thread(mus, w_initial_run, w_already):
         (TEST_THREAD_ID, no_error()),
     ],
 )
+@pytest.mark.parametrize("md_as_dict", [False, True])
 @pytest.mark.parametrize(
     "w_metadata, exp_name_desc",
     [
         (None, None),
-        ({"name": TEST_THREAD_NAME}, (TEST_THREAD_NAME, None)),
-        (
-            {
-                "name": TEST_THREAD_NAME,
-                "description": TEST_THREAD_DESC,
-            },
-            (
-                TEST_THREAD_NAME,
-                TEST_THREAD_DESC,
-            ),
-        ),
+        (NO_DESC_THREAD_METADATA, (TEST_THREAD_NAME, None)),
+        (TEST_THREAD_METADATA, (TEST_THREAD_NAME, TEST_THREAD_DESC)),
     ],
 )
 async def test_threads_update_thread(
     w_metadata,
+    md_as_dict,
     exp_name_desc,
     w_thread_id,
     expectation,
@@ -302,10 +302,11 @@ async def test_threads_update_thread(
         }
     }
 
-    if w_metadata is not None:
-        thread_metadata = agui_thread.ThreadMetadata(**w_metadata)
-    else:
-        thread_metadata = None
+    if md_as_dict:
+        if w_metadata is not None:
+            w_metadata = dataclasses.asdict(w_metadata)
+        else:
+            w_metadata = {}
 
     with (
         mock.patch.dict(the_threads._threads, **user_threads_patch),
@@ -314,7 +315,7 @@ async def test_threads_update_thread(
         found = await the_threads.update_thread(
             user_name=TEST_USER,
             thread_id=w_thread_id,
-            thread_metadata=thread_metadata,
+            thread_metadata=w_metadata,
         )
         exp_thread = the_threads._threads[TEST_USER][TEST_THREAD_ID]
 
@@ -531,6 +532,7 @@ async def test_threads_get_run(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("md_as_dict", [False, True])
 @pytest.mark.parametrize(
     "w_metadata, exp_label",
     [
@@ -586,9 +588,16 @@ async def test_threads_update_run(
     expectation,
     w_metadata,
     exp_label,
+    md_as_dict,
 ):
     md_before = object()
     run_before = dataclasses.replace(TEST_RUN, run_metadata=md_before)
+
+    if md_as_dict:
+        if w_metadata is None:
+            w_metadata = {}
+        else:
+            w_metadata = dataclasses.asdict(w_metadata)
 
     exp_thread = dataclasses.replace(
         TEST_THREAD,

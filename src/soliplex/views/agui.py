@@ -13,7 +13,6 @@ from soliplex import models
 from soliplex import util
 from soliplex.agui import mpx as agui_mpx
 from soliplex.agui import parser as agui_parser
-from soliplex.agui import thread as agui_thread
 
 router = fastapi.APIRouter(tags=["rooms"])
 
@@ -82,8 +81,8 @@ async def _check_user_thread(
     room_id: str,
     thread_id: str,
     user_name: str,
-    the_threads: agui_thread.Threads,
-) -> agui_thread.Thread:
+    the_threads: agui_package.ThreadStorage,
+) -> agui_package.Thread:
     """Check for an existing thread for the user within the given room"""
     try:
         thread = await the_threads.get_thread(
@@ -112,8 +111,8 @@ async def _check_user_thread_run(
     thread_id: str,
     user_name: str,
     run_id: str,
-    the_threads: agui_thread.Threads,
-) -> agui_thread.Run:
+    the_threads: agui_package.ThreadStorage,
+) -> agui_package.Run:
     """Check for an existing thread / run for the user within the given room"""
     try:
         run = await the_threads.get_run(
@@ -137,7 +136,7 @@ async def get_room_agui(
     request: fastapi.Request,
     room_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Threads:
     """Return user's extant AGUI threads within the given room"""
@@ -164,7 +163,7 @@ async def get_room_agui_thread_id(
     room_id: str,
     thread_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Thread:
     """Return metadata about a specific thread and its runs"""
@@ -191,7 +190,7 @@ async def get_room_agui_thread_id_run_id(
     thread_id: str,
     run_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Run:
     """Return metadata about a specific run"""
@@ -218,7 +217,7 @@ async def post_room_agui(
     room_id: str,
     new_thread_request: models.AGUI_NewThreadRequest,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Thread:
     """Create a new AGUI thread within the given room
@@ -234,9 +233,7 @@ async def post_room_agui(
     )
 
     if new_thread_request.metadata is not None:
-        t_metadata = agui_thread.ThreadMetadata(
-            **new_thread_request.metadata.model_dump()
-        )
+        t_metadata = new_thread_request.metadata.model_dump()
     else:
         t_metadata = None
 
@@ -269,7 +266,7 @@ async def post_room_agui_thread_id(
     thread_id: str,
     new_run_request: models.AGUI_NewRunRequest,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Run:
     """Create a new AGUI run for a thread within the given room
@@ -285,9 +282,7 @@ async def post_room_agui_thread_id(
     parent_run_id = new_run_request.parent_run_id
 
     if new_run_request.metadata is not None:
-        r_metadata = agui_thread.RunMetadata(
-            **new_run_request.metadata.model_dump()
-        )
+        r_metadata = new_run_request.metadata.model_dump()
     else:
         r_metadata = None
 
@@ -325,7 +320,7 @@ async def post_room_agui_thread_id_meta(
     thread_id: str,
     new_metadata: models.AGUI_ThreadMetadata,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> fastapi.Response:
     """Update metadata for a thread within the given room
@@ -348,15 +343,10 @@ async def post_room_agui_thread_id_meta(
         if value is not None
     }
 
-    if new_md_dict:
-        t_metadata = agui_thread.ThreadMetadata(**new_md_dict)
-    else:
-        t_metadata = None
-
     await the_threads.update_thread(
         user_name=user_name,
         thread_id=thread_id,
-        thread_metadata=t_metadata,
+        thread_metadata=new_md_dict,
     )
     return fastapi.Response(status_code=205)
 
@@ -369,7 +359,7 @@ async def post_room_agui_thread_id_run_id(
     thread_id: str,
     run_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> responses.StreamingResponse:
     """Execute an AGUI run
@@ -437,7 +427,7 @@ async def post_room_agui_thread_id_run_id_meta(
     run_id: str,
     new_metadata: models.AGUI_RunMetadata,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> fastapi.Response:
     """Update metadata for a thread within the given room
@@ -460,17 +450,12 @@ async def post_room_agui_thread_id_run_id_meta(
         if value is not None
     }
 
-    if new_md_dict:
-        t_metadata = agui_thread.RunMetadata(**new_md_dict)
-    else:
-        t_metadata = None
-
     await the_threads.update_run(
         room_id=room_id,
         thread_id=thread_id,
         user_name=user_name,
         run_id=run_id,
-        run_metadata=t_metadata,
+        run_metadata=new_md_dict,
     )
     return fastapi.Response(status_code=205)
 
@@ -482,7 +467,7 @@ async def delete_room_agui_thread_id(
     room_id: str,
     thread_id: str,
     the_installation: installation.Installation = depend_the_installation,
-    the_threads: agui_thread.Threads = depend_the_threads,
+    the_threads: agui_package.ThreadStorage = depend_the_threads,
     token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
 ) -> models.AGUI_Run:
     """Delete an AGUI thread within the given room"""

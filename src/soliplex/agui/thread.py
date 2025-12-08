@@ -222,11 +222,17 @@ class Threads:
         *,
         user_name: str,
         thread_id: str,
-        thread_metadata: ThreadMetadata = None,
+        thread_metadata: ThreadMetadata | dict = None,
     ) -> Thread:
-        """Update thread instance with the given metadata, or None"""
         async with self._lock:
             before = await self._find_thread(user_name, thread_id)
+
+            if isinstance(thread_metadata, dict):
+                if thread_metadata:
+                    thread_metadata = ThreadMetadata(**thread_metadata)
+                else:
+                    thread_metadata = None
+
             after = dataclasses.replace(
                 before,
                 thread_metadata=thread_metadata,
@@ -354,6 +360,12 @@ class Threads:
                     user_name,
                     thread_id,
                 ) from None
+
+            if isinstance(run_metadata, dict):
+                if run_metadata:
+                    run_metadata = RunMetadata(**run_metadata)
+                else:
+                    run_metadata = None
 
             try:
                 before = thread._runs[run_id]

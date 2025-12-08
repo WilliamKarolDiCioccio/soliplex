@@ -143,10 +143,14 @@ class ThreadStorage(abc.ABC):
         *,
         user_name: str,
         room_id: str,
-        metadata: ThreadMetadata = None,
+        thread_metadata: ThreadMetadata | dict = None,
         initial_run: bool = True,
     ) -> Thread:
-        """Create a new thread"""
+        """Create a new thread
+
+        If 'thread_metadata' is a dict, convert it to a 'ThreadMetadata'
+        instance.
+        """
 
     @abc.abstractmethod
     async def update_thread(
@@ -154,9 +158,16 @@ class ThreadStorage(abc.ABC):
         *,
         user_name: str,
         thread_id: str,
-        metadata: ThreadMetadata = None,
+        thread_metadata: ThreadMetadata | dict = None,
     ) -> Thread:
-        """Update thread instance with the given metadata, or None"""
+        """Update thread instance with the given metadata, or None
+
+        If 'thread_metadata' is a dict, convert it to a 'ThreadMetadata'
+        instance.
+
+        If 'thread_metadata' is None, or an empty dict, remove any existing
+        metadata on the thread.
+        """
 
     @abc.abstractmethod
     async def delete_thread(
@@ -174,10 +185,12 @@ class ThreadStorage(abc.ABC):
         room_id: str,
         user_name: str,
         thread_id: str,
-        metadata: RunMetadata = None,
+        run_metadata: RunMetadata = None,
         parent_run_id: str = None,
     ) -> Run:
         """Create a new run for the thread
+
+        If 'run_metadata' is a dict, convert it to a 'RunMetadata' instance.
 
         If 'parent_run_id' is passed, ensure it is valid.
         """
@@ -200,9 +213,12 @@ class ThreadStorage(abc.ABC):
         user_name: str,
         thread_id: str,
         run_id: str,
-        metadata: RunMetadata = None,
+        run_metadata: RunMetadata | dict = None,
     ) -> Run:
         """Update a run with the given metadata
 
-        If 'metadata' is None, remove any existing metadata on the run.
+        If 'run_metadata' is a dict, convert it to a 'RunMetadata' instance.
+
+        If 'run_metadata' is None, or an empty dict, remove any existing
+        metadata on the run.
         """
