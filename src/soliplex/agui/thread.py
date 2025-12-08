@@ -60,17 +60,6 @@ class Run(agui_package.Run):
     def created(self) -> datetime.datetime:
         return self._created
 
-    def check_run_input(self, other_run_input: agui_core.RunAgentInput):
-        """Raise if 'other_run_input' IDs do not match"""
-        if self.thread_id != other_run_input.thread_id:
-            raise agui_package.RunInputMismatch("thread_id")
-
-        if self.run_id != other_run_input.run_id:
-            raise agui_package.RunInputMismatch("run_id")
-
-        if self.parent_run_id != other_run_input.parent_run_id:
-            raise agui_package.RunInputMismatch("parent_run_id")
-
     def list_events(self) -> AGUI_Events:
         return self._events[:]
 

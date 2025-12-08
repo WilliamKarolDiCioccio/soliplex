@@ -60,7 +60,6 @@ no_error = contextlib.nullcontext
 raises_unknown_thread = pytest.raises(agui_package.UnknownThread)
 raises_unknown_run = pytest.raises(agui_package.UnknownRun)
 raises_missing_parent_run = pytest.raises(agui_package.MissingParentRun)
-raises_run_input_mismatch = pytest.raises(agui_package.RunInputMismatch)
 
 
 @pytest.fixture
@@ -146,23 +145,6 @@ def test_run_created():
     run = dataclasses.replace(TEST_RUN, _created=NOW)
 
     assert run.created == NOW
-
-
-@pytest.mark.parametrize(
-    "ri_kwargs, expectation",
-    [
-        ({}, no_error()),
-        ({"thread_id": OTHER_THREAD_ID}, raises_run_input_mismatch),
-        ({"run_id": OTHER_RUN_ID}, raises_run_input_mismatch),
-        ({"parent_run_id": OTHER_PARENT_RUN_ID}, raises_run_input_mismatch),
-    ],
-)
-def test_run_check_run_input(run_input, ri_kwargs, expectation):
-    run = dataclasses.replace(TEST_RUN, run_input=run_input)
-    to_compare = run_input.model_copy(update=ri_kwargs)
-
-    with expectation as expectation:
-        run.check_run_input(to_compare)
 
 
 def test_thread_created():

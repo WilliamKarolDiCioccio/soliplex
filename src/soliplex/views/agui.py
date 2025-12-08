@@ -13,6 +13,7 @@ from soliplex import models
 from soliplex import util
 from soliplex.agui import mpx as agui_mpx
 from soliplex.agui import parser as agui_parser
+from soliplex.agui import util as agui_util
 
 router = fastapi.APIRouter(tags=["rooms"])
 
@@ -387,7 +388,7 @@ async def post_room_agui_thread_id_run_id(
     run_agent_input = agui_adapter.run_input
 
     try:
-        run.check_run_input(run_agent_input)
+        agui_util.check_run_input(run.run_input, run_agent_input)
     except agui_package.RunInputMismatch:
         raise fastapi.HTTPException(
             status_code=400,
