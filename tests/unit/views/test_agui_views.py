@@ -268,7 +268,7 @@ async def test_get_room_agui(cuir, w_meta):
     thr_replace = {"_runs": {}}
 
     if w_meta:
-        thr_replace["metadata"] = agui_thread.ThreadMetadata(
+        thr_replace["thread_metadata"] = agui_thread.ThreadMetadata(
             name=TEST_THREAD_NAME,
         )
 
@@ -316,7 +316,7 @@ async def test_get_room_agui_thread_id(cuir, cut, w_meta):
     thr_replace = {"_runs": {TEST_RUN_ID: TEST_RUN}}
 
     if w_meta:
-        thr_replace["metadata"] = agui_thread.ThreadMetadata(
+        thr_replace["thread_metadata"] = agui_thread.ThreadMetadata(
             name=TEST_THREAD_NAME,
         )
 
@@ -373,7 +373,7 @@ async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
     run_replace = {"_events": AGUI_EVENTS}
 
     if w_room_meta:
-        run_replace["metadata"] = agui_thread.RunMetadata(
+        run_replace["run_metadata"] = agui_thread.RunMetadata(
             label=TEST_RUN_LABEL,
         )
 
@@ -454,6 +454,9 @@ async def test_post_room_agui(
         _runs={
             TEST_RUN_ID: dataclasses.replace(TEST_RUN),
         },
+        thread_metadata=(
+            agui_thread.ThreadMetadata(**w_meta) if w_meta else None
+        ),
     )
 
     found = await agui_views.post_room_agui(
@@ -477,7 +480,7 @@ async def test_post_room_agui(
     the_threads.new_thread.assert_called_once_with(
         room_id=TEST_ROOM_ID,
         user_name=USER_NAME,
-        metadata=exp_meta,
+        thread_metadata=exp_meta,
         initial_run=True,
     )
 
@@ -542,10 +545,14 @@ async def test_post_room_agui_thread_id(
             TEST_PARENT_RUN_ID,
         )
     else:
-        the_threads.new_run.return_value = mock.create_autospec(
-            agui_thread.Run,
+        exp_run_metadata = (
+            agui_thread.RunMetadata(label=w_meta["label"]) if w_meta else None
+        )
+
+        the_threads.new_run.return_value = agui_thread.Run(
             run_id=TEST_RUN_ID,
             run_input=run_input,
+            run_metadata=exp_run_metadata,
             _events=[],
         )
 
@@ -562,14 +569,16 @@ async def test_post_room_agui_thread_id(
 
     if expected is None:
         assert found.thread_id == TEST_THREAD_ID
-        assert found.metadata == new_run_request.metadata
+        assert found.metadata == models.AGUI_RunMetadata.from_run_meta(
+            exp_run_metadata
+        )
         assert found.parent_run_id == w_parent_id
 
         the_threads.new_run.assert_called_once_with(
             room_id=TEST_ROOM_ID,
             user_name=USER_NAME,
             thread_id=TEST_THREAD_ID,
-            metadata=exp_meta,
+            run_metadata=exp_meta,
             parent_run_id=w_parent_id,
         )
 
@@ -622,7 +631,7 @@ async def test_post_room_agui_thread_id_meta(cuir, w_meta):
     the_threads.update_thread.assert_called_once_with(
         user_name=USER_NAME,
         thread_id=TEST_THREAD_ID,
-        metadata=exp_t_meta,
+        thread_metadata=exp_t_meta,
     )
     cuir.assert_called_once_with(
         room_id=TEST_ROOM_ID,
@@ -803,7 +812,7 @@ async def test_post_room_agui_thread_id_run_id_meta(cuir, w_meta):
         user_name=USER_NAME,
         thread_id=TEST_THREAD_ID,
         run_id=TEST_RUN_ID,
-        metadata=exp_t_meta,
+        run_metadata=exp_t_meta,
     )
     cuir.assert_called_once_with(
         room_id=TEST_ROOM_ID,

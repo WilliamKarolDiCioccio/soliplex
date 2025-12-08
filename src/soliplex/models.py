@@ -428,7 +428,7 @@ class AGUI_Run(pydantic.BaseModel):
             parent_run_id=a_run.parent_run_id,
             run_input=a_run.run_input,
             events=a_run.list_events() if include_events else None,
-            metadata=AGUI_RunMetadata.from_run_meta(a_run.metadata),
+            metadata=AGUI_RunMetadata.from_run_meta(a_run.run_metadata),
         )
 
 
@@ -495,7 +495,9 @@ class AGUI_Thread(pydantic.BaseModel):
             thread_id=a_thread.thread_id,
             runs=runs,
             created=a_thread.created,
-            metadata=AGUI_ThreadMetadata.from_thread_meta(a_thread.metadata),
+            metadata=AGUI_ThreadMetadata.from_thread_meta(
+                a_thread.thread_metadata,
+            ),
         )
 
 

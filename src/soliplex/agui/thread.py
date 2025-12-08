@@ -33,7 +33,7 @@ class Run(agui_package.Run):
 
     _: dataclasses.KW_ONLY
 
-    metadata: RunMetadata = None
+    run_metadata: RunMetadata = None
     _created: datetime.datetime = timestamp
 
     run_input: agui_core.RunAgentInput = None
@@ -54,8 +54,8 @@ class Run(agui_package.Run):
 
     @property
     def label(self) -> str | None:
-        if self.metadata is not None:
-            return self.metadata.label
+        if self.run_metadata is not None:
+            return self.run_metadata.label
 
     @property
     def created(self) -> datetime.datetime:
@@ -97,7 +97,7 @@ class Thread(agui_package.Thread):
 
     _: dataclasses.KW_ONLY
 
-    metadata: ThreadMetadata = None
+    thread_metadata: ThreadMetadata = None
 
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
     _created: datetime.datetime = timestamp
@@ -181,7 +181,7 @@ class Threads:
         *,
         user_name: str,
         room_id: str,
-        metadata: ThreadMetadata = None,
+        thread_metadata: ThreadMetadata = None,
         initial_run: bool = True,
     ) -> Thread:
         """Create a new thread"""
@@ -190,7 +190,7 @@ class Threads:
         thread = Thread(
             thread_id=thread_id,
             room_id=room_id,
-            metadata=metadata,
+            thread_metadata=thread_metadata,
         )
 
         if initial_run:
@@ -222,12 +222,15 @@ class Threads:
         *,
         user_name: str,
         thread_id: str,
-        metadata: ThreadMetadata = None,
+        thread_metadata: ThreadMetadata = None,
     ) -> Thread:
         """Update thread instance with the given metadata, or None"""
         async with self._lock:
             before = await self._find_thread(user_name, thread_id)
-            after = dataclasses.replace(before, metadata=metadata)
+            after = dataclasses.replace(
+                before,
+                thread_metadata=thread_metadata,
+            )
             self._threads[user_name][thread_id] = after
             return after
 
@@ -257,7 +260,7 @@ class Threads:
         room_id: str,
         user_name: str,
         thread_id: str,
-        metadata: RunMetadata = None,
+        run_metadata: RunMetadata = None,
         parent_run_id: str = None,
     ) -> Run:
         """Create a new run for the thread
@@ -287,7 +290,7 @@ class Threads:
 
             run = thread._runs[run_id] = Run(
                 run_id=run_id,
-                metadata=metadata,
+                run_metadata=run_metadata,
                 run_input=agui_core.RunAgentInput(
                     thread_id=thread.thread_id,
                     run_id=run_id,
@@ -335,7 +338,7 @@ class Threads:
         user_name: str,
         thread_id: str,
         run_id: str,
-        metadata: RunMetadata = None,
+        run_metadata: RunMetadata = None,
     ) -> Run:
         """Update run instance with the given metadata, or None"""
         async with self._lock:
@@ -357,7 +360,7 @@ class Threads:
             except KeyError:
                 raise agui_package.UnknownRun(run_id) from None
 
-            after = dataclasses.replace(before, metadata=metadata)
+            after = dataclasses.replace(before, run_metadata=run_metadata)
             thread._runs[run_id] = after
 
             return after

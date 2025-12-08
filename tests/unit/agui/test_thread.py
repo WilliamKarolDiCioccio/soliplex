@@ -126,7 +126,7 @@ def test_run_label(run_input, w_run_input, expected):
     if w_run_input:
         run = dataclasses.replace(
             TEST_RUN,
-            metadata=TEST_RUN_METADATA,
+            run_metadata=TEST_RUN_METADATA,
         )
     else:
         run = TEST_RUN
@@ -294,7 +294,7 @@ async def test_threads_update_thread(
     the_threads = agui_thread.Threads()
 
     md_before = object()
-    thr_before = dataclasses.replace(TEST_THREAD, metadata=md_before)
+    thr_before = dataclasses.replace(TEST_THREAD, thread_metadata=md_before)
 
     user_threads_patch = {
         TEST_USER: {
@@ -303,9 +303,9 @@ async def test_threads_update_thread(
     }
 
     if w_metadata is not None:
-        metadata = agui_thread.ThreadMetadata(**w_metadata)
+        thread_metadata = agui_thread.ThreadMetadata(**w_metadata)
     else:
-        metadata = None
+        thread_metadata = None
 
     with (
         mock.patch.dict(the_threads._threads, **user_threads_patch),
@@ -314,7 +314,7 @@ async def test_threads_update_thread(
         found = await the_threads.update_thread(
             user_name=TEST_USER,
             thread_id=w_thread_id,
-            metadata=metadata,
+            thread_metadata=thread_metadata,
         )
         exp_thread = the_threads._threads[TEST_USER][TEST_THREAD_ID]
 
@@ -324,11 +324,11 @@ async def test_threads_update_thread(
         assert found.thread_id == TEST_THREAD_ID
 
         if exp_name_desc is None:
-            assert found.metadata is None
+            assert found.thread_metadata is None
         else:
             exp_name, exp_desc = exp_name_desc
-            assert found.metadata.name == exp_name
-            assert found.metadata.description == exp_desc
+            assert found.thread_metadata.name == exp_name
+            assert found.thread_metadata.description == exp_desc
 
 
 @pytest.mark.anyio
@@ -441,7 +441,7 @@ async def test_threads_new_run(
         kwargs["parent_run_id"] = w_parent_id
 
     if w_metadata is not None:
-        kwargs["metadata"] = w_metadata
+        kwargs["run_metadata"] = w_metadata
 
     with expectation as expected:
         found = await the_threads.new_run(
@@ -588,7 +588,7 @@ async def test_threads_update_run(
     exp_label,
 ):
     md_before = object()
-    run_before = dataclasses.replace(TEST_RUN, metadata=md_before)
+    run_before = dataclasses.replace(TEST_RUN, run_metadata=md_before)
 
     exp_thread = dataclasses.replace(
         TEST_THREAD,
@@ -606,15 +606,15 @@ async def test_threads_update_run(
             user_name=w_user_name,
             thread_id=w_thread_id,
             run_id=w_run_id,
-            metadata=w_metadata,
+            run_metadata=w_metadata,
         )
 
     if expected is None:
         assert found is exp_thread._runs[TEST_RUN_ID]
         if exp_label is not None:
-            assert found.metadata.label == exp_label
+            assert found.run_metadata.label == exp_label
         else:
-            assert found.metadata is None
+            assert found.run_metadata is None
 
 
 @pytest.mark.anyio

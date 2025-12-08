@@ -64,7 +64,7 @@ class Run(abc.ABC):
     parent_run_id: str | None
     """ID of the parent run"""
 
-    metadata: RunMetadata | None
+    run_metadata: RunMetadata | None
     """Optional user-defined metadata for a run"""
 
     run_input: agui_core.RunAgentInput
@@ -100,7 +100,7 @@ class Thread(abc.ABC):
     room_id: str
     """ID for room in which the thread was created"""
 
-    metadata: ThreadMetadata | None
+    thread_metadata: ThreadMetadata | None
     """Optional thread metadata"""
 
     created: datetime.datetime

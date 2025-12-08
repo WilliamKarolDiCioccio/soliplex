@@ -243,7 +243,7 @@ async def post_room_agui(
     thread = await the_threads.new_thread(
         room_id=room_id,
         user_name=user_name,
-        metadata=t_metadata,
+        thread_metadata=t_metadata,
         initial_run=True,
     )
 
@@ -255,7 +255,9 @@ async def post_room_agui(
             for run in thread.list_runs()
         },
         created=thread.created,
-        metadata=new_thread_request.metadata,
+        metadata=models.AGUI_ThreadMetadata.from_thread_meta(
+            thread.thread_metadata,
+        ),
     )
 
 
@@ -295,7 +297,7 @@ async def post_room_agui_thread_id(
             user_name=user_name,
             thread_id=thread_id,
             parent_run_id=parent_run_id,
-            metadata=r_metadata,
+            run_metadata=r_metadata,
         )
     except agui_package.MissingParentRun:
         raise fastapi.HTTPException(
@@ -311,7 +313,7 @@ async def post_room_agui_thread_id(
         parent_run_id=parent_run_id,
         run_input=run.run_input,
         events=run.list_events(),
-        metadata=new_run_request.metadata,
+        metadata=models.AGUI_RunMetadata.from_run_meta(run.run_metadata),
     )
 
 
@@ -354,7 +356,7 @@ async def post_room_agui_thread_id_meta(
     await the_threads.update_thread(
         user_name=user_name,
         thread_id=thread_id,
-        metadata=t_metadata,
+        thread_metadata=t_metadata,
     )
     return fastapi.Response(status_code=205)
 
@@ -468,7 +470,7 @@ async def post_room_agui_thread_id_run_id_meta(
         thread_id=thread_id,
         user_name=user_name,
         run_id=run_id,
-        metadata=t_metadata,
+        run_metadata=t_metadata,
     )
     return fastapi.Response(status_code=205)
 
