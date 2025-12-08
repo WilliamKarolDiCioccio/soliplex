@@ -177,11 +177,11 @@ def test_thread_created():
 @pytest.mark.parametrize(
     "w_threads, expected",
     [
-        ({}, {}),
-        ({TEST_USER: TEST_THREADS}, TEST_THREADS),
+        ({}, []),
+        ({TEST_USER: TEST_THREADS}, list(TEST_THREADS.values())),
     ],
 )
-async def test_threads_user_threads(w_threads, expected, w_room_id):
+async def test_threads_list_user_threads(w_threads, expected, w_room_id):
     the_threads = agui_thread.Threads()
     the_threads._threads.update(w_threads)
 
@@ -189,13 +189,13 @@ async def test_threads_user_threads(w_threads, expected, w_room_id):
 
     if w_room_id:
         kw["room_id"] = TEST_THREAD_ROOMID
-        expected = {
-            t_id: thread
-            for (t_id, thread) in expected.items()
+        expected = [
+            thread
+            for thread in expected
             if thread.room_id == TEST_THREAD_ROOMID
-        }
+        ]
 
-    found = await the_threads.user_threads(user_name=TEST_USER, **kw)
+    found = await the_threads.list_user_threads(user_name=TEST_USER, **kw)
 
     assert found == expected
 
@@ -260,11 +260,11 @@ async def test_threads_new_thread(mus, w_initial_run, w_already):
     assert found.room_id == TEST_THREAD_ROOMID
 
     if w_initial_run in (None, True):
-        (found_run,) = found.runs.values()
+        (found_run,) = found._runs.values()
         assert found_run.run_input.thread_id == TEST_THREAD_ID
         assert found_run.run_input.run_id == found_run.run_id
     else:
-        assert len(found.runs) == 0
+        assert len(found._runs) == 0
 
 
 @pytest.mark.anyio
@@ -434,7 +434,7 @@ async def test_threads_new_run(
 
     exp_thread = dataclasses.replace(
         TEST_THREAD,
-        runs={TEST_PARENT_RUN_ID: TEST_PARENT_RUN},
+        _runs={TEST_PARENT_RUN_ID: TEST_PARENT_RUN},
     )
 
     the_threads = agui_thread.Threads()
@@ -464,7 +464,7 @@ async def test_threads_new_run(
         assert found.parent_run_id == w_parent_id
         assert found.label == exp_label
 
-        assert found is exp_thread.runs[TEST_RUN_ID]
+        assert found is exp_thread._runs[TEST_RUN_ID]
 
 
 @pytest.mark.anyio
@@ -517,7 +517,7 @@ async def test_threads_get_run(
 ):
     exp_thread = dataclasses.replace(
         TEST_THREAD,
-        runs={TEST_RUN_ID: TEST_RUN},
+        _runs={TEST_RUN_ID: TEST_RUN},
     )
 
     the_threads = agui_thread.Threads()
@@ -599,7 +599,7 @@ async def test_threads_update_run(
 
     exp_thread = dataclasses.replace(
         TEST_THREAD,
-        runs={TEST_RUN_ID: run_before},
+        _runs={TEST_RUN_ID: run_before},
     )
 
     the_threads = agui_thread.Threads()
@@ -617,7 +617,7 @@ async def test_threads_update_run(
         )
 
     if expected is None:
-        assert found is exp_thread.runs[TEST_RUN_ID]
+        assert found is exp_thread._runs[TEST_RUN_ID]
         if exp_label is not None:
             assert found.metadata.label == exp_label
         else:

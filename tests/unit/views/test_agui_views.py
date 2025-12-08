@@ -274,16 +274,16 @@ async def test_get_room_agui(cuir, w_meta):
     the_threads = mock.create_autospec(agui_thread.Threads)
     token = object()
 
-    thr_replace = {"runs": {}}
+    thr_replace = {"_runs": {}}
 
     if w_meta:
         thr_replace["metadata"] = agui_thread.ThreadMetadata(
             name=TEST_THREAD_NAME,
         )
 
-    the_threads.user_threads.return_value = {
-        TEST_THREAD_ID: dataclasses.replace(TEST_THREAD, **thr_replace),
-    }
+    the_threads.list_user_threads.return_value = [
+        dataclasses.replace(TEST_THREAD, **thr_replace),
+    ]
 
     found = await agui_views.get_room_agui(
         request,
@@ -303,7 +303,7 @@ async def test_get_room_agui(cuir, w_meta):
     else:
         assert m_thread.metadata is None
 
-    the_threads.user_threads.assert_called_once_with(
+    the_threads.list_user_threads.assert_called_once_with(
         user_name=USER_NAME,
         room_id=TEST_ROOM_ID,
     )
@@ -322,7 +322,7 @@ async def test_get_room_agui(cuir, w_meta):
 async def test_get_room_agui_thread_id(cuir, cut, w_meta):
     cuir.return_value = USER_NAME
 
-    thr_replace = {"runs": {TEST_RUN_ID: TEST_RUN}}
+    thr_replace = {"_runs": {TEST_RUN_ID: TEST_RUN}}
 
     if w_meta:
         thr_replace["metadata"] = agui_thread.ThreadMetadata(
@@ -382,7 +382,7 @@ async def test_get_room_agui_thread_id(cuir, cut, w_meta):
 async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
     cuir.return_value = USER_NAME
 
-    run_replace = {"events": AGUI_EVENTS}
+    run_replace = {"_events": AGUI_EVENTS}
 
     if w_room_meta:
         run_replace["metadata"] = agui_thread.RunMetadata(
@@ -391,7 +391,7 @@ async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
 
     exp_thread = dataclasses.replace(
         TEST_THREAD,
-        runs={TEST_RUN_ID: TEST_RUN},
+        _runs={TEST_RUN_ID: TEST_RUN},
     )
     exp_run = dataclasses.replace(TEST_RUN, **run_replace)
     cutr.return_value = exp_thread, exp_run
@@ -468,7 +468,7 @@ async def test_post_room_agui(
     the_threads = mock.create_autospec(agui_thread.Threads)
     the_threads.new_thread.return_value = dataclasses.replace(
         TEST_THREAD,
-        runs={
+        _runs={
             TEST_RUN_ID: dataclasses.replace(TEST_RUN),
         },
     )
@@ -564,7 +564,7 @@ async def test_post_room_agui_thread_id(
             agui_thread.Run,
             run_id=TEST_RUN_ID,
             run_input=run_input,
-            events=[],
+            _events=[],
         )
 
     with expectation as expected:

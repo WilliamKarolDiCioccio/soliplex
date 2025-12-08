@@ -29,12 +29,12 @@ timestamp = dataclasses.field(default_factory=_timestamp)
 
 
 @dataclasses.dataclass(frozen=True)
-class RunMetadata:
+class RunMetadata(agui_package.RunMetadata):
     label: str
 
 
 @dataclasses.dataclass(frozen=True)
-class Run:
+class Run(agui_package.Run):
     """Hold original input data and events for an AGUI run"""
 
     run_id: str = dataclasses.field(default_factory=_make_uuid_str)
@@ -46,7 +46,7 @@ class Run:
 
     run_input: agui_core.RunAgentInput = None
 
-    events: AGUI_Events = dataclasses.field(
+    _events: AGUI_Events = dataclasses.field(
         default_factory=list,
     )
 
@@ -80,18 +80,21 @@ class Run:
         if self.parent_run_id != other_run_input.parent_run_id:
             raise agui_package.RunInputMismatch("parent_run_id")
 
+    def list_events(self) -> AGUI_Events:
+        return self._events[:]
+
 
 RunMap = dict[str, Run]
 
 
 @dataclasses.dataclass(frozen=True)
-class ThreadMetadata:
+class ThreadMetadata(agui_package.ThreadMetadata):
     name: str
     description: str = None
 
 
 @dataclasses.dataclass(frozen=True)
-class Thread:
+class Thread(agui_package.Thread):
     """Hold a set of AGUI runs sharing the same 'thread_id'"""
 
     room_id: str
@@ -101,14 +104,17 @@ class Thread:
     _: dataclasses.KW_ONLY
 
     metadata: ThreadMetadata = None
-    runs: RunMap = dataclasses.field(default_factory=dict)
 
     _lock: asyncio.Lock = dataclasses.field(default_factory=asyncio.Lock)
     _created: datetime.datetime = timestamp
+    _runs: RunMap = dataclasses.field(default_factory=dict)
 
     @property
     def created(self) -> datetime.datetime:
         return self._created
+
+    def list_runs(self) -> list[Run]:
+        return list(self._runs.values())
 
 
 ThreadsByID = dict[str, Thread]
@@ -153,14 +159,15 @@ class Threads:
 
         return thread
 
-    async def user_threads(
+    async def list_user_threads(
         self,
         *,
         user_name: str,
         room_id: str = None,
-    ) -> ThreadsByID:
+    ) -> list[Thread]:
         async with self._lock:
-            return await self._find_user_threads(user_name, room_id=room_id)
+            found = await self._find_user_threads(user_name, room_id=room_id)
+            return list(found.values())
 
     async def get_thread(
         self,
@@ -194,7 +201,7 @@ class Threads:
 
         if initial_run:
             run_id = _make_uuid_str()
-            thread.runs[run_id] = Run(
+            thread._runs[run_id] = Run(
                 run_id=run_id,
                 run_input=agui_core.RunAgentInput(
                     thread_id=thread_id,
@@ -277,14 +284,14 @@ class Threads:
                     thread_id,
                 ) from None
 
-            if parent_run_id is not None and parent_run_id not in thread.runs:
+            if parent_run_id is not None and parent_run_id not in thread._runs:
                 raise agui_package.MissingParentRun(parent_run_id)
 
             run_id = _make_uuid_str()
 
-            assert run_id not in thread.runs
+            assert run_id not in thread._runs
 
-            run = thread.runs[run_id] = Run(
+            run = thread._runs[run_id] = Run(
                 run_id=run_id,
                 metadata=metadata,
                 run_input=agui_core.RunAgentInput(
@@ -323,7 +330,7 @@ class Threads:
                 ) from None
 
             try:
-                return thread.runs[run_id]
+                return thread._runs[run_id]
             except KeyError:
                 raise agui_package.UnknownRun(run_id) from None
 
@@ -352,12 +359,12 @@ class Threads:
                 ) from None
 
             try:
-                before = thread.runs[run_id]
+                before = thread._runs[run_id]
             except KeyError:
                 raise agui_package.UnknownRun(run_id) from None
 
             after = dataclasses.replace(before, metadata=metadata)
-            thread.runs[run_id] = after
+            thread._runs[run_id] = after
 
             return after
 

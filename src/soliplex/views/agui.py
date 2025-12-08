@@ -152,13 +152,12 @@ async def get_room_agui(
         the_installation=the_installation,
         token=token,
     )
-    user_threads = await the_threads.user_threads(
-        user_name=user_name,
-        room_id=room_id,
-    )
     model_threads = [
         models.AGUI_Thread.from_thread(a_thread, include_runs=False)
-        for a_thread in user_threads.values()
+        for a_thread in await the_threads.list_user_threads(
+            user_name=user_name,
+            room_id=room_id,
+        )
     ]
 
     return models.AGUI_Threads(threads=model_threads)
@@ -265,7 +264,7 @@ async def post_room_agui(
             run.run_id: models.AGUI_Run.from_run_and_thread(
                 a_run=run, a_thread=thread
             )
-            for run in thread.runs.values()
+            for run in thread.list_runs()
         },
         created=thread.created,
         metadata=new_thread_request.metadata,
@@ -323,7 +322,7 @@ async def post_room_agui_thread_id(
         created=run.created,
         parent_run_id=parent_run_id,
         run_input=run.run_input,
-        events=run.events,
+        events=run.list_events(),
         metadata=new_run_request.metadata,
     )
 

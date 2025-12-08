@@ -1,4 +1,12 @@
+from __future__ import annotations
+
+import abc
+import datetime
+
 import fastapi
+from ag_ui import core as agui_core
+
+AGUI_Events = list[agui_core.BaseEvent]
 
 
 class UnknownThread(fastapi.HTTPException):
@@ -27,3 +35,174 @@ class RunInputMismatch(ValueError):
     def __init__(self, which: str):
         self.which = which
         super().__init__(f"Run input field does not match run: {which}")
+
+
+#
+#   ABCs defined here are notional contracts.
+#
+
+
+class RunMetadata(abc.ABC):
+    """User-defined metadata for a run"""
+
+    label: str
+    """Label for a run (similar to a git tag)"""
+
+
+class Run(abc.ABC):
+    """Input data and events for an AGUI run
+
+    Runs are not accessed directly:  use 'ThreadStorage'.
+    """
+
+    thread_id: str
+    """ID of the thread in which the run was created"""
+
+    run_id: str
+    """Unique ID for a run"""
+
+    parent_run_id: str | None
+    """ID of the parent run"""
+
+    metadata: RunMetadata | None
+    """Optional user-defined metadata for a run"""
+
+    run_input: agui_core.RunAgentInput
+    """Input from the client-request which initiates the AG-UI run"""
+
+    created: datetime.datetime
+    """Timestamp"""
+
+    @abc.abstractmethod
+    def list_events(self) -> AGUI_Events:
+        """Return AGUI events for the run"""
+
+
+class ThreadMetadata(abc.ABC):
+    """Optional user-defined thread metadata"""
+
+    name: str
+    """Name for the thread"""
+
+    description: str
+    """Description for the thread"""
+
+
+class Thread(abc.ABC):
+    """Hold a set of AGUI runs sharing the same 'thread_id'
+
+    Runs are not accessed directly:  use 'ThreadStorage'.
+    """
+
+    thread_id: str
+    """Unique ID for the thread"""
+
+    room_id: str
+    """ID for room in which the thread was created"""
+
+    metadata: ThreadMetadata | None
+    """Optional thread metadata"""
+
+    created: datetime.datetime
+    """Timestamp"""
+
+    @abc.abstractmethod
+    def list_runs(self) -> list[Run]:
+        """Return runs for this thread"""
+
+
+class ThreadStorage(abc.ABC):
+    @abc.abstractmethod
+    async def list_user_threads(
+        self,
+        *,
+        user_name: str,
+        room_id: str = None,
+    ) -> list[Thread]:
+        """Return a list of the user's threads.
+
+        If 'room_id' is passed, filter the threads to those created
+        in that room.
+        """
+
+    @abc.abstractmethod
+    async def get_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+    ) -> Thread:
+        """Return the actual thread instance
+
+        N.B.:  caller must treat the instance as read-only!
+        """
+
+    @abc.abstractmethod
+    async def new_thread(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+        metadata: ThreadMetadata = None,
+        initial_run: bool = True,
+    ) -> Thread:
+        """Create a new thread"""
+
+    @abc.abstractmethod
+    async def update_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+        metadata: ThreadMetadata = None,
+    ) -> Thread:
+        """Update thread instance with the given metadata, or None"""
+
+    @abc.abstractmethod
+    async def delete_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+    ) -> None:
+        """Remove a thread"""
+
+    @abc.abstractmethod
+    async def new_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        metadata: RunMetadata = None,
+        parent_run_id: str = None,
+    ) -> Run:
+        """Create a new run for the thread
+
+        If 'parent_run_id' is passed, ensure it is valid.
+        """
+
+    @abc.abstractmethod
+    async def get_run(
+        self,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+    ) -> Run:
+        """Return an existing run for a thread"""
+
+    @abc.abstractmethod
+    async def update_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+        metadata: RunMetadata = None,
+    ) -> Run:
+        """Update a run with the given metadata
+
+        If 'metadata' is None, remove any existing metadata on the run.
+        """

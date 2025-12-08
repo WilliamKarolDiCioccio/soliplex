@@ -9,9 +9,9 @@ import uuid
 import pydantic
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
 from soliplex import config
 from soliplex import convos
-from soliplex.agui import thread as agui_thread
 
 KW_ONLY = pydantic.Field(kw_only=True)
 KW_ONLY_NONE = pydantic.Field(kw_only=True, default=None)
@@ -386,7 +386,7 @@ class AGUI_RunMetadata(pydantic.BaseModel):
     @classmethod
     def from_run_meta(
         cls,
-        a_run_meta: agui_thread.RunMeta | None,
+        a_run_meta: agui_package.RunMeta | None,
     ):
         if a_run_meta is not None:
             return cls(
@@ -419,8 +419,8 @@ class AGUI_Run(pydantic.BaseModel):
     def from_run_and_thread(
         cls,
         *,
-        a_run: agui_thread.Run,
-        a_thread: agui_thread.Thread,
+        a_run: agui_package.Run,
+        a_thread: agui_package.Thread,
         include_events: bool = False,
     ):
         return cls(
@@ -430,7 +430,7 @@ class AGUI_Run(pydantic.BaseModel):
             created=a_run.created,
             parent_run_id=a_run.parent_run_id,
             run_input=a_run.run_input,
-            events=a_run.events if include_events else None,
+            events=a_run.list_events() if include_events else None,
             metadata=AGUI_RunMetadata.from_run_meta(a_run.metadata),
         )
 
@@ -450,7 +450,7 @@ class AGUI_ThreadMetadata(pydantic.BaseModel):
     @classmethod
     def from_thread_meta(
         cls,
-        a_thread_meta: agui_thread.ThreadMeta | None,
+        a_thread_meta: agui_package.ThreadMeta | None,
     ):
         if a_thread_meta is not None:
             return cls(
@@ -478,7 +478,7 @@ class AGUI_Thread(pydantic.BaseModel):
     @classmethod
     def from_thread(
         cls,
-        a_thread: agui_thread.Thread,
+        a_thread: agui_package.Thread,
         include_runs=True,
     ):
         runs = (
@@ -488,7 +488,7 @@ class AGUI_Thread(pydantic.BaseModel):
                     a_thread=a_thread,
                     include_events=False,
                 )
-                for a_run in a_thread.runs.values()
+                for a_run in a_thread.list_runs()
             }
             if include_runs
             else None

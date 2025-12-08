@@ -108,7 +108,7 @@ AGUI_RUNS = {
         run_id=AGUI_RUN_ID,
         metadata=None,
         run_input=EMPTY_AGUI_RUN_INPUT.model_copy(deep=True),
-        events=AGUI_EVENTS,
+        _events=AGUI_EVENTS,
     ),
 }
 
@@ -800,7 +800,7 @@ def test_aguirun_from_run_and_thread(
             run_id=AGUI_RUN_ID,
             metadata=run_metadata,
             run_input=run_input,
-            events=AGUI_EVENTS,
+            _events=AGUI_EVENTS,
         )
     else:
         a_run = agui_thread.Run(
@@ -888,7 +888,7 @@ def test_aguithread_from_thread(
             room_id=ROOM_ID,
             thread_id=AGUI_THREAD_ID,
             metadata=thread_metadata,
-            runs=AGUI_RUNS,
+            _runs=AGUI_RUNS,
         )
     else:
         a_thread = agui_thread.Thread(
