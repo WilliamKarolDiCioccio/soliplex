@@ -222,10 +222,8 @@ async def test__check_user_thread(w_miss, w_room_id, expectation):
         (True, raises_httpexc(code=404, match="No such run")),
     ],
 )
-@mock.patch("soliplex.views.agui._check_user_thread")
-async def test__check_user_thread_run(cut, w_miss, expectation):
+async def test__check_user_thread_run(w_miss, expectation):
     the_threads = mock.create_autospec(agui_thread.Threads)
-    exp_thread = cut.return_value = mock.create_autospec(agui_thread.Thread)
 
     if w_miss:
         the_threads.get_run.side_effect = agui_package.UnknownRun(
@@ -237,7 +235,7 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
         )
 
     with expectation as expected:
-        found_thread, found_run = await agui_views._check_user_thread_run(
+        found_run = await agui_views._check_user_thread_run(
             room_id=TEST_ROOM_ID,
             user_name=USER_NAME,
             thread_id=TEST_THREAD_ID,
@@ -246,7 +244,6 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
         )
 
     if expected is None:
-        assert found_thread is exp_thread
         assert found_run is the_threads.get_run.return_value
 
     the_threads.get_run.assert_called_once_with(
@@ -254,12 +251,6 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
         user_name=USER_NAME,
         thread_id=TEST_THREAD_ID,
         run_id=TEST_RUN_ID,
-    )
-    cut.assert_called_once_with(
-        room_id=TEST_ROOM_ID,
-        thread_id=TEST_THREAD_ID,
-        user_name=USER_NAME,
-        the_threads=the_threads,
     )
 
 
@@ -386,12 +377,8 @@ async def test_get_room_agui_thread_id_run_id(cuir, cutr, w_room_meta):
             label=TEST_RUN_LABEL,
         )
 
-    exp_thread = dataclasses.replace(
-        TEST_THREAD,
-        _runs={TEST_RUN_ID: TEST_RUN},
-    )
     exp_run = dataclasses.replace(TEST_RUN, **run_replace)
-    cutr.return_value = exp_thread, exp_run
+    cutr.return_value = exp_run
 
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
@@ -685,9 +672,8 @@ async def test_post_room_agui_thread_id_run_id(
     the_threads = mock.create_autospec(agui_thread.Threads)
     token = object()
 
-    exp_thread = mock.create_autospec(agui_thread.Thread)
     exp_run = mock.create_autospec(agui_thread.Run)
-    cutr.return_value = exp_thread, exp_run
+    cutr.return_value = exp_run
 
     if bad_run_input:
         exp_run.check_run_input.side_effect = agui_package.RunInputMismatch(
