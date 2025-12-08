@@ -17,7 +17,7 @@ from soliplex.agui import parser as agui_parser
 router = fastapi.APIRouter(tags=["rooms"])
 
 depend_the_installation = installation.depend_the_installation
-depend_the_threads = agui_thread.depend_the_threads
+depend_the_threads = agui_package.depend_the_threads
 
 
 async def _check_user_in_room(

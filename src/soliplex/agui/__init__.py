@@ -222,3 +222,10 @@ class ThreadStorage(abc.ABC):
         If 'run_metadata' is None, or an empty dict, remove any existing
         metadata on the run.
         """
+
+
+async def get_the_threads(request: fastapi.Request) -> ThreadStorage:
+    return request.state.the_threads
+
+
+depend_the_threads = fastapi.Depends(get_the_threads)

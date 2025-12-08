@@ -4,7 +4,6 @@ import datetime
 import uuid
 from unittest import mock
 
-import fastapi
 import pytest
 from ag_ui import core as agui_core
 
@@ -624,14 +623,3 @@ async def test_threads_update_run(
             assert found.run_metadata.label == exp_label
         else:
             assert found.run_metadata is None
-
-
-@pytest.mark.anyio
-async def test_get_the_threads():
-    expected = object()
-    request = fastapi.Request(scope={"type": "http"})
-    request.state.the_threads = expected
-
-    found = await agui_thread.get_the_threads(request)
-
-    assert found is expected

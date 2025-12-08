@@ -8,7 +8,6 @@ import asyncio
 import dataclasses
 import datetime
 
-import fastapi
 from ag_ui import core as agui_core
 
 from soliplex import agui as agui_package
@@ -376,10 +375,3 @@ class Threads:
             thread._runs[run_id] = after
 
             return after
-
-
-async def get_the_threads(request: fastapi.Request) -> Threads:
-    return request.state.the_threads
-
-
-depend_the_threads = fastapi.Depends(get_the_threads)
