@@ -248,6 +248,56 @@ TEST_AGUI_RUN_EVENTS = [
 ]
 
 
+def test_run_thread_id():
+    thread = agui_persistence.Thread(thread_id=THREAD_UUID)
+    run = agui_persistence.Run(thread=thread)
+
+    assert run.thread_id == THREAD_UUID
+
+
+@pytest.mark.parametrize("w_parent_id", [None, PARENT_RUN_ID])
+def test_run_parent_run_id(w_parent_id):
+    thread = agui_persistence.Thread(thread_id=THREAD_UUID)
+
+    if w_parent_id is not None:
+        parent = agui_persistence.Run(thread=thread, run_id=w_parent_id)
+    else:
+        parent = None
+
+    run = agui_persistence.Run(thread=thread, parent=parent)
+
+    assert run.parent_run_id == w_parent_id
+
+
+@pytest.mark.parametrize(
+    "w_run_input",
+    [
+        None,
+        EMPTY_RUN_AGENT_INPUT,
+        FULL_RUN_AGENT_INPUT,
+    ],
+)
+def test_run_run_input(w_run_input):
+    run = agui_persistence.Run()
+
+    if w_run_input is not None:
+        _ = agui_persistence.RunAgentInput.from_agui_model(run, w_run_input)
+
+    assert run.run_input == w_run_input
+
+
+@pytest.mark.parametrize("w_agui_events", [[], TEST_AGUI_RUN_EVENTS])
+def test_run_list_events(w_agui_events):
+    run = agui_persistence.Run()
+
+    run.events = [
+        agui_persistence.RunEvent.from_agui_model(run, agui_event)
+        for agui_event in w_agui_events
+    ]
+
+    assert run.list_events() == w_agui_events
+
+
 @pytest.mark.parametrize(
     "agui_rai",
     [
@@ -261,6 +311,7 @@ def test_runagentinput_from_agui_model(agui_rai):
     found = agui_persistence.RunAgentInput.from_agui_model(run, agui_rai)
 
     assert found.run is run
+    assert found.to_agui_model() == agui_rai
     assert found.data == agui_rai.model_dump()
 
     assert found.thread_id == agui_rai.thread_id
@@ -312,6 +363,7 @@ def test_runevent_from_agui_event(agui_event):
     found = agui_persistence.RunEvent.from_agui_model(run, agui_event)
 
     assert found.run is run
+    assert found.to_agui_model() == agui_event
     assert found.data == agui_event.model_dump()
 
     assert found.type == agui_event.type
@@ -457,10 +509,10 @@ def test_sqla_run_events(the_session):
 
         for agui_event, db_event in zip(
             TEST_AGUI_RUN_EVENTS,
-            run.events,
+            run.list_events(),
             strict=True,
         ):
-            assert db_event.type == agui_event.type
+            assert db_event == agui_event
 
 
 @pytest.mark.parametrize("init_schema", [False, True])

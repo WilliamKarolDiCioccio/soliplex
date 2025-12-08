@@ -21,6 +21,7 @@ mapped_column = sqla_orm.mapped_column
 relationship = sqla_orm.relationship
 
 MESSAGE_DESERIALIZER = pydantic.TypeAdapter(agui_core.Message)
+EVENT_DESERIALIZER = pydantic.TypeAdapter(agui_core.Event)
 
 SYNC_MEMORY_ENGINE_URL = "sqlite://"
 ASYNC_MEMORY_ENGINE_URL = "sqlite+aiosqlite://"
@@ -63,20 +64,16 @@ class Thread(Base):
     __tablename__ = "thread"
 
     id_: Mapped[int] = mapped_column(primary_key=True)
-    # created: Mapped[datetime.datetime] = mapped_column(
-    #    default=sqla_func.now(),
-    # )
-    created: Mapped[datetime.datetime] = mapped_column(
-        default=agui_util._timestamp,
-    )
 
+    #
+    #   'soliplex.agui.Thread' contract
+    #
     thread_id: Mapped[str] = mapped_column(
         default=agui_util._make_uuid_str,
         index=True,
     )
 
     room_id: Mapped[str] = mapped_column(index=True)
-    user_name: Mapped[str] = mapped_column(index=True)
 
     thread_metadata: Mapped[ThreadMetadata | None] = sqla_orm.relationship(
         back_populates="thread",
@@ -84,6 +81,14 @@ class Thread(Base):
         passive_deletes=True,
     )
 
+    created: Mapped[datetime.datetime] = mapped_column(
+        default=agui_util._timestamp,
+    )
+
+    #
+    #   Not part of the generic 'soliplex.agui.Thread' contract
+    #
+    user_name: Mapped[str] = mapped_column(index=True)
     runs: Mapped[list[Run]] = relationship(
         back_populates="thread",
         order_by="Run.created",
@@ -115,6 +120,9 @@ class ThreadMetadata(Base):
     )
     thread: Mapped[Thread] = relationship(back_populates="thread_metadata")
 
+    #
+    #   'soliplex.agui.ThreadMetadata' contract
+    #
     name: Mapped[str] = mapped_column()
     description: Mapped[str | None] = mapped_column()
 
@@ -142,9 +150,6 @@ class Run(Base):
     __tablename__ = "run"
 
     id_: Mapped[int] = mapped_column(primary_key=True)
-    created: Mapped[datetime.datetime] = mapped_column(
-        default=agui_util._timestamp,
-    )
 
     thread_id_: Mapped[int] = mapped_column(
         ForeignKey("thread.id_", ondelete="CASCADE"),
@@ -186,6 +191,13 @@ class Run(Base):
         passive_deletes=True,
     )
 
+    #
+    #   'soliplex.agui.Run' contract
+    #
+    @property
+    def thread_id(self) -> str:
+        return self.thread.thread_id
+
     run_id: Mapped[str] = mapped_column(
         default=agui_util._make_uuid_str,
         index=True,
@@ -194,6 +206,18 @@ class Run(Base):
     @property
     def parent_run_id(self) -> str | None:
         return self.parent.run_id if self.parent is not None else None
+
+    @property
+    def run_input(self) -> agui_core.RunAgentInput | None:
+        if self.run_agent_input is not None:
+            return self.run_agent_input.to_agui_model()
+
+    created: Mapped[datetime.datetime] = mapped_column(
+        default=agui_util._timestamp,
+    )
+
+    def list_events(self) -> list[agui_core.Event]:
+        return [event.to_agui_model() for event in self.events]
 
 
 class RunMetadata(Base):
@@ -217,6 +241,9 @@ class RunMetadata(Base):
     )
     run: Mapped[Run] = relationship(back_populates="run_metadata")
 
+    #
+    #   'soliplex.agui.RunMetadata' contract
+    #
     label: Mapped[str] = mapped_column()
 
 
@@ -248,6 +275,18 @@ class RunAgentInput(Base):
     @classmethod
     def from_agui_model(cls, run: Run, model: agui_core.RunAgentInput):
         return cls(run=run, data=model.model_dump())
+
+    def to_agui_model(self):
+        return agui_core.RunAgentInput(
+            thread_id=self.thread_id,
+            run_id=self.run_id,
+            parent_run_id=self.parent_run_id,
+            state=self.state,
+            messages=self.messages,
+            context=self.context,
+            tools=self.tools,
+            forwarded_props=self.forwarded_props,
+        )
 
     @property
     def thread_id(self) -> str:
@@ -314,6 +353,16 @@ class RunEvent(Base):
     @classmethod
     def from_agui_model(cls, run, model: agui_core.Event):
         return cls(run=run, data=model.model_dump())
+
+    def to_agui_model(self) -> agui_core.Event:
+        event = EVENT_DESERIALIZER.validate_python(self.data)
+        rai = getattr(event, "run_agent_input", None)
+
+        if isinstance(rai, dict):
+            rai = agui_core.RunAgentInput.model_validate(rai)
+            event.run_agent_input = rai
+
+        return event
 
     @property
     def type(self) -> str:
