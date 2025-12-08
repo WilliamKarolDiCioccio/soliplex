@@ -12,35 +12,9 @@ import uuid
 import fastapi
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
+
 AGUI_Events = list[agui_core.BaseEvent]
-
-
-class UnknownThread(fastapi.HTTPException):
-    def __init__(self, user_name: str, thread_id: str):
-        self.user_name = user_name
-        self.thread_id = thread_id
-        message = f"Unknown thread: UUID {thread_id} for user {user_name}"
-        super().__init__(status_code=404, detail=message)
-
-
-class UnknownRunId(ValueError):
-    def __init__(self, run_id: str):
-        self.run_id = run_id
-        super().__init__(f"Run input run ID {run_id} does not exist in thread")
-
-
-class MissingParentRunId(ValueError):
-    def __init__(self, parent_run_id: str):
-        self.parent_run_id = parent_run_id
-        super().__init__(
-            f"Run input parent run ID {parent_run_id} does not exist in thread"
-        )
-
-
-class RunInputMismatch(ValueError):
-    def __init__(self, which: str):
-        self.which = which
-        super().__init__(f"Run input field does not match run: {which}")
 
 
 def _make_uuid_str() -> str:
@@ -98,11 +72,13 @@ class Run:
     def check_run_input(self, other_run_input: agui_core.RunAgentInput):
         """Raise if 'other_run_input' IDs do not match"""
         if self.thread_id != other_run_input.thread_id:
-            raise RunInputMismatch("thread_id")
+            raise agui_package.RunInputMismatch("thread_id")
+
         if self.run_id != other_run_input.run_id:
-            raise RunInputMismatch("run_id")
+            raise agui_package.RunInputMismatch("run_id")
+
         if self.parent_run_id != other_run_input.parent_run_id:
-            raise RunInputMismatch("parent_run_id")
+            raise agui_package.RunInputMismatch("parent_run_id")
 
 
 RunMap = dict[str, Run]
@@ -168,12 +144,12 @@ class Threads:
         user_threads = self._threads.get(user_name)
 
         if user_threads is None:
-            raise UnknownThread(user_name, thread_id)
+            raise agui_package.UnknownThread(user_name, thread_id)
 
         thread = user_threads.get(thread_id)
 
         if thread is None:
-            raise UnknownThread(user_name, thread_id)
+            raise agui_package.UnknownThread(user_name, thread_id)
 
         return thread
 
@@ -267,7 +243,10 @@ class Threads:
             try:
                 del threads[thread_id]
             except KeyError:
-                raise UnknownThread(user_name, thread_id) from None
+                raise agui_package.UnknownThread(
+                    user_name,
+                    thread_id,
+                ) from None
 
             self._threads[user_name] = threads
 
@@ -293,10 +272,13 @@ class Threads:
             try:
                 thread = user_threads[thread_id]
             except KeyError:
-                raise UnknownThread(user_name, thread_id) from None
+                raise agui_package.UnknownThread(
+                    user_name,
+                    thread_id,
+                ) from None
 
             if parent_run_id is not None and parent_run_id not in thread.runs:
-                raise MissingParentRunId(parent_run_id)
+                raise agui_package.MissingParentRun(parent_run_id)
 
             run_id = _make_uuid_str()
 
@@ -335,12 +317,15 @@ class Threads:
             try:
                 thread = user_threads[thread_id]
             except KeyError:
-                raise UnknownThread(user_name, thread_id) from None
+                raise agui_package.UnknownThread(
+                    user_name,
+                    thread_id,
+                ) from None
 
             try:
                 return thread.runs[run_id]
             except KeyError:
-                raise UnknownRunId(run_id) from None
+                raise agui_package.UnknownRun(run_id) from None
 
     async def update_run(
         self,
@@ -361,12 +346,15 @@ class Threads:
             try:
                 thread = user_threads[thread_id]
             except KeyError:
-                raise UnknownThread(user_name, thread_id) from None
+                raise agui_package.UnknownThread(
+                    user_name,
+                    thread_id,
+                ) from None
 
             try:
                 before = thread.runs[run_id]
             except KeyError:
-                raise UnknownRunId(run_id) from None
+                raise agui_package.UnknownRun(run_id) from None
 
             after = dataclasses.replace(before, metadata=metadata)
             thread.runs[run_id] = after

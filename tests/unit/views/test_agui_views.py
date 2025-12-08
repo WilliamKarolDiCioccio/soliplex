@@ -6,6 +6,7 @@ import fastapi
 import pytest
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
 from soliplex import installation
 from soliplex import models
 from soliplex.agui import thread as agui_thread
@@ -186,7 +187,7 @@ async def test__check_user_thread(w_miss, w_room_id, expectation):
     the_threads = mock.create_autospec(agui_thread.Threads)
 
     if w_miss:
-        the_threads.get_thread.side_effect = agui_thread.UnknownThread(
+        the_threads.get_thread.side_effect = agui_package.UnknownThread(
             user_name=USER_NAME,
             thread_id=TEST_THREAD_ID,
         )
@@ -227,7 +228,7 @@ async def test__check_user_thread_run(cut, w_miss, expectation):
     exp_thread = cut.return_value = mock.create_autospec(agui_thread.Thread)
 
     if w_miss:
-        the_threads.get_run.side_effect = agui_thread.UnknownRunId(
+        the_threads.get_run.side_effect = agui_package.UnknownRun(
             run_id=TEST_RUN_ID,
         )
     else:
@@ -555,7 +556,7 @@ async def test_post_room_agui_thread_id(
     token = object()
 
     if missing_parent:
-        the_threads.new_run.side_effect = agui_thread.MissingParentRunId(
+        the_threads.new_run.side_effect = agui_package.MissingParentRun(
             TEST_PARENT_RUN_ID,
         )
     else:
@@ -695,7 +696,7 @@ async def test_post_room_agui_thread_id_run_id(
     cutr.return_value = exp_thread, exp_run
 
     if bad_run_input:
-        exp_run.check_run_input.side_effect = agui_thread.RunInputMismatch(
+        exp_run.check_run_input.side_effect = agui_package.RunInputMismatch(
             "testing",
         )
     else:

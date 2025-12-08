@@ -6,6 +6,7 @@ from fastapi import responses
 from fastapi import security
 from pydantic_ai.ui import ag_ui as ai_ag_ui
 
+from soliplex import agui as agui_package
 from soliplex import auth
 from soliplex import installation
 from soliplex import models
@@ -89,7 +90,7 @@ async def _check_user_thread(
             user_name=user_name,
             thread_id=thread_id,
         )
-    except agui_thread.UnknownThread:
+    except agui_package.UnknownThread:
         raise fastapi.HTTPException(
             status_code=404,
             detail=f"No such thread: {thread_id}",
@@ -127,7 +128,7 @@ async def _check_user_thread_run(
             user_name=user_name,
             run_id=run_id,
         )
-    except agui_thread.UnknownRunId:
+    except agui_package.UnknownRun:
         raise fastapi.HTTPException(
             status_code=404,
             detail=f"No such run: {run_id}",
@@ -309,7 +310,7 @@ async def post_room_agui_thread_id(
             parent_run_id=parent_run_id,
             metadata=r_metadata,
         )
-    except agui_thread.MissingParentRunId:
+    except agui_package.MissingParentRun:
         raise fastapi.HTTPException(
             status_code=400,
             detail=f"No such parent run: {parent_run_id}",
@@ -408,7 +409,7 @@ async def post_room_agui_thread_id_run_id(
 
     try:
         run.check_run_input(run_agent_input)
-    except agui_thread.RunInputMismatch:
+    except agui_package.RunInputMismatch:
         raise fastapi.HTTPException(
             status_code=400,
             detail="Mismatched 'run_input'",

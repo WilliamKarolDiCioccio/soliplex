@@ -8,6 +8,7 @@ import fastapi
 import pytest
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
 from soliplex.agui import thread as agui_thread
 
 UUID4 = uuid.uuid4()
@@ -48,6 +49,12 @@ TEST_RUN_METADATA = agui_thread.RunMetadata(
 )
 
 no_error = contextlib.nullcontext
+
+
+raises_unknown_thread = pytest.raises(agui_package.UnknownThread)
+raises_unknown_run = pytest.raises(agui_package.UnknownRun)
+raises_missing_parent_run = pytest.raises(agui_package.MissingParentRun)
+raises_run_input_mismatch = pytest.raises(agui_package.RunInputMismatch)
 
 
 @pytest.fixture
@@ -142,16 +149,13 @@ def test_run_created():
     assert run.created == NOW
 
 
-mismatch = pytest.raises(agui_thread.RunInputMismatch)
-
-
 @pytest.mark.parametrize(
     "ri_kwargs, expectation",
     [
         ({}, no_error()),
-        ({"thread_id": OTHER_THREAD_ID}, mismatch),
-        ({"run_id": OTHER_RUN_ID}, mismatch),
-        ({"parent_run_id": OTHER_PARENT_RUN_ID}, mismatch),
+        ({"thread_id": OTHER_THREAD_ID}, raises_run_input_mismatch),
+        ({"run_id": OTHER_RUN_ID}, raises_run_input_mismatch),
+        ({"parent_run_id": OTHER_PARENT_RUN_ID}, raises_run_input_mismatch),
     ],
 )
 def test_run_check_run_input(run_input, ri_kwargs, expectation):
@@ -200,8 +204,8 @@ async def test_threads_user_threads(w_threads, expected, w_room_id):
 @pytest.mark.parametrize(
     "w_threads, expectation",
     [
-        ({}, pytest.raises(agui_thread.UnknownThread)),
-        ({TEST_USER: {}}, pytest.raises(agui_thread.UnknownThread)),
+        ({}, raises_unknown_thread),
+        ({TEST_USER: {}}, raises_unknown_thread),
         (
             {TEST_USER: TEST_THREADS},
             no_error(TEST_THREAD),
@@ -267,7 +271,7 @@ async def test_threads_new_thread(mus, w_initial_run, w_already):
 @pytest.mark.parametrize(
     "w_thread_id, expectation",
     [
-        ("BOGUS", pytest.raises(agui_thread.UnknownThread)),
+        ("BOGUS", raises_unknown_thread),
         (TEST_THREAD_ID, no_error()),
     ],
 )
@@ -338,8 +342,8 @@ async def test_threads_update_thread(
 @pytest.mark.parametrize(
     "w_threads, expectation",
     [
-        ({}, pytest.raises(agui_thread.UnknownThread)),
-        ({TEST_USER: {}}, pytest.raises(agui_thread.UnknownThread)),
+        ({}, raises_unknown_thread),
+        ({TEST_USER: {}}, raises_unknown_thread),
         ({TEST_USER: TEST_THREADS}, no_error(None)),
     ],
 )
@@ -382,28 +386,28 @@ async def test_threads_delete_thread(w_threads, expectation):
             TEST_USER,
             TEST_THREAD_ID,
             None,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             "BOGUS_USERNAME",
             TEST_THREAD_ID,
             None,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             "BOGUS_THREAD_ID",
             None,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             TEST_THREAD_ID,
             "BOGUS_PARENT_ID",
-            pytest.raises(agui_thread.MissingParentRunId),
+            raises_missing_parent_run,
         ),
         (TEST_THREAD_ROOMID, TEST_USER, TEST_THREAD_ID, None, no_error()),
         (
@@ -472,28 +476,28 @@ async def test_threads_new_run(
             TEST_USER,
             TEST_THREAD_ID,
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             "BOGUS_USERNAME",
             TEST_THREAD_ID,
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             "BOGUS_THREAD_ID",
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             TEST_THREAD_ID,
             "BOGUS_RUN_ID",
-            pytest.raises(agui_thread.UnknownRunId),
+            raises_unknown_run,
         ),
         (
             TEST_THREAD_ROOMID,
@@ -549,28 +553,28 @@ async def test_threads_get_run(
             TEST_USER,
             TEST_THREAD_ID,
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             "BOGUS_USERNAME",
             TEST_THREAD_ID,
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             "BOGUS_THREAD_ID",
             TEST_RUN_ID,
-            pytest.raises(agui_thread.UnknownThread),
+            raises_unknown_thread,
         ),
         (
             TEST_THREAD_ROOMID,
             TEST_USER,
             TEST_THREAD_ID,
             "BOGUS_RUN_ID",
-            pytest.raises(agui_thread.UnknownRunId),
+            raises_unknown_run,
         ),
         (
             TEST_THREAD_ROOMID,
