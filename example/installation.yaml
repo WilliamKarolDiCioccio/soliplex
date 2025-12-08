@@ -104,7 +104,7 @@ secrets:
   # ----------------------------------------------------------------------
   - "SMITHERY_AI_API_KEY"
   - "SMITHERY_AI_PROFILE"
-
+  - "GOOGLE_MAPS_API_KEY"
   # ----------------------------------------------------------------------
   # MCP room token generation / validation secret
   #
