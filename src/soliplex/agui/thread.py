@@ -7,25 +7,17 @@ that choice away from the rest of the system.
 import asyncio
 import dataclasses
 import datetime
-import uuid
 
 import fastapi
 from ag_ui import core as agui_core
 
 from soliplex import agui as agui_package
+from soliplex.agui import util as agui_util
 
 AGUI_Events = list[agui_core.BaseEvent]
 
 
-def _make_uuid_str() -> str:
-    return str(uuid.uuid4())
-
-
-def _timestamp() -> datetime.datetime:
-    return datetime.datetime.now(datetime.UTC)
-
-
-timestamp = dataclasses.field(default_factory=_timestamp)
+timestamp = dataclasses.field(default_factory=agui_util._timestamp)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -37,7 +29,7 @@ class RunMetadata(agui_package.RunMetadata):
 class Run(agui_package.Run):
     """Hold original input data and events for an AGUI run"""
 
-    run_id: str = dataclasses.field(default_factory=_make_uuid_str)
+    run_id: str = dataclasses.field(default_factory=agui_util._make_uuid_str)
 
     _: dataclasses.KW_ONLY
 
@@ -99,7 +91,9 @@ class Thread(agui_package.Thread):
 
     room_id: str
 
-    thread_id: str = dataclasses.field(default_factory=_make_uuid_str)
+    thread_id: str = dataclasses.field(
+        default_factory=agui_util._make_uuid_str,
+    )
 
     _: dataclasses.KW_ONLY
 
@@ -191,7 +185,7 @@ class Threads:
         initial_run: bool = True,
     ) -> Thread:
         """Create a new thread"""
-        thread_id = _make_uuid_str()
+        thread_id = agui_util._make_uuid_str()
 
         thread = Thread(
             thread_id=thread_id,
@@ -200,7 +194,7 @@ class Threads:
         )
 
         if initial_run:
-            run_id = _make_uuid_str()
+            run_id = agui_util._make_uuid_str()
             thread._runs[run_id] = Run(
                 run_id=run_id,
                 run_input=agui_core.RunAgentInput(
@@ -287,7 +281,7 @@ class Threads:
             if parent_run_id is not None and parent_run_id not in thread._runs:
                 raise agui_package.MissingParentRun(parent_run_id)
 
-            run_id = _make_uuid_str()
+            run_id = agui_util._make_uuid_str()
 
             assert run_id not in thread._runs
 

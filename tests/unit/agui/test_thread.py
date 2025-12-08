@@ -70,13 +70,6 @@ def run_input():
     )
 
 
-@mock.patch("uuid.uuid4")
-def test__make_uuid_str(uu4):
-    uu4.return_value = UUID4
-
-    assert agui_thread._make_uuid_str() == str(UUID4)
-
-
 @pytest.mark.parametrize(
     "w_run_input, expected",
     [
@@ -229,7 +222,7 @@ async def test_threads_get_thread(w_threads, expectation):
 @pytest.mark.anyio
 @pytest.mark.parametrize("w_already", [False, True])
 @pytest.mark.parametrize("w_initial_run", [None, False, True])
-@mock.patch("soliplex.agui.thread._make_uuid_str")
+@mock.patch("soliplex.agui.util._make_uuid_str")
 async def test_threads_new_thread(mus, w_initial_run, w_already):
     mus.return_value = TEST_THREAD_ID
     the_threads = agui_thread.Threads()
@@ -419,7 +412,7 @@ async def test_threads_delete_thread(w_threads, expectation):
         ),
     ],
 )
-@mock.patch("soliplex.agui.thread._make_uuid_str")
+@mock.patch("soliplex.agui.util._make_uuid_str")
 async def test_threads_new_run(
     mus,
     w_room_id,
