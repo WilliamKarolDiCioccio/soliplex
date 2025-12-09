@@ -9,9 +9,9 @@ import uuid
 import pydantic
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
 from soliplex import config
 from soliplex import convos
-from soliplex.agui import thread as agui_thread
 
 KW_ONLY = pydantic.Field(kw_only=True)
 KW_ONLY_NONE = pydantic.Field(kw_only=True, default=None)
@@ -386,7 +386,7 @@ class AGUI_RunMetadata(pydantic.BaseModel):
     @classmethod
     def from_run_meta(
         cls,
-        a_run_meta: agui_thread.RunMeta | None,
+        a_run_meta: agui_package.RunMeta | None,
     ):
         if a_run_meta is not None:
             return cls(
@@ -400,7 +400,6 @@ class AGUI_NewRunRequest(pydantic.BaseModel):
 
 
 class AGUI_Run(pydantic.BaseModel):
-    room_id: str = KW_ONLY
     thread_id: str = KW_ONLY
     run_id: str = KW_ONLY
 
@@ -416,22 +415,21 @@ class AGUI_Run(pydantic.BaseModel):
     metadata: AGUI_RunMetadata | None = KW_ONLY_NONE
 
     @classmethod
-    def from_run_and_thread(
+    def from_run(
         cls,
-        *,
-        a_run: agui_thread.Run,
-        a_thread: agui_thread.Thread,
-        include_events: bool = False,
+        a_run: agui_package.Run,
+        a_run_input: agui_package.RunAgentInput,
+        a_run_meta: agui_package.RunMetadata = None,
+        a_run_events: list[agui_package.RunEvent] = None,
     ):
         return cls(
-            room_id=a_thread.room_id,
-            thread_id=a_thread.thread_id,
+            thread_id=a_run.thread_id,
             run_id=a_run.run_id,
             created=a_run.created,
             parent_run_id=a_run.parent_run_id,
-            run_input=a_run.run_input,
-            events=a_run.events if include_events else None,
-            metadata=AGUI_RunMetadata.from_run_meta(a_run.metadata),
+            run_input=a_run_input,
+            events=a_run_events,
+            metadata=AGUI_RunMetadata.from_run_meta(a_run_meta),
         )
 
 
@@ -450,7 +448,7 @@ class AGUI_ThreadMetadata(pydantic.BaseModel):
     @classmethod
     def from_thread_meta(
         cls,
-        a_thread_meta: agui_thread.ThreadMeta | None,
+        a_thread_meta: agui_package.ThreadMeta | None,
     ):
         if a_thread_meta is not None:
             return cls(
@@ -478,28 +476,16 @@ class AGUI_Thread(pydantic.BaseModel):
     @classmethod
     def from_thread(
         cls,
-        a_thread: agui_thread.Thread,
-        include_runs=True,
+        a_thread: agui_package.Thread,
+        a_thread_meta: AGUI_ThreadMetadata,
+        a_thread_runs: AGUI_Runs = None,
     ):
-        runs = (
-            {
-                a_run.run_id: AGUI_Run.from_run_and_thread(
-                    a_run=a_run,
-                    a_thread=a_thread,
-                    include_events=False,
-                )
-                for a_run in a_thread.runs.values()
-            }
-            if include_runs
-            else None
-        )
-
         return cls(
             room_id=a_thread.room_id,
             thread_id=a_thread.thread_id,
-            runs=runs,
             created=a_thread.created,
-            metadata=AGUI_ThreadMetadata.from_thread_meta(a_thread.metadata),
+            metadata=a_thread_meta,
+            runs=a_thread_runs,
         )
 
 

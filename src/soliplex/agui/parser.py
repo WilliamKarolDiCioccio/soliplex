@@ -10,7 +10,7 @@ from collections import abc
 import jsonpatch
 from ag_ui import core as agui_core
 
-from soliplex.agui import thread as agui_thread
+from soliplex import agui as agui_package
 
 AGUI_EventIterator = abc.AsyncIterator[agui_core.BaseEvent]
 AGUI_EventDictIterator = abc.AsyncIterator[agui_core.BaseEvent]
@@ -206,12 +206,12 @@ DEFAULT_IGNORE_EVENTS: IgnorableEventTypes = frozenset(
 @dataclasses.dataclass
 class EventStreamParser:
     run_agent_input: dataclasses.InitVar[agui_core.RunAgentInput] = None
-    run: dataclasses.InitVar[agui_thread.Run] = None
+    run: dataclasses.InitVar[agui_package.Run] = None
 
     _ = dataclasses.KW_ONLY
 
     _run_input: agui_core.RunAgentInput = None
-    _the_run: agui_thread.Run = None
+    _the_run: agui_package.Run = None
 
     run_status: RunStatus = RunStatus.INITIALIZED
     active_steps: set[str] = dataclasses.field(default_factory=set)
@@ -255,7 +255,7 @@ class EventStreamParser:
         self.messages_by_id = {msg.id: msg for msg in value.messages}
 
     @property
-    def the_run(self) -> agui_thread.Run:
+    def the_run(self) -> agui_package.Run:
         return self._the_run
 
     def _assert_running(self, event):

@@ -7,13 +7,14 @@ import pydantic_ai
 from ag_ui import core as agui_core
 from haiku.rag import config as hr_config
 from haiku.rag.graph import agui as hr_agui
+from sqlalchemy.ext import asyncio as sqla_asyncio
 
 from soliplex import agents
 from soliplex import config
 from soliplex import convos
 from soliplex import mcp_server
 from soliplex import secrets
-from soliplex.agui import thread as agui_thread
+from soliplex.agui import persistence as agui_persistence
 
 
 @dataclasses.dataclass
@@ -178,12 +179,18 @@ async def lifespan(
     the_installation.resolve_secrets()
     the_installation.resolve_environment()
     the_convos = convos.Conversations()
-    the_threads = agui_thread.Threads()
+
+    # XXX temporary hack!:  should come from the 'i_config'
+    engine = sqla_asyncio.create_async_engine(
+        agui_persistence.ASYNC_MEMORY_ENGINE_URL,
+    )
+    async with engine.begin() as connection:
+        await connection.run_sync(agui_persistence.Base.metadata.create_all)
 
     context = {
         "the_installation": the_installation,
         "the_convos": the_convos,
-        "the_threads": the_threads,
+        "threads_engine": engine,
     }
 
     async with contextlib.AsyncExitStack() as stack:

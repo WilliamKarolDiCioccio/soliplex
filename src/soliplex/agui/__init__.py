@@ -1,0 +1,236 @@
+from __future__ import annotations
+
+import abc
+import datetime
+
+import fastapi
+from ag_ui import core as agui_core
+from sqlalchemy.ext import asyncio as sqla_asyncio
+
+AGUI_Events = list[agui_core.BaseEvent]
+
+
+class UnknownThread(fastapi.HTTPException):
+    def __init__(self, user_name: str, thread_id: str):
+        self.user_name = user_name
+        self.thread_id = thread_id
+        message = f"Unknown thread: UUID {thread_id} for user {user_name}"
+        super().__init__(status_code=404, detail=message)
+
+
+class UnknownRun(ValueError):
+    def __init__(self, run_id: str):
+        self.run_id = run_id
+        super().__init__(f"Run input run ID {run_id} does not exist in thread")
+
+
+class MissingParentRun(ValueError):
+    def __init__(self, parent_run_id: str):
+        self.parent_run_id = parent_run_id
+        super().__init__(
+            f"Run input parent run ID {parent_run_id} does not exist in thread"
+        )
+
+
+class RunInputMismatch(ValueError):
+    def __init__(self, which: str):
+        self.which = which
+        super().__init__(f"Run input field does not match run: {which}")
+
+
+#
+#   ABCs defined here are notional contracts.
+#
+
+
+class RunMetadata(abc.ABC):
+    """User-defined metadata for a run"""
+
+    label: str
+    """Label for a run (similar to a git tag)"""
+
+
+class Run(abc.ABC):
+    """Input data and events for an AGUI run
+
+    Runs are not accessed directly:  use 'ThreadStorage'.
+    """
+
+    thread_id: str
+    """ID of the thread in which the run was created"""
+
+    run_id: str
+    """Unique ID for a run"""
+
+    parent_run_id: str | None
+    """ID of the parent run"""
+
+    run_metadata: RunMetadata | None
+    """Optional user-defined metadata for a run"""
+
+    run_input: agui_core.RunAgentInput
+    """Input from the client-request which initiates the AG-UI run"""
+
+    created: datetime.datetime
+    """Timestamp"""
+
+    @abc.abstractmethod
+    async def list_events(self) -> AGUI_Events:
+        """Return AGUI events for the run"""
+
+
+class ThreadMetadata(abc.ABC):
+    """Optional user-defined thread metadata"""
+
+    name: str
+    """Name for the thread"""
+
+    description: str
+    """Description for the thread"""
+
+
+class Thread(abc.ABC):
+    """Hold a set of AGUI runs sharing the same 'thread_id'
+
+    Runs are not accessed directly:  use 'ThreadStorage'.
+    """
+
+    thread_id: str
+    """Unique ID for the thread"""
+
+    room_id: str
+    """ID for room in which the thread was created"""
+
+    thread_metadata: ThreadMetadata | None
+    """Optional thread metadata"""
+
+    created: datetime.datetime
+    """Timestamp"""
+
+    @abc.abstractmethod
+    async def list_runs(self) -> list[Run]:
+        """Return runs for this thread"""
+
+
+class ThreadStorage(abc.ABC):
+    @abc.abstractmethod
+    async def list_user_threads(
+        self,
+        *,
+        user_name: str,
+        room_id: str = None,
+    ) -> list[Thread]:
+        """Return a list of the user's threads.
+
+        If 'room_id' is passed, filter the threads to those created
+        in that room.
+        """
+
+    @abc.abstractmethod
+    async def get_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+    ) -> Thread:
+        """Return the actual thread instance
+
+        N.B.:  caller must treat the instance as read-only!
+        """
+
+    @abc.abstractmethod
+    async def new_thread(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+        thread_metadata: ThreadMetadata | dict = None,
+        initial_run: bool = True,
+    ) -> Thread:
+        """Create a new thread
+
+        If 'thread_metadata' is a dict, convert it to a 'ThreadMetadata'
+        instance.
+        """
+
+    @abc.abstractmethod
+    async def update_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+        thread_metadata: ThreadMetadata | dict = None,
+    ) -> Thread:
+        """Update thread instance with the given metadata, or None
+
+        If 'thread_metadata' is a dict, convert it to a 'ThreadMetadata'
+        instance.
+
+        If 'thread_metadata' is None, or an empty dict, remove any existing
+        metadata on the thread.
+        """
+
+    @abc.abstractmethod
+    async def delete_thread(
+        self,
+        *,
+        user_name: str,
+        thread_id: str,
+    ) -> None:
+        """Remove a thread"""
+
+    @abc.abstractmethod
+    async def new_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_metadata: RunMetadata = None,
+        parent_run_id: str = None,
+    ) -> Run:
+        """Create a new run for the thread
+
+        If 'run_metadata' is a dict, convert it to a 'RunMetadata' instance.
+
+        If 'parent_run_id' is passed, ensure it is valid.
+        """
+
+    @abc.abstractmethod
+    async def get_run(
+        self,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+    ) -> Run:
+        """Return an existing run for a thread"""
+
+    @abc.abstractmethod
+    async def update_run(
+        self,
+        *,
+        room_id: str,
+        user_name: str,
+        thread_id: str,
+        run_id: str,
+        run_metadata: RunMetadata | dict = None,
+    ) -> Run:
+        """Update a run with the given metadata
+
+        If 'run_metadata' is a dict, convert it to a 'RunMetadata' instance.
+
+        If 'run_metadata' is None, or an empty dict, remove any existing
+        metadata on the run.
+        """
+
+
+async def get_the_threads(request: fastapi.Request) -> ThreadStorage:
+    from . import persistence
+
+    engine = request.state.threads_engine
+    async with sqla_asyncio.AsyncSession(bind=engine) as session:
+        yield persistence.ThreadStorage(session)
+
+
+depend_the_threads = fastapi.Depends(get_the_threads)
