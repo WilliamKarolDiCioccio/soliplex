@@ -96,8 +96,10 @@ async def _check_user_thread(
             detail=f"No such thread: {thread_id}",
         ) from None
 
-    if thread.room_id != room_id:
-        msg = f"Expected thread.room_id: {room_id}, found {thread.room_id}"
+    t_room_id = await thread.awaitable_attrs.room_id
+
+    if t_room_id != room_id:
+        msg = f"Expected thread.room_id: {room_id}, found {t_room_id}"
         raise fastapi.HTTPException(
             status_code=400,
             detail=msg,
@@ -146,13 +148,22 @@ async def get_room_agui(
         the_installation=the_installation,
         token=token,
     )
-    model_threads = [
-        models.AGUI_Thread.from_thread(a_thread, include_runs=False)
-        for a_thread in await the_threads.list_user_threads(
-            user_name=user_name,
-            room_id=room_id,
+    model_threads = []
+    for a_thread in await the_threads.list_user_threads(
+        user_name=user_name,
+        room_id=room_id,
+    ):
+        thread_meta = await a_thread.awaitable_attrs.thread_metadata
+
+        model_threads.append(
+            models.AGUI_Thread.from_thread(
+                a_thread,
+                a_thread_meta=models.AGUI_ThreadMetadata.from_thread_meta(
+                    thread_meta,
+                ),
+                a_thread_runs=None,
+            )
         )
-    ]
 
     return models.AGUI_Threads(threads=model_threads)
 
@@ -179,8 +190,27 @@ async def get_room_agui_thread_id(
         user_name=user_name,
         the_threads=the_threads,
     )
+    thread_meta = await thread.awaitable_attrs.thread_metadata
 
-    return models.AGUI_Thread.from_thread(thread, include_runs=True)
+    a_thread_runs = {}
+
+    for a_run in await thread.list_runs():
+        a_thread_runs[a_run.run_id] = models.AGUI_Run.from_run(
+            a_run=a_run,
+            a_run_input=(
+                await a_run.awaitable_attrs.run_agent_input
+            ).to_agui_model(),
+            a_run_meta=await a_run.awaitable_attrs.run_metadata,
+            a_run_events=None,
+        )
+
+    return models.AGUI_Thread.from_thread(
+        a_thread=thread,
+        a_thread_meta=models.AGUI_ThreadMetadata.from_thread_meta(
+            thread_meta,
+        ),
+        a_thread_runs=a_thread_runs,
+    )
 
 
 @util.logfire_span("GET /v1/rooms/{room_id}/agui/{thread_id}/{run_id}")
@@ -207,8 +237,16 @@ async def get_room_agui_thread_id_run_id(
         run_id=run_id,
         the_threads=the_threads,
     )
+    await run.awaitable_attrs.thread
 
-    return models.AGUI_Run.from_run(a_run=run, include_events=True)
+    return models.AGUI_Run.from_run(
+        a_run=run,
+        a_run_input=(
+            await run.awaitable_attrs.run_agent_input
+        ).to_agui_model(),
+        a_run_meta=await run.awaitable_attrs.run_metadata,
+        a_run_events=await run.list_events(),
+    )
 
 
 @util.logfire_span("POST /v1/rooms/{room_id}/agui")
@@ -245,16 +283,25 @@ async def post_room_agui(
         initial_run=True,
     )
 
+    run_map = {}
+
+    for run in await thread.list_runs():
+        rai = await run.awaitable_attrs.run_agent_input
+        run_meta = await run.awaitable_attrs.run_metadata
+        run_map[run.run_id] = models.AGUI_Run.from_run(
+            a_run=run,
+            a_run_input=rai.to_agui_model(),
+            a_run_meta=run_meta,
+            a_run_events=[],
+        )
+
     return models.AGUI_Thread(
         room_id=room_id,
         thread_id=thread.thread_id,
-        runs={
-            run.run_id: models.AGUI_Run.from_run(a_run=run)
-            for run in thread.list_runs()
-        },
+        runs=run_map,
         created=thread.created,
         metadata=models.AGUI_ThreadMetadata.from_thread_meta(
-            thread.thread_metadata,
+            await thread.awaitable_attrs.thread_metadata,
         ),
     )
 
@@ -301,15 +348,21 @@ async def post_room_agui_thread_id(
             detail=f"No such parent run: {parent_run_id}",
         ) from None
 
+    # Wait for these for a new run because the are set only at commit time
+    run_id = await run.awaitable_attrs.run_id
+    created = await run.awaitable_attrs.created
+
     return models.AGUI_Run(
         room_id=room_id,
         thread_id=thread_id,
-        run_id=run.run_id,
-        created=run.created,
         parent_run_id=parent_run_id,
-        run_input=run.run_input,
-        events=run.list_events(),
-        metadata=models.AGUI_RunMetadata.from_run_meta(run.run_metadata),
+        run_id=run_id,
+        created=created,
+        run_input=(await run.awaitable_attrs.run_agent_input).to_agui_model(),
+        events=[event.to_agui_model() for event in await run.list_events()],
+        metadata=models.AGUI_RunMetadata.from_run_meta(
+            a_run_meta=await run.awaitable_attrs.run_metadata,
+        ),
     )
 
 
@@ -385,10 +438,11 @@ async def post_room_agui_thread_id_run_id(
         agent=agent,
     )
 
-    run_agent_input = agui_adapter.run_input
+    old_run_agent_input = await run.awaitable_attrs.run_agent_input
+    new_run_agent_input = agui_adapter.run_input
 
     try:
-        agui_util.check_run_input(run.run_input, run_agent_input)
+        agui_util.check_run_input(old_run_agent_input, new_run_agent_input)
     except agui_package.RunInputMismatch:
         raise fastapi.HTTPException(
             status_code=400,
@@ -398,7 +452,7 @@ async def post_room_agui_thread_id_run_id(
     agent_deps = the_installation.get_agent_deps_for_room(
         room_id,
         user=user,
-        run_agent_input=run_agent_input,
+        run_agent_input=new_run_agent_input,
     )
 
     emitter = agent_deps.agui_emitter

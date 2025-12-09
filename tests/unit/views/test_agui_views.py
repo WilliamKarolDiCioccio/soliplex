@@ -70,6 +70,7 @@ def test_thread():
         thread_id=TEST_THREAD_ID,
         thread_metadata=None,
         created=NOW,
+        awaitable_attrs=mock.AsyncMock(),
         instance=True,
     )
 
@@ -95,6 +96,7 @@ def test_run():
         parent_run_id=None,
         run_metadata=None,
         created=NOW,
+        awaitable_attrs=mock.AsyncMock(),
         instance=True,
     )
 
@@ -123,6 +125,15 @@ def run_input():
 @pytest.fixture
 def the_threads():
     return mock.create_autospec(agui_package.ThreadStorage)
+
+
+def _awaitable(name, value):
+    async def getter():
+        return value
+
+    getter_co = getter()
+    getter_co.__qualname__ = f"_awaitable.locals.getter_{name}"
+    return getter_co
 
 
 no_error = contextlib.nullcontext
@@ -235,7 +246,7 @@ async def test__check_user_thread(
         )
     else:
         the_threads.get_thread.return_value = test_thread
-        test_thread.room_id = w_room_id
+        test_thread.awaitable_attrs.room_id = _awaitable("room_id", w_room_id)
 
     with expectation as expected:
         found = await agui_views._check_user_thread(
@@ -306,7 +317,16 @@ async def test_get_room_agui(cuir, the_threads, test_thread, w_thread_meta):
     token = object()
 
     if w_thread_meta:
-        test_thread.thread_metadata = _make_thread_metadata()
+        thread_meta = test_thread.thread_metadata = _make_thread_metadata()
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata",
+            thread_meta,
+        )
+    else:
+        test_thread.thread_meta = None
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata", None
+        )
 
     the_threads.list_user_threads.return_value = [test_thread]
 
@@ -364,14 +384,36 @@ async def test_get_room_agui_thread_id(
     test_thread.list_runs.return_value = [test_run]
 
     if w_thread_meta:
-        test_thread.thread_metadata = _make_thread_metadata()
+        thread_meta = test_thread.thread_metadata = _make_thread_metadata()
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata",
+            thread_meta,
+        )
+    else:
+        test_thread.thread_meta = None
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata", None
+        )
 
-    test_run.run_input = run_input
+    run_agent_input = mock.Mock(spec_set=["to_agui_model"])
+    run_agent_input.to_agui_model.return_value = run_input
+    test_run.awaitable_attrs.run_agent_input = _awaitable(
+        "run_agent_input",
+        run_agent_input,
+    )
 
     if w_run_meta:
         test_run.run_metadata = test_run_metadata
+        test_run.awaitable_attrs.run_metadata = _awaitable(
+            "run_metadata",
+            test_run_metadata,
+        )
     else:
         test_run.run_metadata = None
+        test_run.awaitable_attrs.run_metadata = _awaitable(
+            "run_metadata",
+            None,
+        )
 
     if w_parent:
         test_run.parent_run_id = TEST_PARENT_RUN_ID
@@ -396,9 +438,13 @@ async def test_get_room_agui_thread_id(
     assert found.room_id == TEST_ROOM_ID
     assert found.thread_id == TEST_THREAD_ID
 
-    assert found.runs == {
-        TEST_RUN_ID: models.AGUI_Run.from_run(a_run=test_run),
-    }
+    exp_model_run = models.AGUI_Run.from_run(
+        a_run=test_run,
+        a_run_input=run_input,
+        a_run_meta=test_run.run_metadata,
+        a_run_events=None,
+    )
+    assert found.runs == {TEST_RUN_ID: exp_model_run}
 
     if w_thread_meta:
         assert found.metadata.name == TEST_THREAD_NAME
@@ -428,6 +474,7 @@ async def test_get_room_agui_thread_id_run_id(
     cuir,
     cutr,
     the_threads,
+    test_thread,
     test_run,
     test_run_metadata,
     run_input,
@@ -438,13 +485,27 @@ async def test_get_room_agui_thread_id_run_id(
     cuir.return_value = USER_NAME
 
     test_run.list_events.return_value = w_events
+    test_run.awaitable_attrs.thread = _awaitable("thread", test_thread)
 
-    test_run.run_input = run_input
+    run_agent_input = mock.Mock(spec_set=["to_agui_model"])
+    run_agent_input.to_agui_model.return_value = run_input
+    test_run.awaitable_attrs.run_agent_input = _awaitable(
+        "run_agent_input",
+        run_agent_input,
+    )
 
     if w_run_meta:
         test_run.run_metadata = test_run_metadata
+        test_run.awaitable_attrs.run_metadata = _awaitable(
+            "run_metadata",
+            test_run_metadata,
+        )
     else:
         test_run.run_metadata = None
+        test_run.awaitable_attrs.run_metadata = _awaitable(
+            "run_metadata",
+            None,
+        )
 
     if w_parent:
         test_run.parent_run_id = TEST_PARENT_RUN_ID
@@ -514,12 +575,21 @@ async def test_post_room_agui(
     test_thread.list_runs.return_value = [test_run]
 
     if w_thread_meta:
-        test_thread.thread_metadata = _make_thread_metadata(**w_thread_meta)
+        thread_meta = _make_thread_metadata(**w_thread_meta)
+        test_thread.thread_metadata = thread_meta
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata",
+            thread_meta,
+        )
         exp_meta = {"description": None} | w_thread_meta
         ntr = {"metadata": w_thread_meta}
         new_thread_request = models.AGUI_NewThreadRequest.model_validate(ntr)
     else:
         test_thread.thread_metadata = None
+        test_thread.awaitable_attrs.thread_metadata = _awaitable(
+            "thread_metadata",
+            None,
+        )
         exp_meta = None
         new_thread_request = models.AGUI_NewThreadRequest()
 
@@ -529,9 +599,19 @@ async def test_post_room_agui(
 
     the_threads.new_thread.return_value = test_thread
     test_thread.list_runs.return_value = [test_run]
+
     test_run.parent_run_id = None
+
     test_run.run_metadata = None
+    test_run.awaitable_attrs.run_metadata = _awaitable("run_metadata", None)
+
     test_run.run_input = run_input
+    run_agent_input = mock.Mock(spec_set=["to_agui_model"])
+    run_agent_input.to_agui_model.return_value = run_input
+    test_run.awaitable_attrs.run_agent_input = _awaitable(
+        "run_agent_input",
+        run_agent_input,
+    )
 
     found = await agui_views.post_room_agui(
         request,
@@ -599,26 +679,44 @@ async def test_post_room_agui_thread_id(
     if w_parent_id:
         nrr = {"parent_run_id": TEST_PARENT_RUN_ID}
 
-    if w_run_meta:
-        run_meta_kw = nrr["metadata"] = {"label": TEST_RUN_LABEL}
-        test_run.run_metadata = test_run_metadata
-    else:
-        run_meta_kw = test_run.run_metadata = None
-
-    test_run.run_input = run_input
-    test_run.list_events.return_value = []
-
-    new_run_request = models.AGUI_NewRunRequest.model_validate(nrr)
-
-    the_installation = mock.create_autospec(installation.Installation)
-    token = object()
-
     if missing_parent:
         the_threads.new_run.side_effect = agui_package.MissingParentRun(
             TEST_PARENT_RUN_ID,
         )
     else:
         the_threads.new_run.return_value = test_run
+
+        test_run.awaitable_attrs.run_id = _awaitable("run_id", TEST_RUN_ID)
+        test_run.awaitable_attrs.created = _awaitable("created", NOW)
+
+        if w_run_meta:
+            run_meta_kw = nrr["metadata"] = {"label": TEST_RUN_LABEL}
+            test_run.run_metadata = test_run_metadata
+            test_run.awaitable_attrs.run_metadata = _awaitable(
+                "run_metadata",
+                test_run_metadata,
+            )
+        else:
+            run_meta_kw = test_run.run_metadata = None
+            test_run.awaitable_attrs.run_metadata = _awaitable(
+                "run_metadata",
+                None,
+            )
+
+        test_run.run_input = run_input
+        run_agent_input = mock.Mock(spec_set=["to_agui_model"])
+        run_agent_input.to_agui_model.return_value = run_input
+        test_run.awaitable_attrs.run_agent_input = _awaitable(
+            "run_agent_input",
+            run_agent_input,
+        )
+
+    test_run.list_events.return_value = []
+
+    new_run_request = models.AGUI_NewRunRequest.model_validate(nrr)
+
+    the_installation = mock.create_autospec(installation.Installation)
+    token = object()
 
     with expectation as expected:
         found = await agui_views.post_room_agui_thread_id(
@@ -752,6 +850,14 @@ async def test_post_room_agui_thread_id_run_id(
 
     token = object()
 
+    test_run.run_input = run_input
+    run_agent_input = mock.Mock(spec_set=["to_agui_model"])
+    run_agent_input.to_agui_model.return_value = run_input
+    test_run.awaitable_attrs.run_agent_input = _awaitable(
+        "run_agent_input",
+        run_agent_input,
+    )
+
     cutr.return_value = test_run
     test_run.run_input = run_input
 
@@ -823,6 +929,11 @@ async def test_post_room_agui_thread_id_run_id(
         aga.from_request.assert_called_once_with(
             request=request,
             agent=agent,
+        )
+
+        cri.assert_called_once_with(
+            run_agent_input,
+            exp_adapter.run_input,
         )
 
         cutr.assert_called_once_with(
