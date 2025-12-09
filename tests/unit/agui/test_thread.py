@@ -54,6 +54,102 @@ TEST_RUN_METADATA = agui_thread.RunMetadata(
     label=TEST_RUN_LABEL,
 )
 
+BARE_RUN_STARTED_EVENT = agui_core.RunStartedEvent(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+)
+
+STEP_NAME = "test step"
+STEP_STARTED_EVENT = agui_core.StepStartedEvent(
+    step_name=STEP_NAME,
+)
+
+STEP_FINISHED_EVENT = agui_core.StepFinishedEvent(
+    step_name=STEP_NAME,
+)
+
+ACTIVITY_MESSAGE_ID = "activity-messsage-888"
+ACTIVITY_TYPE = "test activity"
+ACTIVITY_CONTENT = {"waaa": "Blaah"}
+ACTIVITY_PATCH = {"waaa": "Oooph"}
+ACTIVITY_SNAPSHOT_EVENT = agui_core.ActivitySnapshotEvent(
+    message_id=ACTIVITY_MESSAGE_ID,
+    activity_type=ACTIVITY_TYPE,
+    content=ACTIVITY_CONTENT,
+    replace=False,
+)
+
+ACTIVITY_DELTA_EVENT = agui_core.ActivityDeltaEvent(
+    message_id=ACTIVITY_MESSAGE_ID,
+    activity_type=ACTIVITY_TYPE,
+    patch=[ACTIVITY_PATCH],
+)
+
+TEXT_MESSAGE_ID = "text-message-599"
+TEXT_MESSAGE_DELTA = "delta"
+
+TEXT_MESSAGE_START_EVENT = agui_core.TextMessageStartEvent(
+    message_id=TEXT_MESSAGE_ID,
+)
+
+TEXT_MESSAGE_CONTENT_EVENT = agui_core.TextMessageContentEvent(
+    message_id=TEXT_MESSAGE_ID,
+    delta=TEXT_MESSAGE_DELTA,
+)
+
+TEXT_MESSAGE_END_EVENT = agui_core.TextMessageEndEvent(
+    message_id=TEXT_MESSAGE_ID,
+)
+
+TOOL_CALL_ID = "tool-call-448"
+TOOL_CALL_NAME = "test-tool"
+TOOL_CALL_ARGS_DELTA = "args delta"
+TOOL_CALL_MESSAGE_ID = "tool-call-message-212"
+TOOL_CALL_RESULT_CONTENT = "tool result"
+
+TOOL_CALL_START_EVENT = agui_core.ToolCallStartEvent(
+    tool_call_id=TOOL_CALL_ID,
+    tool_call_name=TOOL_CALL_NAME,
+)
+
+TOOL_CALL_ARGS_EVENT = agui_core.ToolCallArgsEvent(
+    tool_call_id=TOOL_CALL_ID,
+    delta=TOOL_CALL_ARGS_DELTA,
+)
+
+TOOL_CALL_END_EVENT = agui_core.ToolCallEndEvent(
+    tool_call_id=TOOL_CALL_ID,
+)
+
+TOOL_CALL_RESULT_EVENT = agui_core.ToolCallResultEvent(
+    message_id=TOOL_CALL_MESSAGE_ID,
+    tool_call_id=TOOL_CALL_ID,
+    content=TOOL_CALL_RESULT_CONTENT,
+)
+
+RUN_RESULT = "test run result"
+W_RESULT_RUN_FINISHED_EVENT = agui_core.RunFinishedEvent(
+    thread_id=TEST_THREAD_ID,
+    run_id=TEST_RUN_ID,
+    result=RUN_RESULT,
+)
+
+TEST_AGUI_RUN_EVENTS = [
+    BARE_RUN_STARTED_EVENT,
+    STEP_STARTED_EVENT,
+    ACTIVITY_SNAPSHOT_EVENT,
+    ACTIVITY_DELTA_EVENT,
+    STEP_FINISHED_EVENT,
+    TEXT_MESSAGE_START_EVENT,
+    TEXT_MESSAGE_CONTENT_EVENT,
+    TEXT_MESSAGE_END_EVENT,
+    TOOL_CALL_START_EVENT,
+    TOOL_CALL_ARGS_EVENT,
+    TOOL_CALL_END_EVENT,
+    TOOL_CALL_RESULT_EVENT,
+    W_RESULT_RUN_FINISHED_EVENT,
+]
+
 no_error = contextlib.nullcontext
 
 
@@ -147,10 +243,30 @@ def test_run_created():
     assert run.created == NOW
 
 
+@pytest.mark.anyio
+async def test_run_list_events():
+    exp_events = TEST_AGUI_RUN_EVENTS
+    run = dataclasses.replace(TEST_RUN, _events=TEST_AGUI_RUN_EVENTS)
+
+    found = await run.list_events()
+
+    assert found == exp_events
+
+
 def test_thread_created():
     thread = dataclasses.replace(TEST_THREAD, _created=NOW)
 
     assert thread.created == NOW
+
+
+@pytest.mark.anyio
+async def test_thread_list_runs():
+    exp_runs = [TEST_RUN]
+    thread = dataclasses.replace(TEST_THREAD, _runs={TEST_RUN_ID: TEST_RUN})
+
+    found = await thread.list_runs()
+
+    assert found == exp_runs
 
 
 @pytest.mark.anyio

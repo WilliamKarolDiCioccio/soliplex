@@ -60,7 +60,7 @@ class Run(agui_package.Run):
     def created(self) -> datetime.datetime:
         return self._created
 
-    def list_events(self) -> AGUI_Events:
+    async def list_events(self) -> AGUI_Events:
         return self._events[:]
 
 
@@ -95,7 +95,7 @@ class Thread(agui_package.Thread):
     def created(self) -> datetime.datetime:
         return self._created
 
-    def list_runs(self) -> list[Run]:
+    async def list_runs(self) -> list[Run]:
         return list(self._runs.values())
 
 

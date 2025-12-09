@@ -74,7 +74,7 @@ class Run(abc.ABC):
     """Timestamp"""
 
     @abc.abstractmethod
-    def list_events(self) -> AGUI_Events:
+    async def list_events(self) -> AGUI_Events:
         """Return AGUI events for the run"""
 
 
@@ -107,7 +107,7 @@ class Thread(abc.ABC):
     """Timestamp"""
 
     @abc.abstractmethod
-    def list_runs(self) -> list[Run]:
+    async def list_runs(self) -> list[Run]:
         """Return runs for this thread"""
 
 
