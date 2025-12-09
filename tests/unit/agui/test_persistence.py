@@ -1,13 +1,18 @@
+import datetime
 import uuid
 from unittest import mock
 
 import pytest
+import pytest_asyncio
 import sqlalchemy
 from ag_ui import core as agui_core
 from sqlalchemy import orm as sqla_orm
 from sqlalchemy.ext import asyncio as sqla_asyncio
 
+from soliplex import agui as agui_package
 from soliplex.agui import persistence as agui_persistence
+
+NOW = datetime.datetime.now(datetime.UTC)
 
 THREAD_UUID = str(uuid.uuid4())
 THREAD_NAME = "Test Thread"
@@ -15,6 +20,7 @@ THREAD_DESCRIPTION = "This thread is for testing"
 
 RUN_UUID = str(uuid.uuid4())
 RUN_LABEL = "test-run-label"
+OTHER_RUN_LABEL = "other-run-label"
 PARENT_RUN_ID = str(uuid.uuid4())
 
 USER_MESSAGE_ID = str(uuid.uuid4())
@@ -333,7 +339,7 @@ def test_runagentinput_empty(w_parent):
 
     found = agui_persistence.RunAgentInput.empty(run, **kw)
 
-    expected_data = (EMPTY_RUN_AGENT_INPUT.model_dump() | kw)
+    expected_data = EMPTY_RUN_AGENT_INPUT.model_dump() | kw
 
     assert found.run is run
     assert found.data == expected_data
@@ -408,6 +414,390 @@ def test_runevent_from_agui_event(agui_event):
     assert found.data == agui_event.model_dump()
 
     assert found.type == agui_event.type
+
+
+@pytest.fixture
+def faux_sqlaa_session():
+    return mock.create_autospec(
+        sqla_asyncio.AsyncSession,
+    )
+
+
+@pytest.mark.anyio
+async def test_threadstorage_session(faux_sqlaa_session):
+    ts = agui_persistence.ThreadStorage(faux_sqlaa_session)
+    begin = faux_sqlaa_session.begin
+
+    async with ts.session as session:
+        assert session is faux_sqlaa_session
+
+        begin.assert_called_once_with()
+        begin.return_value.__aenter__.assert_called_once_with()
+        begin.return_value.__aexit__.assert_not_called()
+
+    begin.return_value.__aenter__.assert_called_once_with()
+
+
+@pytest_asyncio.fixture()
+async def the_async_engine():
+    engine = sqla_asyncio.create_async_engine(
+        agui_persistence.ASYNC_MEMORY_ENGINE_URL,
+    )
+    async with engine.begin() as connection:
+        await connection.run_sync(agui_persistence.Base.metadata.create_all)
+
+    yield engine
+
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture()
+async def the_async_session(the_async_engine):
+    return sqla_asyncio.AsyncSession(bind=the_async_engine)
+
+
+@pytest.mark.asyncio
+async def test_threadstorage_thread_crud(the_async_session):
+    ts = agui_persistence.ThreadStorage(the_async_session)
+
+    found = (await ts.list_user_threads(user_name=USER_NAME)).all()
+    assert found == []
+
+    found = (
+        await ts.list_user_threads(user_name=USER_NAME, room_id=ROOM_ID)
+    ).all()
+    assert found == []
+
+    with pytest.raises(agui_package.UnknownThread):
+        await ts.get_thread(
+            user_name=USER_NAME,
+            thread_id="NONESUCH",
+        )
+
+    thread = await ts.new_thread(user_name=USER_NAME, room_id=ROOM_ID)
+
+    thread_id = await thread.awaitable_attrs.thread_id
+
+    await the_async_session.commit()
+
+    found = (await ts.list_user_threads(user_name=USER_NAME)).all()
+    assert found == [thread]
+
+    found = (
+        await ts.list_user_threads(user_name=USER_NAME, room_id=ROOM_ID)
+    ).all()
+    assert found == [thread]
+
+    await the_async_session.commit()
+
+    gotten = await ts.get_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+    )
+
+    assert gotten is thread
+
+    await the_async_session.commit()
+
+    updated = await ts.update_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+        thread_metadata={
+            "name": THREAD_NAME,
+            "description": THREAD_DESCRIPTION,
+        },
+    )
+
+    assert updated is thread
+
+    await the_async_session.commit()
+
+    thread_meta = await updated.awaitable_attrs.thread_metadata
+
+    assert thread_meta.name == THREAD_NAME
+    assert thread_meta.description == THREAD_DESCRIPTION
+
+    await the_async_session.commit()
+
+    updated_again = await ts.update_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+        thread_metadata=agui_persistence.ThreadMetadata(
+            name=THREAD_NAME,
+        ),
+    )
+
+    assert updated_again is thread
+
+    await the_async_session.commit()
+
+    thread_meta = await updated.awaitable_attrs.thread_metadata
+
+    assert thread_meta.name == THREAD_NAME
+    assert thread_meta.description is None
+
+    await the_async_session.commit()
+
+    cleared = await ts.update_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+        thread_metadata=None,
+    )
+
+    assert cleared is thread
+
+    await the_async_session.commit()
+
+    thread_meta = await updated.awaitable_attrs.thread_metadata
+    assert thread_meta is None
+
+    await the_async_session.commit()
+
+    cleared_again = await ts.update_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+        thread_metadata=None,
+    )
+
+    assert cleared_again is thread
+
+    await the_async_session.commit()
+
+    thread_meta = await updated.awaitable_attrs.thread_metadata
+    assert thread_meta is None
+
+    await the_async_session.commit()
+
+    await ts.delete_thread(
+        user_name=USER_NAME,
+        thread_id=thread_id,
+    )
+
+    await the_async_session.commit()
+
+    found = (await ts.list_user_threads(user_name=USER_NAME)).all()
+    assert found == []
+
+    found = (
+        await ts.list_user_threads(user_name=USER_NAME, room_id=ROOM_ID)
+    ).all()
+    assert found == []
+
+    await the_async_session.commit()
+
+    w_md_dict = await ts.new_thread(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,
+        thread_metadata={
+            "name": "w_md_dict",
+            "description": "Created with metadata as a dict",
+        },
+    )
+
+    await w_md_dict.awaitable_attrs.thread_id
+
+    await the_async_session.commit()
+
+    tmd = await w_md_dict.awaitable_attrs.thread_metadata
+    assert tmd.name == "w_md_dict"
+    assert tmd.description == "Created with metadata as a dict"
+
+    await the_async_session.commit()
+
+    w_md_obj = await ts.new_thread(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,
+        thread_metadata=agui_persistence.ThreadMetadata(
+            name="w_md_obj",
+            description="Created with metadata as an object",
+        ),
+    )
+
+    await w_md_obj.awaitable_attrs.thread_id
+
+    await the_async_session.commit()
+
+    tmd = await w_md_obj.awaitable_attrs.thread_metadata
+    assert tmd.name == "w_md_obj"
+    assert tmd.description == "Created with metadata as an object"
+
+    await the_async_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_threadstorage_thread_run_cru(the_async_session):
+    ts = agui_persistence.ThreadStorage(the_async_session)
+
+    thread = await ts.new_thread(user_name=USER_NAME, room_id=ROOM_ID)
+
+    thread_id = await thread.awaitable_attrs.thread_id
+
+    runs = await thread.list_runs()
+
+    (initial_run,) = runs
+
+    initial_run_id = await initial_run.awaitable_attrs.run_id
+
+    assert await initial_run.awaitable_attrs.thread_id == thread_id
+
+    assert initial_run in await thread.awaitable_attrs.runs
+
+    await the_async_session.commit()
+
+    found = await thread.list_runs()
+
+    assert found == runs
+
+    await the_async_session.commit()
+
+    gotten = await ts.get_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_id=initial_run_id,
+    )
+
+    assert gotten is initial_run
+
+    await the_async_session.commit()
+
+    with pytest.raises(agui_package.UnknownRun):
+        await ts.get_run(
+            user_name=USER_NAME,
+            room_id=ROOM_ID,  # XXX why?
+            thread_id=thread_id,
+            run_id="NONESUCH",
+        )
+
+    added = await ts.new_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_metadata={"label": "added"},
+    )
+    added_id = await added.awaitable_attrs.run_id
+
+    await the_async_session.commit()
+
+    updated = await ts.update_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_id=added_id,
+        run_metadata={
+            "label": RUN_LABEL,
+        },
+    )
+
+    assert updated is added
+
+    rmd = await updated.awaitable_attrs.run_metadata
+    assert rmd.label == RUN_LABEL
+
+    await the_async_session.commit()
+
+    updated_again = await ts.update_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_id=added_id,
+        run_metadata=agui_persistence.RunMetadata(
+            label=OTHER_RUN_LABEL,
+        ),
+    )
+
+    assert updated_again is added
+
+    rmd = await updated_again.awaitable_attrs.run_metadata
+    assert rmd.label == OTHER_RUN_LABEL
+
+    await the_async_session.commit()
+
+    cleared = await ts.update_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_id=added_id,
+        run_metadata=None,
+    )
+
+    assert cleared is added
+
+    assert await cleared.awaitable_attrs.run_metadata is None
+
+    await the_async_session.commit()
+
+    cleared_again = await ts.update_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_id=added_id,
+        run_metadata=None,
+    )
+
+    assert cleared_again is added
+
+    assert await cleared_again.awaitable_attrs.run_metadata is None
+
+    await the_async_session.commit()
+
+    parent = await ts.new_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_metadata=agui_persistence.RunMetadata(label="parent"),
+    )
+
+    await the_async_session.commit()
+
+    parent_id = await parent.awaitable_attrs.run_id
+
+    run_agent_input = agui_persistence.RunAgentInput.empty(
+        parent,
+        thread_id,
+        parent_id,
+    )
+
+    the_async_session.add(run_agent_input)
+
+    await the_async_session.commit()
+
+    spare = await ts.new_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+        run_metadata=agui_persistence.RunMetadata(label="spare"),
+        parent_run_id=parent_id,
+    )
+    await spare.awaitable_attrs.run_id
+
+    await the_async_session.commit()
+
+    rmd = await spare.awaitable_attrs.run_metadata
+    assert rmd.label == "spare"
+
+    assert await spare.awaitable_attrs.parent is parent
+
+    rai = await spare.awaitable_attrs.run_agent_input
+
+    assert rai.thread_id == thread_id
+    assert rai.run_id == await spare.awaitable_attrs.run_id
+    assert rai.parent_run_id == parent_id
+
+    await the_async_session.commit()
+
+    wo_meta = await ts.new_run(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,  # XXX why?
+        thread_id=thread_id,
+    )
+
+    await the_async_session.commit()
+
+    rmd = await wo_meta.awaitable_attrs.run_metadata
+    assert rmd is None
+
+    await the_async_session.commit()
 
 
 @pytest.fixture
