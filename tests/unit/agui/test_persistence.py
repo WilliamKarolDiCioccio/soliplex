@@ -248,6 +248,26 @@ TEST_AGUI_RUN_EVENTS = [
 ]
 
 
+def _mock_run(run_id, thread):
+    return agui_persistence.Run(
+        run_id=run_id,
+        thread=thread,
+    )
+
+
+@pytest.mark.anyio
+async def test_thread_list_runs():
+    thread = agui_persistence.Thread()
+    runs = [
+        _mock_run("one", thread),
+        _mock_run("two", thread),
+    ]
+
+    found = await thread.list_runs()
+
+    assert found == runs
+
+
 def test_run_thread_id():
     thread = agui_persistence.Thread(thread_id=THREAD_UUID)
     run = agui_persistence.Run(thread=thread)
@@ -286,8 +306,9 @@ def test_run_run_input(w_run_input):
     assert run.run_input == w_run_input
 
 
+@pytest.mark.anyio
 @pytest.mark.parametrize("w_agui_events", [[], TEST_AGUI_RUN_EVENTS])
-def test_run_list_events(w_agui_events):
+async def test_run_list_events(w_agui_events):
     run = agui_persistence.Run()
 
     run.events = [
@@ -295,7 +316,27 @@ def test_run_list_events(w_agui_events):
         for agui_event in w_agui_events
     ]
 
-    assert run.list_events() == w_agui_events
+    assert await run.list_events() == w_agui_events
+
+
+@pytest.mark.parametrize("w_parent", [False, True])
+def test_runagentinput_empty(w_parent):
+    run = agui_persistence.Run()
+
+    kw = {
+        "thread_id": THREAD_UUID,
+        "run_id": RUN_UUID,
+    }
+
+    if w_parent:
+        kw["parent_run_id"] = PARENT_RUN_ID
+
+    found = agui_persistence.RunAgentInput.empty(run, **kw)
+
+    expected_data = (EMPTY_RUN_AGENT_INPUT.model_dump() | kw)
+
+    assert found.run is run
+    assert found.data == expected_data
 
 
 @pytest.mark.parametrize(
@@ -483,7 +524,8 @@ def test_sqla_run_hierarchy(the_session):
         assert parent_run.children == [child_run]
 
 
-def test_sqla_run_events(the_session):
+@pytest.mark.anyio
+async def test_sqla_run_events(the_session):
     with the_session as session:
         thread = agui_persistence.Thread(
             room_id=ROOM_ID,
@@ -509,7 +551,7 @@ def test_sqla_run_events(the_session):
 
         for agui_event, db_event in zip(
             TEST_AGUI_RUN_EVENTS,
-            run.list_events(),
+            await run.list_events(),
             strict=True,
         ):
             assert db_event == agui_event

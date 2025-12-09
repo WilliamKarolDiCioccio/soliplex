@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import copy
 import datetime
 import typing
@@ -10,10 +11,13 @@ from ag_ui import core as agui_core
 from sqlalchemy import orm as sqla_orm
 from sqlalchemy import schema as sqla_schema
 from sqlalchemy.ext import asyncio as sqla_asyncio
+from sqlalchemy import sql as sqla_sql
 from sqlalchemy.sql import sqltypes as sqla_sqltypes
 
+from soliplex import agui as agui_package
 from soliplex.agui import util as agui_util
 
+AsyncAttrs = sqla_asyncio.AsyncAttrs
 DeclarativeBase = sqla_orm.DeclarativeBase
 ForeignKey = sqlalchemy.ForeignKey
 Mapped = sqla_orm.Mapped
@@ -42,7 +46,7 @@ JSON_Mapped_From = dict[str, typing.Any]
 metadata = sqla_schema.MetaData(naming_convention=NAMING_CONVENTION)
 
 
-class Base(DeclarativeBase):
+class Base(AsyncAttrs, DeclarativeBase):
     metadata = metadata
     type_annotation_map = {
         JSON_Mapped_From: sqla_sqltypes.JSON,
@@ -95,6 +99,16 @@ class Thread(Base):
         cascade="all, delete",
         passive_deletes=True,
     )
+
+    async def list_runs(self):
+        runs = []
+
+        for run in await self.awaitable_attrs.runs:
+            await run.awaitable_attrs.run_agent_input
+            await run.awaitable_attrs.run_metadata
+            runs.append(run)
+
+        return runs
 
 
 class ThreadMetadata(Base):
@@ -216,8 +230,11 @@ class Run(Base):
         default=agui_util._timestamp,
     )
 
-    def list_events(self) -> list[agui_core.Event]:
-        return [event.to_agui_model() for event in self.events]
+    async def list_events(self) -> list[agui_core.Event]:
+        return [
+            event.to_agui_model()
+            for event in await self.awaitable_attrs.events
+        ]
 
 
 class RunMetadata(Base):
@@ -271,6 +288,22 @@ class RunAgentInput(Base):
     )
 
     data: Mapped[JSON_Mapped_From] = mapped_column()
+
+    @classmethod
+    def empty(cls, run, thread_id, run_id, parent_run_id=None):
+        return cls(
+            run=run,
+            data={
+                "thread_id": thread_id,
+                "run_id": run_id,
+                "parent_run_id": parent_run_id,
+                "state": None,
+                "messages": [],
+                "context": [],
+                "tools": [],
+                "forwarded_props": None,
+            },
+        )
 
     @classmethod
     def from_agui_model(cls, run: Run, model: agui_core.RunAgentInput):
