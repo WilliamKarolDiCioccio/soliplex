@@ -1,3 +1,4 @@
+import datetime
 import dataclasses
 import json
 import pathlib
@@ -11,7 +12,9 @@ from soliplex import config
 from soliplex import convos
 from soliplex import models
 from soliplex import tools
-from soliplex.agui import thread as agui_thread
+from soliplex import agui as agui_package
+
+NOW = datetime.datetime.now(datetime.UTC)
 
 QUIZ_ID = "test_quiz"
 QUIZ_TITLE = "Test Quiz"
@@ -80,6 +83,7 @@ TIMESTAMP = "2025-09-30T18:18:27Z"
 
 AGUI_THREAD_ID = "test-thread"
 AGUI_RUN_ID = "test-run"
+AGUI_PARENT_RUN_ID = "test-parent-run"
 
 EMPTY_AGUI_RUN_INPUT = agui_core.RunAgentInput(
     thread_id=AGUI_THREAD_ID,
@@ -103,14 +107,55 @@ AGUI_EVENTS = [
     E_RUN_STARTED,
     E_RUN_FINISHED,
 ]
+
+
+def _make_run(**kw):
+    return mock.create_autospec(agui_package.Run, **kw)
+
+
 AGUI_RUNS = {
-    AGUI_RUN_ID: agui_thread.Run(
+    AGUI_RUN_ID: _make_run(
+        thread_id=AGUI_THREAD_ID,
         run_id=AGUI_RUN_ID,
+        created=NOW,
+        parent_run_id=None,
         run_metadata=None,
         run_input=EMPTY_AGUI_RUN_INPUT.model_copy(deep=True),
         _events=AGUI_EVENTS,
     ),
 }
+
+
+RUN_LABEL = "run-label"
+AGUI_RUN_METADATA = mock.create_autospec(
+    agui_package.RunMetadata,
+    label=RUN_LABEL,
+)
+
+
+THREAD_NAME = "thread-name"
+THREAD_DESC = "Thread description"
+
+
+def _make_thread_meta(name, description=None):
+    class TestThreadMeta:
+        def __init__(self, name, description):
+            self.name = name
+            self.description = description
+
+    return TestThreadMeta(name, description)
+
+
+WO_DESC_AGUI_THREAD_METADATA = _make_thread_meta(name=THREAD_NAME)
+
+FULL_AGUI_THREAD_METADATA = _make_thread_meta(
+    name=THREAD_NAME,
+    description=THREAD_DESC,
+)
+
+
+def _make_thread(**kw):
+    return mock.create_autospec(agui_package.Thread, **kw)
 
 
 def _from_param(request, key):
@@ -762,7 +807,7 @@ def test_installation_from_config(
     "run_metadata, exp_label",
     [
         (None, None),
-        (agui_thread.RunMetadata(label="foo"), "foo"),
+        (AGUI_RUN_METADATA, RUN_LABEL),
     ],
 )
 def test_aguirunmetadata_from_run_metadata(run_metadata, exp_label):
@@ -778,52 +823,43 @@ def test_aguirunmetadata_from_run_metadata(run_metadata, exp_label):
     "run_metadata, exp_label",
     [
         (None, None),
-        (agui_thread.RunMetadata(label="foo"), "foo"),
+        (AGUI_RUN_METADATA, RUN_LABEL),
     ],
 )
 @pytest.mark.parametrize("w_events", [False, True])
-@pytest.mark.parametrize("w_include_events", [False, True])
-def test_aguirun_from_run_and_thread(
+@pytest.mark.parametrize("w_parent", [False, True])
+def test_aguirun_from_run(
     run_input,
-    w_include_events,
+    w_parent,
     w_events,
     run_metadata,
     exp_label,
 ):
-    if w_events:
-        a_run = agui_thread.Run(
-            run_id=AGUI_RUN_ID,
-            run_metadata=run_metadata,
-            run_input=run_input,
-            _events=AGUI_EVENTS,
-        )
-    else:
-        a_run = agui_thread.Run(
-            run_id=AGUI_RUN_ID,
-            run_metadata=run_metadata,
-            run_input=run_input,
-        )
+    a_run = _make_run(
+        thread_id=AGUI_THREAD_ID,
+        run_id=AGUI_RUN_ID,
+        created=NOW,
+        parent_run_id=AGUI_PARENT_RUN_ID if w_parent else None,
+        run_input=run_input,
+    )
 
-    kw = {}
-
-    if w_include_events:
-        kw["include_events"] = True
-
-    found = models.AGUI_Run.from_run(a_run=a_run, **kw)
+    found = models.AGUI_Run.from_run(
+        a_run=a_run,
+        a_run_input=run_input,
+        a_run_meta=run_metadata,
+        a_run_events=AGUI_EVENTS if w_events else [],
+    )
 
     assert found.thread_id == AGUI_THREAD_ID
     assert found.run_id == AGUI_RUN_ID
-    assert found.created == a_run.created
-    assert found.parent_run_id == a_run.parent_run_id
+    assert found.created == NOW
+    assert found.parent_run_id == (AGUI_PARENT_RUN_ID if w_parent else None)
     assert found.run_input is run_input
 
-    if w_include_events:
-        if w_events:
-            assert found.events == AGUI_EVENTS
-        else:
-            assert found.events == []
+    if w_events:
+        assert found.events == AGUI_EVENTS
     else:
-        assert found.events is None
+        assert found.events == []
 
     if exp_label is None:
         assert found.metadata is None
@@ -835,14 +871,11 @@ def test_aguirun_from_run_and_thread(
     "thread_metadata, exp_name_desc",
     [
         (None, None),
-        (agui_thread.ThreadMetadata(name="foo"), ("foo", None)),
-        (
-            agui_thread.ThreadMetadata(name="foo", description="bar"),
-            ("foo", "bar"),
-        ),
+        (WO_DESC_AGUI_THREAD_METADATA, (THREAD_NAME, None)),
+        (FULL_AGUI_THREAD_METADATA, (THREAD_NAME, THREAD_DESC)),
     ],
 )
-def test_aguithreadmetadata_from_run_metadata(thread_metadata, exp_name_desc):
+def test_aguithreadmetadata_from_thr_metadata(thread_metadata, exp_name_desc):
     found = models.AGUI_ThreadMetadata.from_thread_meta(thread_metadata)
 
     if exp_name_desc is None:
@@ -857,59 +890,50 @@ def test_aguithreadmetadata_from_run_metadata(thread_metadata, exp_name_desc):
     "thread_metadata, exp_name_desc",
     [
         (None, None),
-        (agui_thread.ThreadMetadata(name="foo"), ("foo", None)),
-        (
-            agui_thread.ThreadMetadata(name="foo", description="bar"),
-            ("foo", "bar"),
-        ),
+        (WO_DESC_AGUI_THREAD_METADATA, (THREAD_NAME, None)),
+        (FULL_AGUI_THREAD_METADATA, (THREAD_NAME, THREAD_DESC)),
     ],
 )
 @pytest.mark.parametrize("w_runs", [False, True])
-@pytest.mark.parametrize("w_include_runs", [None, False, True])
 def test_aguithread_from_thread(
     run_input,
-    w_include_runs,
     w_runs,
     thread_metadata,
     exp_name_desc,
 ):
+    a_thread = _make_thread(
+        room_id=ROOM_ID,
+        thread_id=AGUI_THREAD_ID,
+        created=NOW,
+    )
+
+    a_thread_meta = models.AGUI_ThreadMetadata.from_thread_meta(
+        thread_metadata,
+    ) if thread_metadata is not None else None
+
     if w_runs:
-        a_thread = agui_thread.Thread(
-            room_id=ROOM_ID,
-            thread_id=AGUI_THREAD_ID,
-            thread_metadata=thread_metadata,
-            _runs=AGUI_RUNS,
-        )
+        a_thread_runs = {
+            agui_run.run_id: models.AGUI_Run.from_run(
+                a_run=agui_run,
+                a_run_input=agui_run.run_input,
+                a_run_meta=agui_run.run_metadata,
+                a_run_events=[],
+            )
+            for agui_run in AGUI_RUNS.values()
+        }
     else:
-        a_thread = agui_thread.Thread(
-            room_id=ROOM_ID,
-            thread_id=AGUI_THREAD_ID,
-            thread_metadata=thread_metadata,
-        )
+        a_thread_runs = None
 
-    kw = {}
-
-    if w_include_runs is not None:
-        kw["include_runs"] = w_include_runs
-
-    found = models.AGUI_Thread.from_thread(a_thread=a_thread, **kw)
+    found = models.AGUI_Thread.from_thread(
+        a_thread=a_thread,
+        a_thread_meta=a_thread_meta,
+        a_thread_runs=a_thread_runs,
+    )
 
     assert found.room_id == ROOM_ID
     assert found.thread_id == AGUI_THREAD_ID
     assert found.created == a_thread.created
-
-    exp_runs = {
-        run_id: models.AGUI_Run.from_run(a_run=a_run)
-        for run_id, a_run in AGUI_RUNS.items()
-    }
-
-    if w_include_runs is False:
-        assert found.runs is None
-    else:
-        if w_runs:
-            assert found.runs == exp_runs
-        else:
-            assert found.runs == {}
+    assert found.runs == (a_thread_runs if w_runs else None)
 
     if exp_name_desc is None:
         assert found.metadata is None
