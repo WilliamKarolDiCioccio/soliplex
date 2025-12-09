@@ -5,6 +5,7 @@ import datetime
 
 import fastapi
 from ag_ui import core as agui_core
+from sqlalchemy.ext import asyncio as sqla_asyncio
 
 AGUI_Events = list[agui_core.BaseEvent]
 
@@ -225,7 +226,11 @@ class ThreadStorage(abc.ABC):
 
 
 async def get_the_threads(request: fastapi.Request) -> ThreadStorage:
-    return request.state.the_threads
+    from . import persistence
+
+    engine = request.state.threads_engine
+    async with sqla_asyncio.AsyncSession(bind=engine) as session:
+        yield persistence.ThreadStorage(session)
 
 
 depend_the_threads = fastapi.Depends(get_the_threads)

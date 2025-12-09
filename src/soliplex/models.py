@@ -419,7 +419,7 @@ class AGUI_Run(pydantic.BaseModel):
         cls,
         a_run: agui_package.Run,
         a_run_input: agui_package.RunAgentInput,
-        a_run_meta: agui_package.RunMetadata=None,
+        a_run_meta: agui_package.RunMetadata = None,
         a_run_events: list[agui_package.RunEvent] = None,
     ):
         return cls(

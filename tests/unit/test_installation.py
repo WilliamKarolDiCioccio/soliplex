@@ -5,6 +5,7 @@ import fastapi
 import pytest
 from ag_ui import core as agui_core
 from haiku.rag.graph import agui as hr_agui
+from sqlalchemy.ext import asyncio as sqla_asyncio
 
 from soliplex import agents
 from soliplex import config
@@ -12,7 +13,6 @@ from soliplex import convos
 from soliplex import installation
 from soliplex import models
 from soliplex import secrets
-from soliplex.agui import thread as agui_thread
 
 KEY = "test-key"
 VALUE = "test-value"
@@ -498,7 +498,7 @@ def mcp_apps():
     return {key: _mock_mcp_app(key) for key in ["room1", "room2"]}
 
 
-@pytest.mark.anyio
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "w_no_auth_mode, exp_oidc_paths",
     [
@@ -559,8 +559,8 @@ async def test_lifespan(
     the_convos = found[0]["the_convos"]
     assert isinstance(the_convos, convos.Conversations)
 
-    the_threads = found[0]["the_threads"]
-    assert isinstance(the_threads, agui_thread.Threads)
+    threads_engine = found[0]["threads_engine"]
+    assert isinstance(threads_engine, sqla_asyncio.AsyncEngine)
 
     for f_call, (key, mcp_app) in zip(
         app.mount.call_args_list,

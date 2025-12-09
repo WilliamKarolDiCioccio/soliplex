@@ -1,5 +1,5 @@
-import datetime
 import dataclasses
+import datetime
 import json
 import pathlib
 import uuid
@@ -8,11 +8,11 @@ from unittest import mock
 import pytest
 from ag_ui import core as agui_core
 
+from soliplex import agui as agui_package
 from soliplex import config
 from soliplex import convos
 from soliplex import models
 from soliplex import tools
-from soliplex import agui as agui_package
 
 NOW = datetime.datetime.now(datetime.UTC)
 
@@ -907,9 +907,13 @@ def test_aguithread_from_thread(
         created=NOW,
     )
 
-    a_thread_meta = models.AGUI_ThreadMetadata.from_thread_meta(
-        thread_metadata,
-    ) if thread_metadata is not None else None
+    a_thread_meta = (
+        models.AGUI_ThreadMetadata.from_thread_meta(
+            thread_metadata,
+        )
+        if thread_metadata is not None
+        else None
+    )
 
     if w_runs:
         a_thread_runs = {
