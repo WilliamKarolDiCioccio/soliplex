@@ -326,6 +326,7 @@ Available widget_name options:
 - "ActionButton": A clickable button
 - "ProgressCard": Show a progress bar with label and percentage
 - "LocationCard": Display GPS coordinates with latitude, longitude, accuracy, city, country
+- "GISCard": Display an OpenStreetMap with location marker and accuracy circle (tap to open interactive map)
 
 The data parameter contains the widget-specific properties as JSON.
 
@@ -349,6 +350,19 @@ Example for LocationCard:
     "city": "San Francisco",
     "country": "USA"
   }
+}
+
+Example for GISCard (interactive map):
+{
+  "widget_name": "GISCard",
+  "data": {
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "accuracy": 10.0,
+    "zoom": 15,
+    "title": "Your Location",
+    "showAccuracyCircle": true
+  }
 }''',
       parameters: {
         'type': 'object',
@@ -356,7 +370,7 @@ Example for LocationCard:
           'widget_name': {
             'type': 'string',
             'description':
-                'Name of the widget to render: InfoCard, MetricDisplay, DataList, ErrorDisplay, LoadingIndicator, ActionButton, ProgressCard, LocationCard',
+                'Name of the widget to render: InfoCard, MetricDisplay, DataList, ErrorDisplay, LoadingIndicator, ActionButton, ProgressCard, LocationCard, GISCard',
           },
           'data': {
             'type': 'object',
@@ -391,6 +405,7 @@ Available widget_name options (same as genui_render):
 - "ActionButton": A clickable button
 - "ProgressCard": Show a progress bar with label and percentage
 - "LocationCard": Display GPS coordinates
+- "GISCard": Display an OpenStreetMap with location marker
 
 The position parameter controls how the widget is added:
 - "append" (default): Add widget to the end of the canvas
@@ -428,7 +443,7 @@ Example - Clear the canvas:
           'widget_name': {
             'type': 'string',
             'description':
-                'Name of the widget to render: InfoCard, MetricDisplay, DataList, ErrorDisplay, LoadingIndicator, ActionButton, ProgressCard, LocationCard',
+                'Name of the widget to render: InfoCard, MetricDisplay, DataList, ErrorDisplay, LoadingIndicator, ActionButton, ProgressCard, LocationCard, GISCard',
           },
           'data': {
             'type': 'object',
