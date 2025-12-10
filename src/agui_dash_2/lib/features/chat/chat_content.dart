@@ -91,8 +91,30 @@ class _ChatContentState extends ConsumerState<ChatContent> {
             contextNotifier,
           );
         },
-        onLocalToolExecution: (toolName, status) {
+        onLocalToolExecution: (toolCallId, toolName, status) {
+          // Deduplicate by tool call ID - skip if we've already processed this execution
+          final trackingKey = '$toolCallId:$status';
+          if (_processedToolNotifications.contains(trackingKey)) {
+            debugPrint('Skipping duplicate tool notification: $toolCallId $toolName $status');
+            return;
+          }
+          _processedToolNotifications.add(trackingKey);
+
           contextNotifier.addLocalToolExecution(toolName, status: status);
+
+          // Add or update tool call message in chat
+          if (status == 'executing') {
+            final messageId = chatNotifier.addToolCallMessage(toolName);
+            _toolCallMessageIds[toolCallId] = messageId;
+          } else {
+            final messageId = _toolCallMessageIds[toolCallId];
+            if (messageId != null) {
+              chatNotifier.updateToolCallStatus(messageId, status);
+              if (status == 'completed' || status.startsWith('error')) {
+                _toolCallMessageIds.remove(toolCallId);
+              }
+            }
+          }
         },
       );
     } catch (e) {
@@ -113,6 +135,12 @@ class _ChatContentState extends ConsumerState<ChatContent> {
 
   // Track processed UI tool calls to prevent duplicate execution
   final Set<String> _processedUiToolCalls = {};
+
+  // Track processed tool notifications to prevent duplicates (key: "$toolCallId:$status")
+  final Set<String> _processedToolNotifications = {};
+
+  // Track tool call message IDs for updating status (key: toolCallId)
+  final Map<String, String> _toolCallMessageIds = {};
 
   /// Process a single AG-UI event.
   void _processEvent(

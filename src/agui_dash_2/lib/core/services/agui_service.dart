@@ -46,7 +46,7 @@ typedef UiToolHandler =
     );
 
 /// Callback for local tool execution notifications.
-typedef LocalToolNotifier = void Function(String toolName, String status);
+typedef LocalToolNotifier = void Function(String toolCallId, String toolName, String status);
 
 /// AG-UI Service - manages communication with the AG-UI server using Thread.
 ///
@@ -202,21 +202,21 @@ class AgUiService extends ChangeNotifier {
         // Check if this is a UI tool that needs special handling
         if (_uiTools.contains(call.function.name) && _uiToolHandler != null) {
           debugPrint('AG-UI: Routing ${call.function.name} to UI handler (id=${call.id})');
-          _localToolNotifier?.call(call.function.name, 'executing');
+          _localToolNotifier?.call(call.id, call.function.name, 'executing');
           try {
             final result = await _uiToolHandler!(call.id, call.function.name, args);
-            _localToolNotifier?.call(call.function.name, 'completed');
+            _localToolNotifier?.call(call.id, call.function.name, 'completed');
             return jsonEncode(result);
           } catch (e) {
             debugPrint('AG-UI: UI handler error: $e');
-            _localToolNotifier?.call(call.function.name, 'error: $e');
+            _localToolNotifier?.call(call.id, call.function.name, 'error: $e');
             return jsonEncode({'error': e.toString()});
           }
         }
 
         // Execute the tool via LocalToolsService
         debugPrint('AG-UI: Calling localToolsService.executeTool...');
-        _localToolNotifier?.call(call.function.name, 'executing');
+        _localToolNotifier?.call(call.id, call.function.name, 'executing');
         final result = await localToolsService.executeTool(
           call.id,
           call.function.name,
@@ -227,11 +227,11 @@ class AgUiService extends ChangeNotifier {
         if (result.success) {
           final json = jsonEncode(result.result);
           debugPrint('AG-UI: Returning success JSON (${json.length} chars)');
-          _localToolNotifier?.call(call.function.name, 'completed');
+          _localToolNotifier?.call(call.id, call.function.name, 'completed');
           return json;
         } else {
           debugPrint('AG-UI: Returning error: ${result.error}');
-          _localToolNotifier?.call(call.function.name, 'error');
+          _localToolNotifier?.call(call.id, call.function.name, 'error');
           return jsonEncode({'error': result.error});
         }
       });
@@ -371,13 +371,13 @@ class AgUiService extends ChangeNotifier {
         _currentRunId = runId;
 
         _thread = Thread(id: threadId, client: _agUiClient!);
+
+        // Register tools only once when thread is created
+        _registerTools(localToolsService);
       } else {
         // Create new run for existing thread
         _currentRunId = await _createRun(_thread!.id);
       }
-
-      // Always register tools (thread may have been resumed without tools)
-      _registerTools(localToolsService);
 
       _state = AgUiConnectionState.streaming;
       notifyListeners();

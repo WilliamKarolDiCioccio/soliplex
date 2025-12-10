@@ -40,7 +40,7 @@ class ChatUser extends Equatable {
 }
 
 /// Type of chat message content.
-enum MessageType { text, genUi, loading, error }
+enum MessageType { text, genUi, loading, error, toolCall }
 
 /// Represents a message in the chat.
 class ChatMessage extends Equatable {
@@ -52,6 +52,8 @@ class ChatMessage extends Equatable {
   final GenUiContent? genUiContent;
   final String? errorMessage;
   final bool isStreaming;
+  final String? toolCallName;
+  final String? toolCallStatus;
 
   ChatMessage({
     String? id,
@@ -62,6 +64,8 @@ class ChatMessage extends Equatable {
     this.genUiContent,
     this.errorMessage,
     this.isStreaming = false,
+    this.toolCallName,
+    this.toolCallStatus,
   }) : id = id ?? _uuid.v4(),
        createdAt = createdAt ?? DateTime.now();
 
@@ -129,6 +133,24 @@ class ChatMessage extends Equatable {
     );
   }
 
+  /// Create a tool call message.
+  factory ChatMessage.toolCall({
+    String? id,
+    required ChatUser user,
+    required String toolName,
+    String status = 'executing',
+    DateTime? createdAt,
+  }) {
+    return ChatMessage(
+      id: id,
+      user: user,
+      type: MessageType.toolCall,
+      toolCallName: toolName,
+      toolCallStatus: status,
+      createdAt: createdAt,
+    );
+  }
+
   /// Create a copy with updated fields.
   ChatMessage copyWith({
     String? id,
@@ -139,6 +161,8 @@ class ChatMessage extends Equatable {
     GenUiContent? genUiContent,
     String? errorMessage,
     bool? isStreaming,
+    String? toolCallName,
+    String? toolCallStatus,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -149,6 +173,8 @@ class ChatMessage extends Equatable {
       genUiContent: genUiContent ?? this.genUiContent,
       errorMessage: errorMessage ?? this.errorMessage,
       isStreaming: isStreaming ?? this.isStreaming,
+      toolCallName: toolCallName ?? this.toolCallName,
+      toolCallStatus: toolCallStatus ?? this.toolCallStatus,
     );
   }
 
@@ -162,6 +188,8 @@ class ChatMessage extends Equatable {
     genUiContent,
     errorMessage,
     isStreaming,
+    toolCallName,
+    toolCallStatus,
   ];
 }
 

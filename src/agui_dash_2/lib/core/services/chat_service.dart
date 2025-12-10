@@ -183,6 +183,29 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
+  /// Add a tool call message showing local tool execution.
+  /// Returns the message ID for later updates.
+  String addToolCallMessage(String toolName, {String status = 'executing'}) {
+    final message = ChatMessage.toolCall(
+      user: ChatUser.system,
+      toolName: toolName,
+      status: status,
+    );
+    state = state.copyWith(messages: [...state.messages, message]);
+    return message.id;
+  }
+
+  /// Update the status of a tool call message.
+  void updateToolCallStatus(String messageId, String status) {
+    final messages = state.messages.map((m) {
+      if (m.id == messageId && m.type == MessageType.toolCall) {
+        return m.copyWith(toolCallStatus: status);
+      }
+      return m;
+    }).toList();
+    state = state.copyWith(messages: messages);
+  }
+
   /// Add a system/info message.
   void addSystemMessage(String text) {
     final message = ChatMessage.text(user: ChatUser.system, text: text);

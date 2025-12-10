@@ -45,6 +45,7 @@ class MessageBuilder {
       MessageType.genUi => _buildGenUiMessage(chatMessage),
       MessageType.loading => _buildLoadingMessage(),
       MessageType.error => _buildErrorMessage(chatMessage),
+      MessageType.toolCall => _buildToolCallMessage(chatMessage),
     };
   }
 
@@ -124,6 +125,76 @@ class MessageBuilder {
       ),
     );
   }
+
+  Widget _buildToolCallMessage(ChatMessage message) {
+    final toolName = message.toolCallName ?? 'Unknown tool';
+    final status = message.toolCallStatus ?? 'executing';
+    final isExecuting = status == 'executing';
+    final isError = status.startsWith('error');
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isError
+              ? Colors.red.shade50
+              : isExecuting
+                  ? Colors.blue.shade50
+                  : Colors.green.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isError
+                ? Colors.red.shade200
+                : isExecuting
+                    ? Colors.blue.shade200
+                    : Colors.green.shade200,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isExecuting)
+              SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.blue.shade600,
+                ),
+              )
+            else if (isError)
+              Icon(Icons.error_outline, color: Colors.red.shade600, size: 18)
+            else
+              Icon(Icons.check_circle_outline, color: Colors.green.shade600, size: 18),
+            const SizedBox(width: 10),
+            Icon(Icons.build_outlined, size: 16, color: Colors.grey.shade600),
+            const SizedBox(width: 6),
+            Text(
+              toolName,
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              status,
+              style: TextStyle(
+                fontSize: 12,
+                color: isError
+                    ? Colors.red.shade600
+                    : isExecuting
+                        ? Colors.blue.shade600
+                        : Colors.green.shade600,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Convert our ChatMessage to Dash Chat's ChatMessage format.
@@ -149,6 +220,9 @@ dash.ChatMessage toDashChatMessage(ChatMessage message) {
     case MessageType.error:
       displayText = message.errorMessage ?? '[Error]';
       debugPrint('toDashChatMessage: ERROR message=${message.errorMessage}');
+    case MessageType.toolCall:
+      displayText = '[Tool: ${message.toolCallName}]';
+      debugPrint('toDashChatMessage: TOOLCALL name=${message.toolCallName}');
   }
 
   return dash.ChatMessage(
