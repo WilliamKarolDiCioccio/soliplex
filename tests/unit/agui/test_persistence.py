@@ -652,7 +652,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     gotten = await ts.get_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_id=initial_run_id,
     )
@@ -664,14 +663,12 @@ async def test_threadstorage_thread_run_cru(the_async_session):
     with pytest.raises(agui_package.UnknownRun):
         await ts.get_run(
             user_name=USER_NAME,
-            room_id=ROOM_ID,  # XXX why?
             thread_id=thread_id,
             run_id="NONESUCH",
         )
 
     added = await ts.new_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_metadata={"label": "added"},
     )
@@ -681,7 +678,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     updated = await ts.update_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_id=added_id,
         run_metadata={
@@ -698,7 +694,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     updated_again = await ts.update_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_id=added_id,
         run_metadata=agui_persistence.RunMetadata(
@@ -715,7 +710,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     cleared = await ts.update_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_id=added_id,
         run_metadata=None,
@@ -729,7 +723,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     cleared_again = await ts.update_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_id=added_id,
         run_metadata=None,
@@ -743,7 +736,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     parent = await ts.new_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_metadata=agui_persistence.RunMetadata(label="parent"),
     )
@@ -764,7 +756,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     spare = await ts.new_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
         run_metadata=agui_persistence.RunMetadata(label="spare"),
         parent_run_id=parent_id,
@@ -788,7 +779,6 @@ async def test_threadstorage_thread_run_cru(the_async_session):
 
     wo_meta = await ts.new_run(
         user_name=USER_NAME,
-        room_id=ROOM_ID,  # XXX why?
         thread_id=thread_id,
     )
 
