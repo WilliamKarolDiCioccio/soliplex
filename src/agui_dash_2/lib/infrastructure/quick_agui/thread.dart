@@ -70,7 +70,10 @@ class Thread {
   List<ag_ui.Tool> get tools => List.unmodifiable(_tools);
 
   /// Add a tool dynamically.
+  /// If a tool with the same name already exists, it will be replaced.
   void addTool(ag_ui.Tool tool, ToolExecutor executor) {
+    // Remove existing tool with same name to prevent duplicates
+    _tools.removeWhere((t) => t.name == tool.name);
     _tools.add(tool);
     _toolExecutors[tool.name] = executor;
   }

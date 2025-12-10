@@ -73,8 +73,16 @@ class _ChatContentState extends ConsumerState<ChatContent> {
           if (!mounted) return;
           _processEvent(event, chatNotifier, contextNotifier, canvasNotifier);
         },
-        uiToolHandler: (toolName, args) async {
-          debugPrint('UI Tool Handler: $toolName with args: $args');
+        uiToolHandler: (toolCallId, toolName, args) async {
+          debugPrint('UI Tool Handler: $toolName (id=$toolCallId) with args: $args');
+
+          // Prevent duplicate execution of the same tool call
+          if (_processedUiToolCalls.contains(toolCallId)) {
+            debugPrint('UI Tool Handler: SKIPPING duplicate tool call $toolCallId');
+            return {'skipped': true, 'reason': 'duplicate'};
+          }
+          _processedUiToolCalls.add(toolCallId);
+
           return _handleUiTool(
             toolName,
             args,
@@ -99,6 +107,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
   // Maps AG-UI event messageId -> our internal ChatMessage id
   final Map<String, String> _messageIdMap = {};
   final Map<String, StringBuffer> _textBuffers = {};
+
+  // Track processed UI tool calls to prevent duplicate execution
+  final Set<String> _processedUiToolCalls = {};
 
   /// Process a single AG-UI event.
   void _processEvent(

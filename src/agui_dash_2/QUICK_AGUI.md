@@ -354,3 +354,155 @@ while (toolResults.isNotEmpty) {
   );
 }
 ```
+
+## Lessons Learned & Known Issues
+
+This section documents design issues discovered during development and the fixes applied.
+
+### 1. Single Shared Text Buffer (Fixed)
+
+**Problem**: Thread originally used a single `_textBuffer` instance for all text messages:
+```dart
+var _textBuffer = TextMessageBuffer('');
+```
+
+When concurrent text messages were streamed (e.g., multiple tool calls triggering responses), they would overwrite each other's buffer content, causing corrupted/mixed text.
+
+**Fix**: Changed to a Map keyed by messageId:
+```dart
+final Map<String, TextMessageBuffer> _textBuffers = {};
+
+case ag_ui.TextMessageStartEvent(messageId: final msgId):
+  _textBuffers[msgId] = TextMessageBuffer(msgId);
+
+case ag_ui.TextMessageContentEvent(messageId: final msgId, delta: final text):
+  _textBuffers[msgId]?.add(msgId, text);
+
+case ag_ui.TextMessageEndEvent(messageId: final msgId):
+  final buffer = _textBuffers.remove(msgId);
+  // ... use buffer.content
+```
+
+### 2. Broadcast Stream Duplicate Subscribers (Fixed)
+
+**Problem**: When `chat()` was called multiple times before the first completed, each call created a new subscription to `stepsStream` (a broadcast stream). All subscribers received ALL events, causing duplicate message processing.
+
+**Fix**: Added a mutex lock in `AgUiService.chat()` to serialize calls:
+```dart
+Completer<void>? _chatLock;
+
+Future<void> chat(...) async {
+  // Wait for any pending chat() to complete
+  while (_chatLock != null) {
+    await _chatLock!.future;
+  }
+  _chatLock = Completer<void>();
+
+  try {
+    // ... chat logic
+  } finally {
+    _chatLock!.complete();
+    _chatLock = null;
+  }
+}
+```
+
+### 3. Duplicate Tool Registration (Fixed)
+
+**Problem**: `_registerTools()` was called on every `chat()` invocation. Since `addTool()` simply appended to the `_tools` list, duplicate tools accumulated:
+```dart
+void addTool(ag_ui.Tool tool, ToolExecutor executor) {
+  _tools.add(tool);  // Keeps adding duplicates!
+  _toolExecutors[tool.name] = executor;
+}
+```
+
+**Fix**: `addTool()` now removes existing tools with the same name first:
+```dart
+void addTool(ag_ui.Tool tool, ToolExecutor executor) {
+  _tools.removeWhere((t) => t.name == tool.name);
+  _tools.add(tool);
+  _toolExecutors[tool.name] = executor;
+}
+```
+
+### 4. Duplicate UI Tool Execution (Fixed)
+
+**Problem**: UI tools (genui_render, canvas_render) could be executed multiple times for the same tool call ID, causing duplicate widgets to appear.
+
+**Fix**: Added deduplication in the UI layer using a Set of processed tool call IDs:
+```dart
+final Set<String> _processedUiToolCalls = {};
+
+uiToolHandler: (toolCallId, toolName, args) async {
+  if (_processedUiToolCalls.contains(toolCallId)) {
+    return {'skipped': true, 'reason': 'duplicate'};
+  }
+  _processedUiToolCalls.add(toolCallId);
+  // ... handle tool
+}
+```
+
+Also required updating the `UiToolHandler` typedef to include `toolCallId`:
+```dart
+typedef UiToolHandler = Future<Map<String, dynamic>> Function(
+  String toolCallId,  // Added for deduplication
+  String toolName,
+  Map<String, dynamic> args,
+);
+```
+
+### 5. Single Streaming Message ID in ChatState (Fixed)
+
+**Problem**: `ChatState` tracked only one `currentStreamingMessageId`. When multiple messages streamed concurrently, they all tried to write to the same message.
+
+**Fix**: Changed to track multiple streaming messages:
+```dart
+// Before
+final String? currentStreamingMessageId;
+
+// After
+final Set<String> streamingMessageIds;
+```
+
+And updated methods to take explicit message IDs:
+```dart
+// Before
+void appendToStreamingMessage(String delta);
+void finalizeStreamingMessage();
+
+// After
+void appendToStreamingMessage(String messageId, String delta);
+void finalizeStreamingMessage(String messageId);
+```
+
+### 6. Message ID Mapping for Events (Fixed)
+
+**Problem**: The UI layer used a single `_currentMessageId` variable to track which message was being streamed. With concurrent streams, this caused events from different messages to be applied to the wrong UI message.
+
+**Fix**: Map AG-UI event messageIds to internal chat messageIds:
+```dart
+final Map<String, String> _messageIdMap = {};  // aguiMessageId -> chatMessageId
+final Map<String, StringBuffer> _textBuffers = {};
+
+case ag_ui.TextMessageStartEvent():
+  final chatMessageId = chatNotifier.startAgentMessage();
+  _messageIdMap[event.messageId] = chatMessageId;
+  _textBuffers[event.messageId] = StringBuffer();
+
+case ag_ui.TextMessageContentEvent():
+  final chatMessageId = _messageIdMap[event.messageId];
+  if (chatMessageId != null) {
+    chatNotifier.appendToStreamingMessage(chatMessageId, event.delta);
+  }
+```
+
+## Design Recommendations
+
+Based on lessons learned:
+
+1. **Always use per-message/per-call state** - Never use single shared buffers for concurrent operations
+2. **Include IDs in all callbacks** - Tool handlers, event processors, etc. should receive identifying information for deduplication
+3. **Serialize operations when using broadcast streams** - Or filter events by run/message ID
+4. **Idempotent tool registration** - `addTool()` should handle being called multiple times with the same tool
+5. **Clear state between operations** - Ensure registries, buffers, and trackers are properly cleaned up

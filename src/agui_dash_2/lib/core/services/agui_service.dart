@@ -40,6 +40,7 @@ enum AgUiConnectionState {
 /// Callback for UI tool handlers (canvas_render, genui_render).
 typedef UiToolHandler =
     Future<Map<String, dynamic>> Function(
+      String toolCallId,
       String toolName,
       Map<String, dynamic> args,
     );
@@ -194,9 +195,9 @@ class AgUiService extends ChangeNotifier {
 
         // Check if this is a UI tool that needs special handling
         if (_uiTools.contains(call.function.name) && _uiToolHandler != null) {
-          debugPrint('AG-UI: Routing ${call.function.name} to UI handler');
+          debugPrint('AG-UI: Routing ${call.function.name} to UI handler (id=${call.id})');
           try {
-            final result = await _uiToolHandler!(call.function.name, args);
+            final result = await _uiToolHandler!(call.id, call.function.name, args);
             return jsonEncode(result);
           } catch (e) {
             debugPrint('AG-UI: UI handler error: $e');
