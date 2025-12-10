@@ -227,6 +227,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = const ChatState();
   }
 
+  /// Load messages from thread history.
+  ///
+  /// This is called when resuming an existing thread to restore
+  /// the conversation history to the UI.
+  void loadMessages(List<ChatMessage> messages) {
+    state = state.copyWith(messages: messages);
+  }
+
   /// Set agent typing state.
   void setAgentTyping(bool isTyping) {
     state = state.copyWith(isAgentTyping: isTyping);

@@ -281,7 +281,7 @@ class _ThreadHistoryPaneState extends ConsumerState<_ThreadHistoryPane> {
                       : null,
                 ),
               ),
-              onTap: () {
+              onTap: () async {
                 // Select thread in history
                 ref
                     .read(threadHistoryProvider(params).notifier)
@@ -290,17 +290,28 @@ class _ThreadHistoryPaneState extends ConsumerState<_ThreadHistoryPane> {
                 // Clear current chat messages
                 ref.read(chatProvider.notifier).clearMessages();
 
-                // Resume the thread in AgUiService
-                ref.read(agUiServiceProvider).resumeThread(thread.threadId);
+                // Resume the thread and load history
+                final messages = await ref
+                    .read(agUiServiceProvider)
+                    .resumeThread(thread.threadId);
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Resumed thread ${thread.threadId.substring(0, 8)}... - send a message to continue',
+                // Load the historical messages into chat
+                if (messages.isNotEmpty) {
+                  ref.read(chatProvider.notifier).loadMessages(messages);
+                }
+
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        messages.isNotEmpty
+                            ? 'Loaded ${messages.length} messages from thread'
+                            : 'Resumed thread - send a message to continue',
+                      ),
+                      duration: const Duration(seconds: 2),
                     ),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                  );
+                }
               },
             ),
           ),
