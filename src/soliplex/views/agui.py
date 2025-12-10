@@ -117,14 +117,9 @@ async def _check_user_thread_run(
     the_threads: agui_package.ThreadStorage,
 ) -> agui_package.Run:
     """Check for an existing thread / run for the user within the given room"""
-    await _check_user_thread(
-        room_id=room_id,
-        thread_id=thread_id,
-        user_name=user_name,
-        the_threads=the_threads,
-    )
     try:
         run = await the_threads.get_run(
+            room_id=room_id,
             thread_id=thread_id,
             user_name=user_name,
             run_id=run_id,
@@ -341,6 +336,7 @@ async def post_room_agui_thread_id(
 
     try:
         run = await the_threads.new_run(
+            room_id=room_id,
             user_name=user_name,
             thread_id=thread_id,
             parent_run_id=parent_run_id,
@@ -510,6 +506,7 @@ async def post_room_agui_thread_id_run_id_meta(
     }
 
     await the_threads.update_run(
+        room_id=room_id,
         thread_id=thread_id,
         user_name=user_name,
         run_id=run_id,
