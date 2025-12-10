@@ -119,7 +119,6 @@ async def _check_user_thread_run(
     """Check for an existing thread / run for the user within the given room"""
     try:
         run = await the_threads.get_run(
-            room_id=room_id,
             thread_id=thread_id,
             user_name=user_name,
             run_id=run_id,
@@ -128,6 +127,16 @@ async def _check_user_thread_run(
         raise fastapi.HTTPException(
             status_code=404,
             detail=f"No such run: {run_id}",
+        ) from None
+
+    thread = await run.awaitable_attrs.thread
+    t_room_id = await thread.awaitable_attrs.room_id
+
+    if t_room_id != room_id:
+        msg = f"Expected thread.room_id: {room_id}, found {t_room_id}"
+        raise fastapi.HTTPException(
+            status_code=400,
+            detail=msg,
         ) from None
 
     return run
@@ -336,7 +345,6 @@ async def post_room_agui_thread_id(
 
     try:
         run = await the_threads.new_run(
-            room_id=room_id,
             user_name=user_name,
             thread_id=thread_id,
             parent_run_id=parent_run_id,
@@ -506,7 +514,6 @@ async def post_room_agui_thread_id_run_id_meta(
     }
 
     await the_threads.update_run(
-        room_id=room_id,
         thread_id=thread_id,
         user_name=user_name,
         run_id=run_id,
