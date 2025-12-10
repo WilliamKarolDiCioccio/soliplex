@@ -7,27 +7,26 @@ import '../models/chat_models.dart';
 class ChatState {
   final List<ChatMessage> messages;
   final bool isAgentTyping;
-  final String? currentStreamingMessageId;
+  final Set<String> streamingMessageIds; // Track multiple concurrent streams
   final Map<String, String> pendingToolCalls; // toolCallId -> accumulated args
 
   const ChatState({
     this.messages = const [],
     this.isAgentTyping = false,
-    this.currentStreamingMessageId,
+    this.streamingMessageIds = const {},
     this.pendingToolCalls = const {},
   });
 
   ChatState copyWith({
     List<ChatMessage>? messages,
     bool? isAgentTyping,
-    String? currentStreamingMessageId,
+    Set<String>? streamingMessageIds,
     Map<String, String>? pendingToolCalls,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
       isAgentTyping: isAgentTyping ?? this.isAgentTyping,
-      currentStreamingMessageId:
-          currentStreamingMessageId ?? this.currentStreamingMessageId,
+      streamingMessageIds: streamingMessageIds ?? this.streamingMessageIds,
       pendingToolCalls: pendingToolCalls ?? this.pendingToolCalls,
     );
   }
@@ -53,17 +52,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       messages: [...state.messages, message],
       isAgentTyping: true,
-      currentStreamingMessageId: message.id,
+      streamingMessageIds: {...state.streamingMessageIds, message.id},
     );
     return message.id;
   }
 
-  /// Append text to the current streaming message.
-  void appendToStreamingMessage(String delta) {
-    if (state.currentStreamingMessageId == null) return;
+  /// Append text to a specific streaming message by ID.
+  void appendToStreamingMessage(String messageId, String delta) {
+    if (!state.streamingMessageIds.contains(messageId)) return;
 
     final messages = state.messages.map((m) {
-      if (m.id == state.currentStreamingMessageId) {
+      if (m.id == messageId) {
         return m.copyWith(text: (m.text ?? '') + delta);
       }
       return m;
@@ -72,21 +71,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(messages: messages);
   }
 
-  /// Finalize the current streaming message.
-  void finalizeStreamingMessage() {
-    if (state.currentStreamingMessageId == null) return;
+  /// Finalize a specific streaming message by ID.
+  void finalizeStreamingMessage(String messageId) {
+    if (!state.streamingMessageIds.contains(messageId)) return;
 
     final messages = state.messages.map((m) {
-      if (m.id == state.currentStreamingMessageId) {
+      if (m.id == messageId) {
         return m.copyWith(isStreaming: false);
       }
       return m;
     }).toList();
 
+    final newStreamingIds = Set<String>.from(state.streamingMessageIds)
+      ..remove(messageId);
+
     state = state.copyWith(
       messages: messages,
-      isAgentTyping: false,
-      currentStreamingMessageId: null,
+      isAgentTyping: newStreamingIds.isNotEmpty,
+      streamingMessageIds: newStreamingIds,
     );
   }
 
@@ -190,14 +192,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
   /// Remove a message by ID.
   void removeMessage(String messageId) {
     final messages = state.messages.where((m) => m.id != messageId).toList();
+    final newStreamingIds = Set<String>.from(state.streamingMessageIds)
+      ..remove(messageId);
     state = state.copyWith(
       messages: messages,
-      isAgentTyping: state.currentStreamingMessageId == messageId
-          ? false
-          : state.isAgentTyping,
-      currentStreamingMessageId: state.currentStreamingMessageId == messageId
-          ? null
-          : state.currentStreamingMessageId,
+      isAgentTyping: newStreamingIds.isNotEmpty,
+      streamingMessageIds: newStreamingIds,
     );
   }
 

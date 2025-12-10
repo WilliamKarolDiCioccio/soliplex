@@ -4,14 +4,62 @@ import 'package:latlong2/latlong.dart';
 
 import 'gis_map_modal.dart';
 
-/// GIS Card widget for displaying a location on an OpenStreetMap.
-///
-/// Shows a static map thumbnail in the chat that opens an interactive
-/// map modal when tapped.
-class GISCardWidget extends StatelessWidget {
+/// Represents a single GIS coordinate point with optional metadata.
+class GISCoordinate {
   final double latitude;
   final double longitude;
   final double? accuracy;
+  final String? label;
+  final Color? color;
+
+  const GISCoordinate({
+    required this.latitude,
+    required this.longitude,
+    this.accuracy,
+    this.label,
+    this.color,
+  });
+
+  LatLng toLatLng() => LatLng(latitude, longitude);
+
+  factory GISCoordinate.fromMap(Map<String, dynamic> data) {
+    return GISCoordinate(
+      latitude: _parseDouble(data['latitude']) ?? 0.0,
+      longitude: _parseDouble(data['longitude']) ?? 0.0,
+      accuracy: _parseDouble(data['accuracy']),
+      label: data['label'] as String?,
+      color: data['color'] != null ? _parseColor(data['color']) : null,
+    );
+  }
+
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
+
+  static Color? _parseColor(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      // Support hex colors like "#FF0000" or "FF0000"
+      final hex = value.replaceFirst('#', '');
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      }
+    }
+    return null;
+  }
+}
+
+/// GIS Card widget for displaying one or more locations on an OpenStreetMap.
+///
+/// Shows a static map thumbnail in the chat that opens an interactive
+/// map modal when tapped. Supports multiple coordinate points.
+class GISCardWidget extends StatelessWidget {
+  final List<GISCoordinate> coordinates;
   final double zoom;
   final String? title;
   final bool showAccuracyCircle;
@@ -19,9 +67,7 @@ class GISCardWidget extends StatelessWidget {
 
   const GISCardWidget({
     super.key,
-    required this.latitude,
-    required this.longitude,
-    this.accuracy,
+    required this.coordinates,
     this.zoom = 15,
     this.title,
     this.showAccuracyCircle = true,
@@ -30,7 +76,9 @@ class GISCardWidget extends StatelessWidget {
 
   /// Create from JSON data.
   ///
-  /// Expected data format:
+  /// Supports two formats:
+  ///
+  /// Single coordinate (legacy):
   /// ```json
   /// {
   ///   "latitude": 37.7749,
@@ -41,21 +89,63 @@ class GISCardWidget extends StatelessWidget {
   ///   "showAccuracyCircle": true
   /// }
   /// ```
+  ///
+  /// Multiple coordinates:
+  /// ```json
+  /// {
+  ///   "coordinates": [
+  ///     {"latitude": 37.7749, "longitude": -122.4194, "label": "SF", "color": "#FF0000"},
+  ///     {"latitude": 34.0522, "longitude": -118.2437, "label": "LA", "color": "#00FF00"}
+  ///   ],
+  ///   "zoom": 10,
+  ///   "title": "Cities",
+  ///   "showAccuracyCircle": true
+  /// }
+  /// ```
   factory GISCardWidget.fromData(
     Map<String, dynamic> data,
     void Function(String, Map<String, dynamic>)? onEvent,
   ) {
+    debugPrint('GISCardWidget.fromData: Received data keys: ${data.keys.toList()}');
+    debugPrint('GISCardWidget.fromData: Has coordinates key: ${data.containsKey('coordinates')}');
+    if (data.containsKey('coordinates')) {
+      debugPrint('GISCardWidget.fromData: coordinates type: ${data['coordinates'].runtimeType}');
+      debugPrint('GISCardWidget.fromData: coordinates value: ${data['coordinates']}');
+    }
+
+    List<GISCoordinate> coords;
+
+    if (data.containsKey('coordinates') && data['coordinates'] is List) {
+      // Multiple coordinates format
+      final coordList = data['coordinates'] as List;
+      debugPrint('GISCardWidget.fromData: Parsing ${coordList.length} coordinates');
+      coords = coordList
+          .map((c) => GISCoordinate.fromMap(c as Map<String, dynamic>))
+          .toList();
+      debugPrint('GISCardWidget.fromData: Created ${coords.length} GISCoordinate objects');
+    } else {
+      // Legacy single coordinate format
+      debugPrint('GISCardWidget.fromData: Using legacy single coordinate format');
+      coords = [
+        GISCoordinate(
+          latitude: _parseDouble(data['latitude']) ?? 0.0,
+          longitude: _parseDouble(data['longitude']) ?? 0.0,
+          accuracy: _parseDouble(data['accuracy']),
+          label: data['label'] as String?,
+        ),
+      ];
+    }
+
     return GISCardWidget(
-      latitude: _parseDouble(data['latitude']) ?? 0.0,
-      longitude: _parseDouble(data['longitude']) ?? 0.0,
-      accuracy: _parseDouble(data['accuracy']),
+      coordinates: coords,
       zoom: _parseDouble(data['zoom']) ?? 15.0,
       title: data['title'] as String?,
       showAccuracyCircle: data['showAccuracyCircle'] as bool? ?? true,
       onTap: onEvent != null
           ? () => onEvent('tap', {
-                'latitude': data['latitude'],
-                'longitude': data['longitude'],
+                'coordinates': coords
+                    .map((c) => {'latitude': c.latitude, 'longitude': c.longitude})
+                    .toList(),
               })
           : null,
     );
@@ -69,22 +159,63 @@ class GISCardWidget extends StatelessWidget {
     return null;
   }
 
+  /// Calculate the center point of all coordinates.
+  LatLng get _center {
+    if (coordinates.isEmpty) return const LatLng(0, 0);
+    if (coordinates.length == 1) return coordinates.first.toLatLng();
+
+    double sumLat = 0, sumLng = 0;
+    for (final coord in coordinates) {
+      sumLat += coord.latitude;
+      sumLng += coord.longitude;
+    }
+    return LatLng(sumLat / coordinates.length, sumLng / coordinates.length);
+  }
+
+  /// Get the first coordinate (for backwards compatibility in display).
+  GISCoordinate? get _firstCoordinate =>
+      coordinates.isNotEmpty ? coordinates.first : null;
+
+  /// Calculate bounds that contain all coordinates with padding.
+  LatLngBounds? get _bounds {
+    if (coordinates.isEmpty) return null;
+    if (coordinates.length == 1) return null; // Use center/zoom for single point
+
+    double minLat = coordinates.first.latitude;
+    double maxLat = coordinates.first.latitude;
+    double minLng = coordinates.first.longitude;
+    double maxLng = coordinates.first.longitude;
+
+    for (final coord in coordinates) {
+      if (coord.latitude < minLat) minLat = coord.latitude;
+      if (coord.latitude > maxLat) maxLat = coord.latitude;
+      if (coord.longitude < minLng) minLng = coord.longitude;
+      if (coord.longitude > maxLng) maxLng = coord.longitude;
+    }
+
+    return LatLngBounds(
+      LatLng(minLat, minLng),
+      LatLng(maxLat, maxLng),
+    );
+  }
+
   void _openMapModal(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => GISMapModal(
-        latitude: latitude,
-        longitude: longitude,
-        accuracy: accuracy,
+        coordinates: coordinates,
         initialZoom: zoom,
         title: title,
+        showAccuracyCircle: showAccuracyCircle,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final center = LatLng(latitude, longitude);
+    final center = _center;
+    final first = _firstCoordinate;
+    final pointCount = coordinates.length;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -117,13 +248,17 @@ class GISCardWidget extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          title ?? 'Location',
+                          title ?? (pointCount > 1 ? 'Locations' : 'Location'),
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          '${latitude.toStringAsFixed(4)}, ${longitude.toStringAsFixed(4)}',
+                          pointCount > 1
+                              ? '$pointCount points'
+                              : first != null
+                                  ? '${first.latitude.toStringAsFixed(4)}, ${first.longitude.toStringAsFixed(4)}'
+                                  : 'No coordinates',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: Colors.grey.shade600,
                             fontFamily: 'monospace',
@@ -146,47 +281,60 @@ class GISCardWidget extends StatelessWidget {
               width: double.infinity,
               child: IgnorePointer(
                 child: FlutterMap(
-                  options: MapOptions(
-                    initialCenter: center,
-                    initialZoom: zoom,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.none,
-                    ),
-                  ),
+                  options: _bounds != null
+                      ? MapOptions(
+                          initialCameraFit: CameraFit.bounds(
+                            bounds: _bounds!,
+                            padding: const EdgeInsets.all(40),
+                          ),
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.none,
+                          ),
+                        )
+                      : MapOptions(
+                          initialCenter: center,
+                          initialZoom: zoom,
+                          interactionOptions: const InteractionOptions(
+                            flags: InteractiveFlag.none,
+                          ),
+                        ),
                   children: [
                     // OpenStreetMap tiles
                     TileLayer(
                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                       userAgentPackageName: 'com.example.agui_dash_2',
                     ),
-                    // Accuracy circle
-                    if (showAccuracyCircle && accuracy != null && accuracy! > 0)
+                    // Accuracy circles
+                    if (showAccuracyCircle)
                       CircleLayer(
-                        circles: [
-                          CircleMarker(
-                            point: center,
-                            radius: accuracy!,
-                            useRadiusInMeter: true,
-                            color: Colors.blue.withAlpha(40),
-                            borderColor: Colors.blue.withAlpha(150),
-                            borderStrokeWidth: 2,
-                          ),
-                        ],
+                        circles: coordinates
+                            .where((c) => c.accuracy != null && c.accuracy! > 0)
+                            .map((c) => CircleMarker(
+                                  point: c.toLatLng(),
+                                  radius: c.accuracy!,
+                                  useRadiusInMeter: true,
+                                  color: (c.color ?? Colors.blue).withAlpha(40),
+                                  borderColor: (c.color ?? Colors.blue).withAlpha(150),
+                                  borderStrokeWidth: 2,
+                                ))
+                            .toList(),
                       ),
-                    // Location marker
+                    // Location markers
                     MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: center,
-                          width: 40,
-                          height: 40,
-                          child: const Icon(
-                            Icons.location_on,
-                            color: Colors.red,
-                            size: 40,
-                          ),
-                        ),
-                      ],
+                      markers: coordinates
+                          .asMap()
+                          .entries
+                          .map((entry) => Marker(
+                                point: entry.value.toLatLng(),
+                                width: 40,
+                                height: 40,
+                                child: Icon(
+                                  Icons.location_on,
+                                  color: entry.value.color ?? Colors.red,
+                                  size: 40,
+                                ),
+                              ))
+                          .toList(),
                     ),
                   ],
                 ),

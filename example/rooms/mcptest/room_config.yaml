@@ -13,25 +13,11 @@ tools:
 
 mcp_client_toolsets:
 
-  smithery_nws:
-    kind: "http"
-    url: "https://server.smithery.ai/@smithery-ai/national-weather-service/mcp"
-    allowed_tools:
-    - "get_current_weather"
-
-    query_params:
-      # This is bog stupid:  the SmitheryAI endpoint does not support
-      # passing an 'Authorization: Bearer <API KEY>' header, but instead
-      # expects to have the values passed in the query string (unless the
-      # client can do the full OAuth2 flow).
-      api_key: "secret:SMITHERY_AI_API_KEY"
-      profile: "secret:SMITHERY_AI_PROFILE"
-
-# google_maps:
-#   kind: "stdio"
-#   command: "npx"
-#   args: 
-#     - "-y"
-#     - "@modelcontextprotocol/server-google-maps"
-#   env: 
-#     GOOGLE_MAPS_API_KEY: GOOGLE_MAPS_API_KEY
+  google_maps:
+    kind: "stdio"
+    command: "npx"
+    args: 
+      - "-y"
+      - "@modelcontextprotocol/server-google-maps"
+    env: 
+      GOOGLE_MAPS_API_KEY: secret:GOOGLE_MAPS_API_KEY

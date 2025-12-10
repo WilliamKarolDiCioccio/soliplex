@@ -95,9 +95,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     }
   }
 
-  // State for tracking current message
-  String? _currentMessageId;
-  final _textBuffer = StringBuffer();
+  // State for tracking messages per AG-UI messageId
+  // Maps AG-UI event messageId -> our internal ChatMessage id
+  final Map<String, String> _messageIdMap = {};
+  final Map<String, StringBuffer> _textBuffers = {};
 
   /// Process a single AG-UI event.
   void _processEvent(
@@ -114,28 +115,36 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         contextNotifier.addAgUiEvent('Run Started', summary: event.runId);
 
       case ag_ui.TextMessageStartEvent():
-        debugPrint('AG-UI: TextMessageStartEvent received, messageId=${event.messageId}');
-        _currentMessageId = chatNotifier.startAgentMessage();
-        _textBuffer.clear();
-        debugPrint('AG-UI: Text message started, id=$_currentMessageId');
+        final aguiMessageId = event.messageId;
+        debugPrint('AG-UI: TextMessageStartEvent received, messageId=$aguiMessageId');
+        final chatMessageId = chatNotifier.startAgentMessage();
+        _messageIdMap[aguiMessageId] = chatMessageId;
+        _textBuffers[aguiMessageId] = StringBuffer();
+        debugPrint('AG-UI: Text message started, aguiId=$aguiMessageId -> chatId=$chatMessageId');
 
       case ag_ui.TextMessageContentEvent():
-        debugPrint('AG-UI: TextMessageContentEvent received, delta="${event.delta}"');
-        if (_currentMessageId != null) {
-          chatNotifier.appendToStreamingMessage(event.delta);
-          _textBuffer.write(event.delta);
+        final aguiMessageId = event.messageId;
+        final chatMessageId = _messageIdMap[aguiMessageId];
+        debugPrint('AG-UI: TextMessageContentEvent received, messageId=$aguiMessageId, delta="${event.delta}"');
+        if (chatMessageId != null) {
+          chatNotifier.appendToStreamingMessage(chatMessageId, event.delta);
+          _textBuffers[aguiMessageId]?.write(event.delta);
         } else {
-          debugPrint('AG-UI: WARNING - TextMessageContentEvent but no _currentMessageId');
+          debugPrint('AG-UI: WARNING - TextMessageContentEvent but no mapping for messageId=$aguiMessageId');
         }
 
       case ag_ui.TextMessageEndEvent():
-        debugPrint('AG-UI: TextMessageEndEvent received');
-        if (_currentMessageId != null) {
-          chatNotifier.finalizeStreamingMessage();
-          contextNotifier.addTextMessage(_textBuffer.toString(), isUser: false);
-          _currentMessageId = null;
+        final aguiMessageId = event.messageId;
+        final chatMessageId = _messageIdMap[aguiMessageId];
+        debugPrint('AG-UI: TextMessageEndEvent received, messageId=$aguiMessageId');
+        if (chatMessageId != null) {
+          chatNotifier.finalizeStreamingMessage(chatMessageId);
+          final text = _textBuffers[aguiMessageId]?.toString() ?? '';
+          contextNotifier.addTextMessage(text, isUser: false);
+          _messageIdMap.remove(aguiMessageId);
+          _textBuffers.remove(aguiMessageId);
         } else {
-          debugPrint('AG-UI: WARNING - TextMessageEndEvent but no _currentMessageId');
+          debugPrint('AG-UI: WARNING - TextMessageEndEvent but no mapping for messageId=$aguiMessageId');
         }
 
       case ag_ui.ToolCallStartEvent():
@@ -227,6 +236,8 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       final widgetName = args['widget_name'] as String? ?? 'Widget';
       final data = args['data'] as Map<String, dynamic>? ?? {};
 
+      debugPrint('_handleUiTool genui_render: ADDING GenUI message for widget=$widgetName');
+      debugPrint('_handleUiTool genui_render: data=$data');
       chatNotifier.addGenUiMessage(
         GenUiContent(
           toolCallId: 'tool-${DateTime.now().millisecondsSinceEpoch}',

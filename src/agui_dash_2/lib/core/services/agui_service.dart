@@ -65,6 +65,9 @@ class AgUiService extends ChangeNotifier {
   // Handler for UI tools (canvas_render, genui_render)
   UiToolHandler? _uiToolHandler;
 
+  // Mutex to prevent concurrent chat() calls
+  Completer<void>? _chatLock;
+
   /// Tools that should be handled by the UI layer instead of LocalToolsService.
   static const _uiTools = {'canvas_render', 'genui_render'};
 
@@ -315,15 +318,28 @@ class AgUiService extends ChangeNotifier {
   ///
   /// [uiToolHandler] is called for canvas_render and genui_render tools
   /// which need access to UI state (Riverpod providers).
+  ///
+  /// Note: Calls are serialized to prevent concurrent streaming issues.
   Future<void> chat(
     String userMessage, {
     required LocalToolsService localToolsService,
     required void Function(ag_ui.BaseEvent event) onEvent,
     UiToolHandler? uiToolHandler,
   }) async {
+    // Wait for any pending chat() to complete
+    while (_chatLock != null) {
+      debugPrint('AG-UI: Waiting for previous chat() to complete...');
+      await _chatLock!.future;
+    }
+
+    // Acquire lock
+    _chatLock = Completer<void>();
+
     // Store UI tool handler for use in tool executor
     _uiToolHandler = uiToolHandler;
     if (_config == null || _agUiClient == null) {
+      _chatLock!.complete();
+      _chatLock = null;
       throw StateError('AgUiService not configured. Call configure() first.');
     }
 
@@ -395,6 +411,10 @@ class AgUiService extends ChangeNotifier {
       debugPrint('AgUiService error: $e\n$stackTrace');
       notifyListeners();
       rethrow;
+    } finally {
+      // Release lock
+      _chatLock!.complete();
+      _chatLock = null;
     }
   }
 
