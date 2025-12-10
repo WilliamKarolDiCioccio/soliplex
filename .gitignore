@@ -7,10 +7,10 @@ venv/
 *.egg-info
 __pycache__/
 
-# venv
-lib/
-bin/
-share/
+# venv (root level only, not Flutter lib/)
+/lib/
+/bin/
+/share/
 pyvenv.cfg
 
 # pre-commit
