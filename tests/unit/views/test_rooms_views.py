@@ -1,3 +1,5 @@
+import datetime
+import pathlib
 from unittest import mock
 
 import fastapi
@@ -5,7 +7,10 @@ import pytest
 
 from soliplex import config
 from soliplex import installation
+from soliplex import models
 from soliplex.views import rooms as rooms_views
+
+NOW = datetime.datetime.now(datetime.UTC)
 
 ROOM_IDS = ["foo", "bar", "baz"]
 
@@ -27,6 +32,27 @@ UNKNOWN_USER = {
     "family_name": "<unknown>",
     "email": "<unknown>",
 }
+
+DOCUMENT_ID = "test-doc-id"
+DOCUMENT_URI = f"https://example.com/documents/{DOCUMENT_ID}.txt"
+DOCUMENT_TITLE = "Test Document"
+DOCUMENT_METADATA = {"testing": "Test"}
+DOCUMENT_CREATED_AT = NOW
+DOCUMENT_UPDATED_AT = NOW
+
+DOCUMENT_KWARGS = {
+    "id": DOCUMENT_ID,
+    "uri": DOCUMENT_URI,
+    "title": DOCUMENT_TITLE,
+    "metadata": DOCUMENT_METADATA,
+    "created_at": DOCUMENT_CREATED_AT,
+    "updated_at": DOCUMENT_UPDATED_AT,
+}
+DOCUMENT = mock.Mock(
+    spec_set=list(DOCUMENT_KWARGS.keys()),
+    **DOCUMENT_KWARGS,
+)
+RAG_DOCUMENT = models.RAGDocument(**DOCUMENT_KWARGS)
 
 
 @pytest.fixture(scope="module", params=[(), ROOM_IDS])
@@ -243,5 +269,96 @@ async def test_get_room_mcp_token(auth_fn, gust, w_error):
     the_installation.get_room_config.assert_called_once_with(
         ROOM_ID,
         user=auth_fn.return_value,
+    )
+    auth_fn.assert_called_once_with(the_installation, token)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("w_hr_tool", [False, True])
+@mock.patch("haiku.rag.client.HaikuRAG")
+@mock.patch("soliplex.auth.authenticate")
+async def test_get_room_documents(
+    auth_fn,
+    hr_klass,
+    temp_dir,
+    w_hr_tool,
+    room_configs,
+):
+    ROOM_ID = "foo"
+
+    hr_inst = hr_klass.return_value
+    hr_entered = hr_inst.__aenter__.return_value
+
+    request = mock.create_autospec(fastapi.Request)
+
+    the_installation = mock.create_autospec(installation.Installation)
+
+    if ROOM_ID not in room_configs:
+        the_installation.get_room_config.side_effect = KeyError("testing")
+    else:
+        the_installation.get_room_config.return_value = room_configs[ROOM_ID]
+
+    token = object()
+
+    hr_config = object()
+    db_path = pathlib.Path("/tmp/rag.db")
+
+    if ROOM_ID in room_configs:
+        non_hr_tool_config = mock.create_autospec(config.ToolConfig)
+        tool_configs = room_configs[ROOM_ID].tool_configs = {
+            "non_hr": non_hr_tool_config,
+        }
+
+        if w_hr_tool:
+            tool_config = mock.create_autospec(
+                config.ToolConfig,
+                haiku_rag_config=hr_config,
+                rag_lancedb_path=db_path,
+            )
+            tool_configs["testing"] = tool_config
+
+            hr_entered.list_documents.return_value = [DOCUMENT]
+            exp_docs = {DOCUMENT_ID: RAG_DOCUMENT}
+        else:
+            exp_docs = {}
+
+    if ROOM_ID not in room_configs:
+        with pytest.raises(fastapi.HTTPException) as exc:
+            await rooms_views.get_room_documents(
+                request,
+                room_id=ROOM_ID,
+                the_installation=the_installation,
+                token=token,
+            )
+
+        assert exc.value.status_code == 404
+        assert exc.value.detail == "No such room: foo"
+    else:
+        found = await rooms_views.get_room_documents(
+            request,
+            room_id=ROOM_ID,
+            the_installation=the_installation,
+            token=token,
+        )
+
+        assert found == models.RoomDocuments(
+            room_id=ROOM_ID,
+            document_set=exp_docs,
+        )
+
+        if w_hr_tool:
+            hr_entered.list_documents.assert_called_once_with()
+
+            hr_klass.assert_called_once_with(
+                db_path=db_path,
+                config=hr_config,
+            )
+        else:
+            hr_entered.list_documents.assert_not_called()
+            hr_klass.list_documents.assert_not_called()
+
+    the_installation.get_room_config.assert_called_once_with(
+        ROOM_ID,
+        auth_fn.return_value,
     )
     auth_fn.assert_called_once_with(the_installation, token)
