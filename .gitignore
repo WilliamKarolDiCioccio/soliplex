@@ -7,6 +7,12 @@ venv/
 *.egg-info
 __pycache__/
 
+# venv
+lib/
+bin/
+share/
+pyvenv.cfg
+
 # pre-commit
 .pre-commit-config.yaml
 
