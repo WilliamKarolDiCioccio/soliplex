@@ -564,6 +564,7 @@ class ThreadStorage(agui_package.ThreadStorage):
     async def new_run(
         self,
         *,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_metadata: RunMetadata | dict = None,
@@ -630,6 +631,7 @@ class ThreadStorage(agui_package.ThreadStorage):
 
     async def get_run(
         self,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_id: str,
@@ -651,6 +653,7 @@ class ThreadStorage(agui_package.ThreadStorage):
     async def update_run(
         self,
         *,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_id: str,

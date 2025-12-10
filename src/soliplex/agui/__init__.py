@@ -183,6 +183,7 @@ class ThreadStorage(abc.ABC):
     async def new_run(
         self,
         *,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_metadata: RunMetadata = None,
@@ -198,6 +199,7 @@ class ThreadStorage(abc.ABC):
     @abc.abstractmethod
     async def get_run(
         self,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_id: str,
@@ -208,6 +210,7 @@ class ThreadStorage(abc.ABC):
     async def update_run(
         self,
         *,
+        room_id: str,
         user_name: str,
         thread_id: str,
         run_id: str,
