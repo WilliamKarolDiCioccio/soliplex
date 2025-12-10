@@ -2,8 +2,7 @@ import 'dart:collection';
 
 /// A simple LRU (Least Recently Used) cache implementation.
 ///
-/// Used for caching RemoteWidgetLibrary blobs to avoid re-transmission
-/// of common widget definitions.
+/// Used for caching frequently accessed data to improve performance.
 class LruCache<K, V> {
   final int maxSize;
   final LinkedHashMap<K, V> _cache = LinkedHashMap<K, V>();

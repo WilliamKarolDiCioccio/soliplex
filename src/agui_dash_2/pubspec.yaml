@@ -52,6 +52,10 @@ dependencies:
   # Location services
   geolocator: ^13.0.2
 
+  # Maps (OpenStreetMap)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

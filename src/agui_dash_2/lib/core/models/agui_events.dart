@@ -109,7 +109,7 @@ class ToolCallStartEvent extends AgUiEvent {
   List<Object?> get props => [...super.props, toolCallId, toolName];
 }
 
-/// Tool call arguments - contains RFW payload chunk.
+/// Tool call arguments - contains tool arguments chunk (streamed JSON).
 class ToolCallArgsEvent extends AgUiEvent {
   final String toolCallId;
   final String argsChunk;
@@ -128,7 +128,7 @@ class ToolCallArgsEvent extends AgUiEvent {
   List<Object?> get props => [...super.props, toolCallId, argsChunk];
 }
 
-/// Tool call ended - RFW payload complete, ready to render.
+/// Tool call ended - tool arguments complete, ready to execute.
 class ToolCallEndEvent extends AgUiEvent {
   final String toolCallId;
 

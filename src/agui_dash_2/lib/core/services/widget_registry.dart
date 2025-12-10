@@ -9,6 +9,7 @@ import '../../widgets/registry/loading_indicator_widget.dart';
 import '../../widgets/registry/action_button_widget.dart';
 import '../../widgets/registry/progress_card_widget.dart';
 import '../../widgets/registry/location_card_widget.dart';
+import '../../widgets/registry/gis_card_widget.dart';
 
 /// Widget builder function signature.
 ///
@@ -91,6 +92,10 @@ void _registerDefaultWidgets(WidgetRegistry registry) {
 
   registry.register('LocationCard', (context, data, onEvent) {
     return LocationCardWidget.fromData(data, onEvent);
+  });
+
+  registry.register('GISCard', (context, data, onEvent) {
+    return GISCardWidget.fromData(data, onEvent);
   });
 }
 
