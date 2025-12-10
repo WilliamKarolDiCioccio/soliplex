@@ -363,8 +363,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         },
       ),
       inputOptions: dash.InputOptions(
+        sendOnEnter: true,
         inputDecoration: InputDecoration(
-          hintText: 'Type a message...',
+          hintText: 'Type a message, SHIFT+ENTER multiple lines',
           filled: true,
           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           border: OutlineInputBorder(
