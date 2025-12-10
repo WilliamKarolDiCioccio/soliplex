@@ -45,6 +45,9 @@ typedef UiToolHandler =
       Map<String, dynamic> args,
     );
 
+/// Callback for local tool execution notifications.
+typedef LocalToolNotifier = void Function(String toolName, String status);
+
 /// AG-UI Service - manages communication with the AG-UI server using Thread.
 ///
 /// Uses the quick_agui Thread class for:
@@ -65,6 +68,9 @@ class AgUiService extends ChangeNotifier {
 
   // Handler for UI tools (canvas_render, genui_render)
   UiToolHandler? _uiToolHandler;
+
+  // Notifier for local tool execution events
+  LocalToolNotifier? _localToolNotifier;
 
   // Mutex to prevent concurrent chat() calls
   Completer<void>? _chatLock;
@@ -196,17 +202,21 @@ class AgUiService extends ChangeNotifier {
         // Check if this is a UI tool that needs special handling
         if (_uiTools.contains(call.function.name) && _uiToolHandler != null) {
           debugPrint('AG-UI: Routing ${call.function.name} to UI handler (id=${call.id})');
+          _localToolNotifier?.call(call.function.name, 'executing');
           try {
             final result = await _uiToolHandler!(call.id, call.function.name, args);
+            _localToolNotifier?.call(call.function.name, 'completed');
             return jsonEncode(result);
           } catch (e) {
             debugPrint('AG-UI: UI handler error: $e');
+            _localToolNotifier?.call(call.function.name, 'error: $e');
             return jsonEncode({'error': e.toString()});
           }
         }
 
         // Execute the tool via LocalToolsService
         debugPrint('AG-UI: Calling localToolsService.executeTool...');
+        _localToolNotifier?.call(call.function.name, 'executing');
         final result = await localToolsService.executeTool(
           call.id,
           call.function.name,
@@ -217,9 +227,11 @@ class AgUiService extends ChangeNotifier {
         if (result.success) {
           final json = jsonEncode(result.result);
           debugPrint('AG-UI: Returning success JSON (${json.length} chars)');
+          _localToolNotifier?.call(call.function.name, 'completed');
           return json;
         } else {
           debugPrint('AG-UI: Returning error: ${result.error}');
+          _localToolNotifier?.call(call.function.name, 'error');
           return jsonEncode({'error': result.error});
         }
       });
@@ -320,12 +332,15 @@ class AgUiService extends ChangeNotifier {
   /// [uiToolHandler] is called for canvas_render and genui_render tools
   /// which need access to UI state (Riverpod providers).
   ///
+  /// [onLocalToolExecution] is called when a local tool starts/completes execution.
+  ///
   /// Note: Calls are serialized to prevent concurrent streaming issues.
   Future<void> chat(
     String userMessage, {
     required LocalToolsService localToolsService,
     required void Function(ag_ui.BaseEvent event) onEvent,
     UiToolHandler? uiToolHandler,
+    LocalToolNotifier? onLocalToolExecution,
   }) async {
     // Wait for any pending chat() to complete
     while (_chatLock != null) {
@@ -336,8 +351,9 @@ class AgUiService extends ChangeNotifier {
     // Acquire lock
     _chatLock = Completer<void>();
 
-    // Store UI tool handler for use in tool executor
+    // Store handlers for use in tool executor
     _uiToolHandler = uiToolHandler;
+    _localToolNotifier = onLocalToolExecution;
     if (_config == null || _agUiClient == null) {
       _chatLock!.complete();
       _chatLock = null;

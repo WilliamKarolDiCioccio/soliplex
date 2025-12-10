@@ -169,6 +169,18 @@ class ContextPaneNotifier extends StateNotifier<ContextPaneState> {
     );
   }
 
+  /// Add a local tool execution event.
+  void addLocalToolExecution(String toolName, {String status = 'executing'}) {
+    _addItem(
+      ContextItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'agui_event',
+        title: 'Local Tool: $toolName',
+        summary: status,
+      ),
+    );
+  }
+
   void _addItem(ContextItem item) {
     final newItems = [item, ...state.items];
     // Keep only maxItems

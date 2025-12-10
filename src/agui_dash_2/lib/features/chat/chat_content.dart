@@ -91,6 +91,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
             contextNotifier,
           );
         },
+        onLocalToolExecution: (toolName, status) {
+          contextNotifier.addLocalToolExecution(toolName, status: status);
+        },
       );
     } catch (e) {
       debugPrint('Error sending message: $e');
@@ -118,7 +121,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     ContextPaneNotifier contextNotifier,
     CanvasNotifier canvasNotifier,
   ) {
-    debugPrint('AG-UI Event: ${event.runtimeType}');
+    // Skip verbose thinking content events
+    if (event is! ag_ui.ThinkingTextMessageContentEvent) {
+      debugPrint('AG-UI Event: ${event.runtimeType}');
+    }
 
     switch (event) {
       case ag_ui.RunStartedEvent():
@@ -202,7 +208,8 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         debugPrint('AG-UI: Thinking text started');
 
       case ag_ui.ThinkingTextMessageContentEvent():
-        debugPrint('AG-UI: Thinking: ${event.delta}');
+        // Suppressed - too verbose
+        break;
 
       case ag_ui.ThinkingTextMessageEndEvent():
         debugPrint('AG-UI: Thinking text ended');
