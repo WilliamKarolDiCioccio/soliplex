@@ -236,8 +236,6 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       final widgetName = args['widget_name'] as String? ?? 'Widget';
       final data = args['data'] as Map<String, dynamic>? ?? {};
 
-      debugPrint('_handleUiTool genui_render: ADDING GenUI message for widget=$widgetName');
-      debugPrint('_handleUiTool genui_render: data=$data');
       chatNotifier.addGenUiMessage(
         GenUiContent(
           toolCallId: 'tool-${DateTime.now().millisecondsSinceEpoch}',

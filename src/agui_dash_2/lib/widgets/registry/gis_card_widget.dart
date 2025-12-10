@@ -106,26 +106,16 @@ class GISCardWidget extends StatelessWidget {
     Map<String, dynamic> data,
     void Function(String, Map<String, dynamic>)? onEvent,
   ) {
-    debugPrint('GISCardWidget.fromData: Received data keys: ${data.keys.toList()}');
-    debugPrint('GISCardWidget.fromData: Has coordinates key: ${data.containsKey('coordinates')}');
-    if (data.containsKey('coordinates')) {
-      debugPrint('GISCardWidget.fromData: coordinates type: ${data['coordinates'].runtimeType}');
-      debugPrint('GISCardWidget.fromData: coordinates value: ${data['coordinates']}');
-    }
-
     List<GISCoordinate> coords;
 
     if (data.containsKey('coordinates') && data['coordinates'] is List) {
       // Multiple coordinates format
       final coordList = data['coordinates'] as List;
-      debugPrint('GISCardWidget.fromData: Parsing ${coordList.length} coordinates');
       coords = coordList
           .map((c) => GISCoordinate.fromMap(c as Map<String, dynamic>))
           .toList();
-      debugPrint('GISCardWidget.fromData: Created ${coords.length} GISCoordinate objects');
     } else {
       // Legacy single coordinate format
-      debugPrint('GISCardWidget.fromData: Using legacy single coordinate format');
       coords = [
         GISCoordinate(
           latitude: _parseDouble(data['latitude']) ?? 0.0,
