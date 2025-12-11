@@ -11,7 +11,7 @@ agent:
 tools:
   - tool_name: "soliplex.tools.get_current_datetime"
 
-mcp_client_toolsets:
+#mcp_client_toolsets:
 
   #smithery_nws:
   #  kind: "http"
@@ -27,11 +27,11 @@ mcp_client_toolsets:
   #    api_key: "secret:SMITHERY_AI_API_KEY"
   #    profile: "secret:SMITHERY_AI_PROFILE"
 
- google_maps:
-   kind: "stdio"
-   command: "npx"
-   args:
-     - "-y"
-     - "@modelcontextprotocol/server-google-maps"
-   env:
-     GOOGLE_MAPS_API_KEY: "secret:GOOGLE_MAPS_API_KEY"
+# google_maps:
+#   kind: "stdio"
+#   command: "npx"
+#   args:
+#     - "-y"
+#     - "@modelcontextprotocol/server-google-maps"
+#   env:
+#     GOOGLE_MAPS_API_KEY: "secret:GOOGLE_MAPS_API_KEY"

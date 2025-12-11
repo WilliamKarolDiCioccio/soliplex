@@ -95,11 +95,16 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       return;
     }
 
+    // Get current canvas state to send with request
+    // NOTE: State sync disabled until backend implements StateHandler protocol
+    // final canvasState = ref.read(canvasProvider);
+
     try {
       // Use the chat() method which handles tool loop internally
       await agUiService.chat(
         text,
         localToolsService: localToolsService,
+        // state: canvasState.toJson(),  // TODO: Enable when backend supports StateHandler
         onEvent: (event) {
           if (!mounted) return;
           _processEvent(event, chatNotifier, contextNotifier, canvasNotifier);
@@ -676,6 +681,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         _showDemo(demoName, chatNotifier);
         return true;
 
+      case '/canvas':
+        _showCanvasState(chatNotifier, canvasNotifier);
+        return true;
+
       case '/help':
         chatNotifier.addSystemMessage(
           'Available commands:\n'
@@ -683,6 +692,7 @@ class _ChatContentState extends ConsumerState<ChatContent> {
           '• /list projects - Show available projects\n'
           '• /list demos - Show available demos\n'
           '• /demo <name> - Walk through a specific demo\n'
+          '• /canvas - Show current canvas contents\n'
           '• /help - Show this help message',
         );
         return true;
@@ -775,6 +785,14 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       default:
         chatNotifier.addSystemMessage('Unknown list type: $listType\nTry: /list projects or /list demos');
     }
+  }
+
+  /// Show current canvas state.
+  void _showCanvasState(ChatNotifier chatNotifier, CanvasNotifier canvasNotifier) {
+    chatNotifier.addUserMessage('/canvas');
+
+    final canvasState = ref.read(canvasProvider);
+    chatNotifier.addSystemMessage(canvasState.toSummary());
   }
 
   /// Show a specific demo walkthrough.
