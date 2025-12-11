@@ -825,6 +825,23 @@ async def test_post_room_agui_thread_id_meta(cuir, the_threads, w_meta):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("w_event_count", [0, 1, 10])
+async def test_tee_events(w_event_count):
+    event_log = []
+
+    async def event_iter():
+        for event in range(w_event_count):
+            yield event
+
+    expected = [
+        val async for val in agui_views.tee_events(event_iter(), event_log)
+    ]
+
+    assert len(event_log) == w_event_count
+    assert event_log == expected
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "bad_run_input, expectation",
     [
@@ -839,7 +856,9 @@ async def test_post_room_agui_thread_id_meta(cuir, the_threads, w_meta):
 @mock.patch("soliplex.agui.util.check_run_input")
 @mock.patch("soliplex.views.agui._check_user_thread_run")
 @mock.patch("soliplex.views.agui._check_user_room_agent")
+@mock.patch("soliplex.views.agui.tee_events")
 async def test_post_room_agui_thread_id_run_id(
+    tee,
     cura,
     cutr,
     cri,
@@ -892,7 +911,6 @@ async def test_post_room_agui_thread_id_run_id(
     exp_adapter.encode_stream = mock.MagicMock()
     exp_adapter.run_stream = mock.MagicMock()
     exp_agent_stream = exp_adapter.run_stream.return_value
-    exp_mpx = mpx.return_value
     exp_sse_stream = exp_adapter.encode_stream.return_value
 
     with expectation as expected:
@@ -914,7 +932,12 @@ async def test_post_room_agui_thread_id_run_id(
             media_type=exp_adapter.accept,
         )
 
-        exp_adapter.encode_stream.assert_called_once_with(exp_mpx)
+        exp_adapter.encode_stream.assert_called_once_with(tee.return_value)
+
+        tee.assert_called_once()
+        event_stream, event_list = tee.call_args_list[0].args
+        assert event_stream is mpx.return_value
+        assert event_list == []
 
         mpx.assert_called_once_with(
             exp_agent_stream,
