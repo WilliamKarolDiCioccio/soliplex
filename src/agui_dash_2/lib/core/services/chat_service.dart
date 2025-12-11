@@ -187,6 +187,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(messages: [...state.messages, message]);
   }
 
+  /// Add a tool call message showing tool execution status.
+  void addToolCallMessage(String toolName, {bool? success}) {
+    final message = ChatMessage.toolCall(
+      toolName: toolName,
+      success: success,
+    );
+    state = state.copyWith(messages: [...state.messages, message]);
+  }
+
   /// Remove a message by ID.
   void removeMessage(String messageId) {
     final messages = state.messages.where((m) => m.id != messageId).toList();

@@ -45,6 +45,7 @@ class MessageBuilder {
       MessageType.genUi => _buildGenUiMessage(chatMessage),
       MessageType.loading => _buildLoadingMessage(),
       MessageType.error => _buildErrorMessage(chatMessage),
+      MessageType.toolCall => _buildToolCallMessage(chatMessage),
     };
   }
 
@@ -124,6 +125,62 @@ class MessageBuilder {
       ),
     );
   }
+
+  Widget _buildToolCallMessage(ChatMessage message) {
+    final toolName = message.toolCallName ?? 'Unknown Tool';
+    final formattedName = _formatToolName(toolName);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.blueGrey.shade200),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.build_circle_outlined,
+              color: Colors.blueGrey.shade600,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'System',
+              style: TextStyle(
+                color: Colors.blueGrey.shade700,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                'Executing $formattedName',
+                style: TextStyle(
+                  color: Colors.blueGrey.shade600,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Format tool name for display (convert snake_case to Title Case).
+  String _formatToolName(String name) {
+    return name
+        .split('_')
+        .map((word) => word.isEmpty
+            ? ''
+            : '${word[0].toUpperCase()}${word.substring(1)}')
+        .join(' ');
+  }
 }
 
 /// Convert our ChatMessage to Dash Chat's ChatMessage format.
@@ -149,6 +206,9 @@ dash.ChatMessage toDashChatMessage(ChatMessage message) {
     case MessageType.error:
       displayText = message.errorMessage ?? '[Error]';
       debugPrint('toDashChatMessage: ERROR message=${message.errorMessage}');
+    case MessageType.toolCall:
+      displayText = '[Tool: ${message.toolCallName}]';
+      debugPrint('toDashChatMessage: TOOLCALL message=${message.toolCallName}');
   }
 
   return dash.ChatMessage(

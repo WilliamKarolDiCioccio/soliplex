@@ -6,6 +6,7 @@ import 'package:ag_ui/ag_ui.dart' as ag_ui;
 import 'text_message_buffer.dart';
 import 'tool_call_reception_buffer.dart';
 import 'tool_call_registry.dart';
+import 'tool_call_state.dart';
 
 /// Callback type for executing client-side tools.
 typedef ToolExecutor = Future<String> Function(ag_ui.ToolCall call);
@@ -68,10 +69,24 @@ class Thread {
   /// List of registered tools.
   List<ag_ui.Tool> get tools => List.unmodifiable(_tools);
 
+  /// Stream of tool call state changes for UI notifications.
+  Stream<ToolCallStateChange> get toolStateChanges => _toolRegistry.stateChanges;
+
   /// Add a tool dynamically.
-  void addTool(ag_ui.Tool tool, ToolExecutor executor) {
+  ///
+  /// Returns true if the tool was newly added, false if it already exists.
+  /// This is idempotent - calling with the same tool name multiple times
+  /// will only update the executor but not add duplicate tools.
+  bool addTool(ag_ui.Tool tool, ToolExecutor executor) {
+    // Check if tool already registered by name
+    if (_tools.any((t) => t.name == tool.name)) {
+      // Update executor (in case it changed) but don't add duplicate tool
+      _toolExecutors[tool.name] = executor;
+      return false;
+    }
     _tools.add(tool);
     _toolExecutors[tool.name] = executor;
+    return true;
   }
 
   /// Remove a tool.
@@ -127,7 +142,9 @@ class Thread {
     );
 
     try {
+      debugPrint('Thread: Starting await for loop on SSE stream');
       await for (final event in client.runAgent(endpoint, agentInput)) {
+        debugPrint('Thread: Received event: ${event.runtimeType}');
         // Check if disposed during streaming
         if (_disposed) {
           debugPrint('Thread: disposed during event stream, stopping');
@@ -301,41 +318,69 @@ class Thread {
       }
     }
 
+    debugPrint('Thread: SSE stream completed, checking for pending tool calls');
+
     // Execute any pending client tools
     final pendingToolCalls = _toolRegistry.pendingCalls;
     if (pendingToolCalls.isEmpty) {
       return [];
     }
 
+    // _executeClientTools handles state transitions internally via tryStartExecution
     final results = await _executeClientTools(pendingToolCalls.toList());
-    for (final result in results) {
-      _toolRegistry.markCompleted(result.toolCallId, result);
-    }
     return results;
   }
 
   Future<List<ag_ui.ToolMessage>> _executeClientTools(
     List<ag_ui.ToolCall> toolCalls,
   ) async {
-    final results = await Future.wait(
-      toolCalls.map((toolCall) => _executeClientTool(toolCall)),
-    );
-
     final toolMessages = <ag_ui.ToolMessage>[];
-    for (int i = 0; i < results.length; i++) {
-      final toolCallId = toolCalls[i].id;
-      final result = results[i];
+    final futures = <Future<void>>[];
 
-      toolMessages.add(
+    for (final toolCall in toolCalls) {
+      // Atomically try to start execution - prevents double execution
+      final callToExecute = _toolRegistry.tryStartExecution(toolCall.id);
+      if (callToExecute == null) {
+        // Already executing or completed - skip
+        debugPrint(
+          'Thread: Skipping ${toolCall.function.name} (${toolCall.id}) - already processed',
+        );
+        continue;
+      }
+
+      futures.add(_executeAndTrack(callToExecute, toolMessages));
+    }
+
+    await Future.wait(futures);
+    return toolMessages;
+  }
+
+  /// Execute a tool call and track its result.
+  Future<void> _executeAndTrack(
+    ag_ui.ToolCall toolCall,
+    List<ag_ui.ToolMessage> results,
+  ) async {
+    try {
+      final result = await _executeClientTool(toolCall);
+      final message = ag_ui.ToolMessage(
+        id: 'msg-${toolCall.id}',
+        toolCallId: toolCall.id,
+        content: result,
+      );
+      results.add(message);
+      _toolRegistry.markCompleted(toolCall.id, message);
+    } catch (e) {
+      debugPrint('Thread: Tool execution failed for ${toolCall.function.name}: $e');
+      _toolRegistry.markFailed(toolCall.id, e.toString());
+      // Still add an error result so the conversation can continue
+      results.add(
         ag_ui.ToolMessage(
-          id: 'msg-$toolCallId',
-          toolCallId: toolCallId,
-          content: result,
+          id: 'msg-${toolCall.id}',
+          toolCallId: toolCall.id,
+          content: 'ERROR: $e',
         ),
       );
     }
-
-    return toolMessages;
   }
 
   Future<String> _executeClientTool(ag_ui.ToolCall toolCall) async {
@@ -387,5 +432,6 @@ class Thread {
     _messagesController.close();
     _statesController.close();
     _stepsController.close();
+    _toolRegistry.dispose();
   }
 }

@@ -40,7 +40,7 @@ class ChatUser extends Equatable {
 }
 
 /// Type of chat message content.
-enum MessageType { text, genUi, loading, error }
+enum MessageType { text, genUi, loading, error, toolCall }
 
 /// Represents a message in the chat.
 class ChatMessage extends Equatable {
@@ -52,6 +52,8 @@ class ChatMessage extends Equatable {
   final GenUiContent? genUiContent;
   final String? errorMessage;
   final bool isStreaming;
+  final String? toolCallName;
+  final bool? toolCallSuccess;
 
   ChatMessage({
     String? id,
@@ -62,6 +64,8 @@ class ChatMessage extends Equatable {
     this.genUiContent,
     this.errorMessage,
     this.isStreaming = false,
+    this.toolCallName,
+    this.toolCallSuccess,
   }) : id = id ?? _uuid.v4(),
        createdAt = createdAt ?? DateTime.now();
 
@@ -129,6 +133,23 @@ class ChatMessage extends Equatable {
     );
   }
 
+  /// Create a tool call message.
+  factory ChatMessage.toolCall({
+    String? id,
+    required String toolName,
+    bool? success,
+    DateTime? createdAt,
+  }) {
+    return ChatMessage(
+      id: id,
+      user: ChatUser.system,
+      type: MessageType.toolCall,
+      toolCallName: toolName,
+      toolCallSuccess: success,
+      createdAt: createdAt,
+    );
+  }
+
   /// Create a copy with updated fields.
   ChatMessage copyWith({
     String? id,
@@ -139,6 +160,8 @@ class ChatMessage extends Equatable {
     GenUiContent? genUiContent,
     String? errorMessage,
     bool? isStreaming,
+    String? toolCallName,
+    bool? toolCallSuccess,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -149,6 +172,8 @@ class ChatMessage extends Equatable {
       genUiContent: genUiContent ?? this.genUiContent,
       errorMessage: errorMessage ?? this.errorMessage,
       isStreaming: isStreaming ?? this.isStreaming,
+      toolCallName: toolCallName ?? this.toolCallName,
+      toolCallSuccess: toolCallSuccess ?? this.toolCallSuccess,
     );
   }
 
@@ -162,6 +187,8 @@ class ChatMessage extends Equatable {
     genUiContent,
     errorMessage,
     isStreaming,
+    toolCallName,
+    toolCallSuccess,
   ];
 }
 

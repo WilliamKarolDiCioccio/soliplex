@@ -9,7 +9,10 @@ import '../../core/services/canvas_service.dart';
 import '../../core/services/chat_service.dart';
 import '../../core/services/context_pane_service.dart';
 import '../../core/services/local_tools_service.dart';
+import '../../core/services/tool_execution_service.dart';
+import '../../infrastructure/quick_agui/tool_call_state.dart';
 import 'builders/message_builder.dart';
+import 'widgets/tool_execution_indicator.dart';
 
 /// Chat content widget that can be embedded in various layouts.
 ///
@@ -53,6 +56,7 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     final localToolsService = ref.read(localToolsServiceProvider);
     final contextNotifier = ref.read(contextPaneProvider.notifier);
     final canvasNotifier = ref.read(canvasProvider.notifier);
+    final toolExecutionNotifier = ref.read(toolExecutionProvider.notifier);
 
     // Add user message
     chatNotifier.addUserMessage(text);
@@ -83,6 +87,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
             contextNotifier,
           );
         },
+        onToolStateChange: (change) {
+          if (!mounted) return;
+          _handleToolStateChange(change, toolExecutionNotifier, contextNotifier, chatNotifier);
+        },
       );
     } catch (e) {
       debugPrint('Error sending message: $e');
@@ -92,6 +100,40 @@ class _ChatContentState extends ConsumerState<ChatContent> {
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
+    } finally {
+      // Ensure tool execution state is cleared when chat completes
+      if (mounted) {
+        toolExecutionNotifier.clearAll();
+      }
+    }
+  }
+
+  /// Handle tool call state changes for UI notifications.
+  void _handleToolStateChange(
+    ToolCallStateChange change,
+    ToolExecutionNotifier toolExecutionNotifier,
+    ContextPaneNotifier contextNotifier,
+    ChatNotifier chatNotifier,
+  ) {
+    debugPrint(
+      'AG-UI: Tool state change - ${change.toolName}: ${change.previousState} -> ${change.newState}',
+    );
+
+    if (change.isStarting) {
+      // Tool execution started
+      toolExecutionNotifier.startExecution(change.toolCallId, change.toolName);
+      contextNotifier.addToolExecution(change.toolName, isStarting: true);
+      // Add to chat as System message
+      chatNotifier.addToolCallMessage(change.toolName);
+    } else if (change.isEnding) {
+      // Tool execution ended
+      toolExecutionNotifier.endExecution(change.toolCallId);
+      contextNotifier.addToolExecution(
+        change.toolName,
+        isStarting: false,
+        success: change.isSuccess,
+        error: change.error,
+      );
     }
   }
 
@@ -297,7 +339,13 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         // Constrain message bubbles to 70% of available chat width
         final messageMaxWidth = constraints.maxWidth * 0.7;
 
-        return dash.DashChat(
+        return Column(
+          children: [
+            // Tool execution indicator at top
+            const ToolExecutionIndicator(),
+            // Chat area takes remaining space
+            Expanded(
+              child: dash.DashChat(
           currentUser: dash.ChatUser(
             id: ChatUser.user.id,
             firstName: ChatUser.user.firstName,
@@ -383,6 +431,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
                   ),
                 ]
               : [],
+            ),
+            ),
+          ],
         );
       },
     );

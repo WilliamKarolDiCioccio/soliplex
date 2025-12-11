@@ -169,6 +169,41 @@ class ContextPaneNotifier extends StateNotifier<ContextPaneState> {
     );
   }
 
+  /// Add a tool execution state change event.
+  ///
+  /// [isStarting] true when tool starts executing, false when it ends.
+  /// [success] indicates whether the tool completed successfully (only valid when !isStarting).
+  /// [error] contains error message if the tool failed.
+  void addToolExecution(
+    String toolName, {
+    required bool isStarting,
+    bool? success,
+    String? error,
+  }) {
+    String title;
+    String? summary;
+
+    if (isStarting) {
+      title = 'Executing: $toolName';
+      summary = 'started';
+    } else if (success == true) {
+      title = 'Completed: $toolName';
+      summary = 'success';
+    } else {
+      title = 'Failed: $toolName';
+      summary = error ?? 'unknown error';
+    }
+
+    _addItem(
+      ContextItem(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        type: 'tool_execution',
+        title: title,
+        summary: summary,
+      ),
+    );
+  }
+
   void _addItem(ContextItem item) {
     final newItems = [item, ...state.items];
     // Keep only maxItems

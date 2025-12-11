@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../infrastructure/quick_agui/thread.dart';
+import '../../infrastructure/quick_agui/tool_call_state.dart';
 import '../models/chat_models.dart';
 import 'local_tools_service.dart';
 
@@ -83,6 +84,9 @@ class AgUiService extends ChangeNotifier {
 
   /// Stream of state updates.
   Stream<ag_ui.State>? get stateStream => _thread?.stateStream;
+
+  /// Stream of tool call state changes for UI notifications.
+  Stream<ToolCallStateChange>? get toolStateChanges => _thread?.toolStateChanges;
 
   /// Configure the AG-UI service with server details.
   void configure(AgUiServiceConfig config) {
@@ -315,11 +319,14 @@ class AgUiService extends ChangeNotifier {
   ///
   /// [uiToolHandler] is called for canvas_render and genui_render tools
   /// which need access to UI state (Riverpod providers).
+  ///
+  /// [onToolStateChange] is called when tool call states change (start/end execution).
   Future<void> chat(
     String userMessage, {
     required LocalToolsService localToolsService,
     required void Function(ag_ui.BaseEvent event) onEvent,
     UiToolHandler? uiToolHandler,
+    void Function(ToolCallStateChange change)? onToolStateChange,
   }) async {
     // Store UI tool handler for use in tool executor
     _uiToolHandler = uiToolHandler;
@@ -351,6 +358,12 @@ class AgUiService extends ChangeNotifier {
 
       // Listen to events stream
       final subscription = _thread!.stepsStream.listen(onEvent);
+
+      // Listen to tool state changes for UI notifications
+      StreamSubscription<ToolCallStateChange>? toolStateSubscription;
+      if (onToolStateChange != null) {
+        toolStateSubscription = _thread!.toolStateChanges.listen(onToolStateChange);
+      }
 
       // Add user message
       final userMsg = ag_ui.UserMessage(
@@ -386,6 +399,7 @@ class AgUiService extends ChangeNotifier {
       }
 
       await subscription.cancel();
+      await toolStateSubscription?.cancel();
 
       _state = AgUiConnectionState.connected;
       notifyListeners();
