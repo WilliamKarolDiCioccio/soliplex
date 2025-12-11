@@ -824,7 +824,7 @@ async def test_threadstorage_save_run_events(
 
     await the_async_session.commit()
 
-    await ts.save_run_events(
+    found_events = await ts.save_run_events(
         user_name=USER_NAME,
         thread_id=thread_id,
         run_id=run_id,
@@ -835,7 +835,13 @@ async def test_threadstorage_save_run_events(
 
     db_events = await run.list_events()
 
-    for exp_event, db_event in zip(exp_events, db_events, strict=True):
+    for found_event, exp_event, db_event in zip(
+        found_events,
+        exp_events,
+        db_events,
+        strict=True,
+    ):
+        assert found_event == exp_event
         assert db_event == exp_event
 
 

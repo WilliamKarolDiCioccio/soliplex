@@ -717,6 +717,8 @@ class ThreadStorage(agui_package.ThreadStorage):
             for event in events:
                 session.add(RunEvent(run=run, data=event.model_dump()))
 
+        return events
+
 
 def get_session(
     engine_url=SYNC_MEMORY_ENGINE_URL,
