@@ -340,6 +340,9 @@ class AgUiService extends ChangeNotifier {
   ///
   /// [onToolStateChange] is called when tool call states change (start/end execution).
   ///
+  /// [state] is optional application state (e.g., canvas contents) to send with the request.
+  /// This state is available to the agent for context-aware responses.
+  ///
   /// Note: Calls are serialized to prevent concurrent streaming issues.
   Future<void> chat(
     String userMessage, {
@@ -348,6 +351,7 @@ class AgUiService extends ChangeNotifier {
     UiToolHandler? uiToolHandler,
     LocalToolNotifier? onLocalToolExecution,
     void Function(ToolCallStateChange change)? onToolStateChange,
+    Map<String, dynamic>? state,
   }) async {
     // Wait for any pending chat() to complete
     while (_chatLock != null) {
@@ -409,11 +413,12 @@ class AgUiService extends ChangeNotifier {
           'rooms/${_config!.roomId}/agui/${_thread!.id}/$_currentRunId';
       debugPrint('AG-UI: Starting run at $endpoint');
 
-      // Start the run
+      // Start the run with optional state
       var toolResults = await _thread!.startRun(
         endpoint: endpoint,
         runId: _currentRunId!,
         messages: [userMsg],
+        state: state,
       );
 
       // Handle tool result loop

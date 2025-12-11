@@ -4,12 +4,16 @@ description: "test genui"
 suggestions:
 - "What is the weather in <your location>?"
 
+# NOTE: Canvas state sync requires custom factory agent (see genui.py)
+# but it's currently broken. Using default_chat for now.
+# See BACKEND-REQUEST.md for investigation notes.
 agent:
   template_id: "default_chat"
   system_prompt: "./prompt.txt"
 
 tools:
   - tool_name: "soliplex.tools.get_current_datetime"
+  - tool_name: "soliplex.tools.agui_state"
 
 #mcp_client_toolsets:
 

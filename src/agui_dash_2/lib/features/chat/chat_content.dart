@@ -96,7 +96,8 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     }
 
     // Get current canvas state to send with request
-    // NOTE: State sync disabled until backend implements StateHandler protocol
+    // NOTE: State sync disabled - requires custom GenUIAgent which is broken
+    // See BACKEND-REQUEST.md for investigation notes
     // final canvasState = ref.read(canvasProvider);
 
     try {
@@ -104,7 +105,7 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       await agUiService.chat(
         text,
         localToolsService: localToolsService,
-        // state: canvasState.toJson(),  // TODO: Enable when backend supports StateHandler
+        // state: canvasState.toJson(),  // Disabled until GenUIAgent is fixed
         onEvent: (event) {
           if (!mounted) return;
           _processEvent(event, chatNotifier, contextNotifier, canvasNotifier);
