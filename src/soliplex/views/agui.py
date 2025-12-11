@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+
 import fastapi
 import pydantic_ai
 from fastapi import responses
@@ -416,10 +418,13 @@ async def post_room_agui_thread_id_meta(
 async def tee_events(
     event_stream: agui_package.AGUI_EventStream,
     event_list: agui_package.AGUI_Events,
+    on_done,
 ):
     async for event in event_stream:
         event_list.append(event)
         yield event
+
+    await on_done(events=event_list)
 
 
 @util.logfire_span("POST /v1/rooms/{room_id}/agui/{thread_id}/{run_id}")
@@ -479,19 +484,23 @@ async def post_room_agui_thread_id_run_id(
     async def finish_stream(_result):
         await emitter.close()
 
-        await the_threads.save_run_events(
-            user_name=user_name,
-            thread_id=thread_id,
-            run_id=run_id,
-            events=events,
-        )
-
     mpx = agui_mpx.multiplex_streams(
         agui_adapter.run_stream(deps=agent_deps, on_complete=finish_stream),
         agui_parser.agui_events_from_dicts(emitter),
     )
 
-    db_stream = tee_events(mpx, events)
+    save_events = functools.partial(
+        the_threads.save_run_events,
+        user_name=user_name,
+        thread_id=thread_id,
+        run_id=run_id,
+    )
+
+    db_stream = tee_events(
+        mpx,
+        events,
+        on_done=save_events,
+    )
 
     sse_stream = agui_adapter.encode_stream(db_stream)
 

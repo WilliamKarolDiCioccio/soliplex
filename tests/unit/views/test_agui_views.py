@@ -1,5 +1,6 @@
 import contextlib
 import datetime
+import functools
 from unittest import mock
 
 import fastapi
@@ -828,17 +829,25 @@ async def test_post_room_agui_thread_id_meta(cuir, the_threads, w_meta):
 @pytest.mark.parametrize("w_event_count", [0, 1, 10])
 async def test_tee_events(w_event_count):
     event_log = []
+    on_done = mock.AsyncMock(spec_set=())
 
     async def event_iter():
         for event in range(w_event_count):
             yield event
 
     expected = [
-        val async for val in agui_views.tee_events(event_iter(), event_log)
+        event
+        async for event in agui_views.tee_events(
+            event_iter(),
+            event_log,
+            on_done,
+        )
     ]
 
     assert len(event_log) == w_event_count
     assert event_log == expected
+
+    on_done.assert_awaited_once_with(events=event_log)
 
 
 @pytest.mark.asyncio
@@ -936,8 +945,18 @@ async def test_post_room_agui_thread_id_run_id(
 
         tee.assert_called_once()
         event_stream, event_list = tee.call_args_list[0].args
+
         assert event_stream is mpx.return_value
         assert event_list == []
+
+        on_done = tee.call_args_list[0].kwargs["on_done"]
+        assert isinstance(on_done, functools.partial)
+        assert on_done.func is the_threads.save_run_events
+        assert on_done.keywords == {
+            "user_name": USER_NAME,
+            "thread_id": TEST_THREAD_ID,
+            "run_id": TEST_RUN_ID,
+        }
 
         mpx.assert_called_once_with(
             exp_agent_stream,
