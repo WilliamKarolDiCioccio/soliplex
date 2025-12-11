@@ -7,27 +7,26 @@ import '../models/chat_models.dart';
 class ChatState {
   final List<ChatMessage> messages;
   final bool isAgentTyping;
-  final String? currentStreamingMessageId;
+  final Set<String> streamingMessageIds; // Track multiple concurrent streams
   final Map<String, String> pendingToolCalls; // toolCallId -> accumulated args
 
   const ChatState({
     this.messages = const [],
     this.isAgentTyping = false,
-    this.currentStreamingMessageId,
+    this.streamingMessageIds = const {},
     this.pendingToolCalls = const {},
   });
 
   ChatState copyWith({
     List<ChatMessage>? messages,
     bool? isAgentTyping,
-    String? currentStreamingMessageId,
+    Set<String>? streamingMessageIds,
     Map<String, String>? pendingToolCalls,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
       isAgentTyping: isAgentTyping ?? this.isAgentTyping,
-      currentStreamingMessageId:
-          currentStreamingMessageId ?? this.currentStreamingMessageId,
+      streamingMessageIds: streamingMessageIds ?? this.streamingMessageIds,
       pendingToolCalls: pendingToolCalls ?? this.pendingToolCalls,
     );
   }
@@ -53,17 +52,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(
       messages: [...state.messages, message],
       isAgentTyping: true,
-      currentStreamingMessageId: message.id,
+      streamingMessageIds: {...state.streamingMessageIds, message.id},
     );
     return message.id;
   }
 
-  /// Append text to the current streaming message.
-  void appendToStreamingMessage(String delta) {
-    if (state.currentStreamingMessageId == null) return;
+  /// Append text to a specific streaming message by ID.
+  void appendToStreamingMessage(String messageId, String delta) {
+    if (!state.streamingMessageIds.contains(messageId)) return;
 
     final messages = state.messages.map((m) {
-      if (m.id == state.currentStreamingMessageId) {
+      if (m.id == messageId) {
         return m.copyWith(text: (m.text ?? '') + delta);
       }
       return m;
@@ -72,21 +71,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(messages: messages);
   }
 
-  /// Finalize the current streaming message.
-  void finalizeStreamingMessage() {
-    if (state.currentStreamingMessageId == null) return;
+  /// Finalize a specific streaming message by ID.
+  void finalizeStreamingMessage(String messageId) {
+    if (!state.streamingMessageIds.contains(messageId)) return;
 
     final messages = state.messages.map((m) {
-      if (m.id == state.currentStreamingMessageId) {
+      if (m.id == messageId) {
         return m.copyWith(isStreaming: false);
       }
       return m;
     }).toList();
 
+    final newStreamingIds = Set<String>.from(state.streamingMessageIds)
+      ..remove(messageId);
+
     state = state.copyWith(
       messages: messages,
-      isAgentTyping: false,
-      currentStreamingMessageId: null,
+      isAgentTyping: newStreamingIds.isNotEmpty,
+      streamingMessageIds: newStreamingIds,
     );
   }
 
@@ -181,32 +183,51 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
+  /// Add a tool call message showing local tool execution.
+  /// Returns the message ID for later updates.
+  String addToolCallMessage(String toolName, {String status = 'executing'}) {
+    final message = ChatMessage.toolCall(
+      user: ChatUser.system,
+      toolName: toolName,
+      status: status,
+    );
+    state = state.copyWith(messages: [...state.messages, message]);
+    return message.id;
+  }
+
+  /// Update the status of a tool call message.
+  void updateToolCallStatus(String messageId, String status) {
+    debugPrint('updateToolCallStatus: messageId=$messageId, status=$status');
+    bool found = false;
+    final messages = state.messages.map((m) {
+      if (m.id == messageId && m.type == MessageType.toolCall) {
+        found = true;
+        debugPrint('updateToolCallStatus: Found message, updating from ${m.toolCallStatus} to $status');
+        return m.copyWith(toolCallStatus: status);
+      }
+      return m;
+    }).toList();
+    if (!found) {
+      debugPrint('updateToolCallStatus: WARNING - message not found with id=$messageId');
+    }
+    state = state.copyWith(messages: messages);
+  }
+
   /// Add a system/info message.
   void addSystemMessage(String text) {
     final message = ChatMessage.text(user: ChatUser.system, text: text);
     state = state.copyWith(messages: [...state.messages, message]);
   }
 
-  /// Add a tool call message showing tool execution status.
-  void addToolCallMessage(String toolName, {bool? success}) {
-    final message = ChatMessage.toolCall(
-      toolName: toolName,
-      success: success,
-    );
-    state = state.copyWith(messages: [...state.messages, message]);
-  }
-
   /// Remove a message by ID.
   void removeMessage(String messageId) {
     final messages = state.messages.where((m) => m.id != messageId).toList();
+    final newStreamingIds = Set<String>.from(state.streamingMessageIds)
+      ..remove(messageId);
     state = state.copyWith(
       messages: messages,
-      isAgentTyping: state.currentStreamingMessageId == messageId
-          ? false
-          : state.isAgentTyping,
-      currentStreamingMessageId: state.currentStreamingMessageId == messageId
-          ? null
-          : state.currentStreamingMessageId,
+      isAgentTyping: newStreamingIds.isNotEmpty,
+      streamingMessageIds: newStreamingIds,
     );
   }
 

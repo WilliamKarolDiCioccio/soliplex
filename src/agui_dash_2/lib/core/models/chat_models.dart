@@ -53,7 +53,7 @@ class ChatMessage extends Equatable {
   final String? errorMessage;
   final bool isStreaming;
   final String? toolCallName;
-  final bool? toolCallSuccess;
+  final String? toolCallStatus;
 
   ChatMessage({
     String? id,
@@ -65,7 +65,7 @@ class ChatMessage extends Equatable {
     this.errorMessage,
     this.isStreaming = false,
     this.toolCallName,
-    this.toolCallSuccess,
+    this.toolCallStatus,
   }) : id = id ?? _uuid.v4(),
        createdAt = createdAt ?? DateTime.now();
 
@@ -136,16 +136,17 @@ class ChatMessage extends Equatable {
   /// Create a tool call message.
   factory ChatMessage.toolCall({
     String? id,
+    required ChatUser user,
     required String toolName,
-    bool? success,
+    String status = 'executing',
     DateTime? createdAt,
   }) {
     return ChatMessage(
       id: id,
-      user: ChatUser.system,
+      user: user,
       type: MessageType.toolCall,
       toolCallName: toolName,
-      toolCallSuccess: success,
+      toolCallStatus: status,
       createdAt: createdAt,
     );
   }
@@ -161,7 +162,7 @@ class ChatMessage extends Equatable {
     String? errorMessage,
     bool? isStreaming,
     String? toolCallName,
-    bool? toolCallSuccess,
+    String? toolCallStatus,
   }) {
     return ChatMessage(
       id: id ?? this.id,
@@ -173,7 +174,7 @@ class ChatMessage extends Equatable {
       errorMessage: errorMessage ?? this.errorMessage,
       isStreaming: isStreaming ?? this.isStreaming,
       toolCallName: toolCallName ?? this.toolCallName,
-      toolCallSuccess: toolCallSuccess ?? this.toolCallSuccess,
+      toolCallStatus: toolCallStatus ?? this.toolCallStatus,
     );
   }
 
@@ -188,7 +189,7 @@ class ChatMessage extends Equatable {
     errorMessage,
     isStreaming,
     toolCallName,
-    toolCallSuccess,
+    toolCallStatus,
   ];
 }
 

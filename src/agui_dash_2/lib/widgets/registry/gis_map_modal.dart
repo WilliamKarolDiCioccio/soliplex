@@ -2,29 +2,67 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'gis_card_widget.dart';
+
 /// Modal dialog with an interactive OpenStreetMap view.
 ///
-/// Shows the location with a marker and optional accuracy circle.
+/// Shows one or more locations with markers and optional accuracy circles.
 /// Supports pan and zoom interactions.
 class GISMapModal extends StatelessWidget {
-  final double latitude;
-  final double longitude;
-  final double? accuracy;
+  final List<GISCoordinate> coordinates;
   final double initialZoom;
   final String? title;
+  final bool showAccuracyCircle;
 
   const GISMapModal({
     super.key,
-    required this.latitude,
-    required this.longitude,
-    this.accuracy,
+    required this.coordinates,
     this.initialZoom = 15,
     this.title,
+    this.showAccuracyCircle = true,
   });
+
+  /// Calculate the center point of all coordinates.
+  LatLng get _center {
+    if (coordinates.isEmpty) return const LatLng(0, 0);
+    if (coordinates.length == 1) return coordinates.first.toLatLng();
+
+    double sumLat = 0, sumLng = 0;
+    for (final coord in coordinates) {
+      sumLat += coord.latitude;
+      sumLng += coord.longitude;
+    }
+    return LatLng(sumLat / coordinates.length, sumLng / coordinates.length);
+  }
+
+  /// Calculate bounds that contain all coordinates with padding.
+  LatLngBounds? get _bounds {
+    if (coordinates.isEmpty) return null;
+    if (coordinates.length == 1) return null; // Use center/zoom for single point
+
+    double minLat = coordinates.first.latitude;
+    double maxLat = coordinates.first.latitude;
+    double minLng = coordinates.first.longitude;
+    double maxLng = coordinates.first.longitude;
+
+    for (final coord in coordinates) {
+      if (coord.latitude < minLat) minLat = coord.latitude;
+      if (coord.latitude > maxLat) maxLat = coord.latitude;
+      if (coord.longitude < minLng) minLng = coord.longitude;
+      if (coord.longitude > maxLng) maxLng = coord.longitude;
+    }
+
+    return LatLngBounds(
+      LatLng(minLat, minLng),
+      LatLng(maxLat, maxLng),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final center = LatLng(latitude, longitude);
+    final center = _center;
+    final pointCount = coordinates.length;
+    final first = coordinates.isNotEmpty ? coordinates.first : null;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(16),
@@ -48,7 +86,7 @@ class GISMapModal extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      title ?? 'Location',
+                      title ?? (pointCount > 1 ? 'Locations' : 'Location'),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -67,47 +105,58 @@ class GISMapModal extends StatelessWidget {
               height: MediaQuery.of(context).size.height * 0.6,
               width: MediaQuery.of(context).size.width * 0.9,
               child: FlutterMap(
-                options: MapOptions(
-                  initialCenter: center,
-                  initialZoom: initialZoom,
-                  interactionOptions: const InteractionOptions(
-                    flags: InteractiveFlag.all,
-                  ),
-                ),
+                options: _bounds != null
+                    ? MapOptions(
+                        initialCameraFit: CameraFit.bounds(
+                          bounds: _bounds!,
+                          padding: const EdgeInsets.all(50),
+                        ),
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all,
+                        ),
+                      )
+                    : MapOptions(
+                        initialCenter: center,
+                        initialZoom: initialZoom,
+                        interactionOptions: const InteractionOptions(
+                          flags: InteractiveFlag.all,
+                        ),
+                      ),
                 children: [
                   // OpenStreetMap tiles
                   TileLayer(
                     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                     userAgentPackageName: 'com.example.agui_dash_2',
                   ),
-                  // Accuracy circle
-                  if (accuracy != null && accuracy! > 0)
+                  // Accuracy circles
+                  if (showAccuracyCircle)
                     CircleLayer(
-                      circles: [
-                        CircleMarker(
-                          point: center,
-                          radius: accuracy!,
-                          useRadiusInMeter: true,
-                          color: Colors.blue.withAlpha(40),
-                          borderColor: Colors.blue.withAlpha(150),
-                          borderStrokeWidth: 2,
-                        ),
-                      ],
+                      circles: coordinates
+                          .where((c) => c.accuracy != null && c.accuracy! > 0)
+                          .map((c) => CircleMarker(
+                                point: c.toLatLng(),
+                                radius: c.accuracy!,
+                                useRadiusInMeter: true,
+                                color: (c.color ?? Colors.blue).withAlpha(40),
+                                borderColor: (c.color ?? Colors.blue).withAlpha(150),
+                                borderStrokeWidth: 2,
+                              ))
+                          .toList(),
                     ),
-                  // Location marker
+                  // Location markers
                   MarkerLayer(
-                    markers: [
-                      Marker(
-                        point: center,
-                        width: 40,
-                        height: 40,
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.red,
-                          size: 40,
-                        ),
-                      ),
-                    ],
+                    markers: coordinates
+                        .map((c) => Marker(
+                              point: c.toLatLng(),
+                              width: 40,
+                              height: 40,
+                              child: Icon(
+                                Icons.location_on,
+                                color: c.color ?? Colors.red,
+                                size: 40,
+                              ),
+                            ))
+                        .toList(),
                   ),
                 ],
               ),
@@ -128,13 +177,17 @@ class GISMapModal extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${latitude.toStringAsFixed(6)}, ${longitude.toStringAsFixed(6)}',
+                    pointCount > 1
+                        ? '$pointCount points'
+                        : first != null
+                            ? '${first.latitude.toStringAsFixed(6)}, ${first.longitude.toStringAsFixed(6)}'
+                            : 'No coordinates',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       fontFamily: 'monospace',
                       color: Colors.grey.shade700,
                     ),
                   ),
-                  if (accuracy != null) ...[
+                  if (pointCount == 1 && first?.accuracy != null) ...[
                     const SizedBox(width: 16),
                     Icon(
                       Icons.gps_fixed,
@@ -143,7 +196,7 @@ class GISMapModal extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '±${accuracy!.toStringAsFixed(1)}m',
+                      '±${first!.accuracy!.toStringAsFixed(1)}m',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.grey.shade700,
                       ),

@@ -77,8 +77,16 @@ class _ChatContentState extends ConsumerState<ChatContent> {
           if (!mounted) return;
           _processEvent(event, chatNotifier, contextNotifier, canvasNotifier);
         },
-        uiToolHandler: (toolName, args) async {
-          debugPrint('UI Tool Handler: $toolName with args: $args');
+        uiToolHandler: (toolCallId, toolName, args) async {
+          debugPrint('UI Tool Handler: $toolName (id=$toolCallId) with args: $args');
+
+          // Prevent duplicate execution of the same tool call
+          if (_processedUiToolCalls.contains(toolCallId)) {
+            debugPrint('UI Tool Handler: SKIPPING duplicate tool call $toolCallId');
+            return {'skipped': true, 'reason': 'duplicate'};
+          }
+          _processedUiToolCalls.add(toolCallId);
+
           return _handleUiTool(
             toolName,
             args,
@@ -86,6 +94,38 @@ class _ChatContentState extends ConsumerState<ChatContent> {
             canvasNotifier,
             contextNotifier,
           );
+        },
+        onLocalToolExecution: (toolCallId, toolName, status) {
+          debugPrint('onLocalToolExecution: toolCallId=$toolCallId, toolName=$toolName, status=$status');
+
+          // Deduplicate by tool call ID - skip if we've already processed this execution
+          final trackingKey = '$toolCallId:$status';
+          if (_processedToolNotifications.contains(trackingKey)) {
+            debugPrint('Skipping duplicate tool notification: $toolCallId $toolName $status');
+            return;
+          }
+          _processedToolNotifications.add(trackingKey);
+
+          contextNotifier.addLocalToolExecution(toolName, status: status);
+
+          // Add or update tool call message in chat
+          if (status == 'executing') {
+            final messageId = chatNotifier.addToolCallMessage(toolName);
+            _toolCallMessageIds[toolCallId] = messageId;
+            debugPrint('Added tool call message: toolCallId=$toolCallId -> messageId=$messageId');
+          } else {
+            final messageId = _toolCallMessageIds[toolCallId];
+            debugPrint('Updating tool call: toolCallId=$toolCallId, messageId=$messageId');
+            if (messageId != null) {
+              chatNotifier.updateToolCallStatus(messageId, status);
+              debugPrint('Updated tool call status to: $status');
+              if (status == 'completed' || status.startsWith('error')) {
+                _toolCallMessageIds.remove(toolCallId);
+              }
+            } else {
+              debugPrint('WARNING: No message ID found for toolCallId=$toolCallId');
+            }
+          }
         },
         onToolStateChange: (change) {
           if (!mounted) return;
@@ -109,6 +149,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
   }
 
   /// Handle tool call state changes for UI notifications.
+  ///
+  /// Note: Tool call messages are added/updated via onLocalToolExecution callback.
+  /// This handler only manages the ToolExecutionNotifier (for the indicator widget)
+  /// and ContextPaneNotifier (for the context pane).
   void _handleToolStateChange(
     ToolCallStateChange change,
     ToolExecutionNotifier toolExecutionNotifier,
@@ -123,8 +167,7 @@ class _ChatContentState extends ConsumerState<ChatContent> {
       // Tool execution started
       toolExecutionNotifier.startExecution(change.toolCallId, change.toolName);
       contextNotifier.addToolExecution(change.toolName, isStarting: true);
-      // Add to chat as System message
-      chatNotifier.addToolCallMessage(change.toolName);
+      // Note: Chat message is added via onLocalToolExecution to track ID for status updates
     } else if (change.isEnding) {
       // Tool execution ended
       toolExecutionNotifier.endExecution(change.toolCallId);
@@ -137,9 +180,19 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     }
   }
 
-  // State for tracking current message
-  String? _currentMessageId;
-  final _textBuffer = StringBuffer();
+  // State for tracking messages per AG-UI messageId
+  // Maps AG-UI event messageId -> our internal ChatMessage id
+  final Map<String, String> _messageIdMap = {};
+  final Map<String, StringBuffer> _textBuffers = {};
+
+  // Track processed UI tool calls to prevent duplicate execution
+  final Set<String> _processedUiToolCalls = {};
+
+  // Track processed tool notifications to prevent duplicates (key: "$toolCallId:$status")
+  final Set<String> _processedToolNotifications = {};
+
+  // Track tool call message IDs for updating status (key: toolCallId)
+  final Map<String, String> _toolCallMessageIds = {};
 
   /// Process a single AG-UI event.
   void _processEvent(
@@ -148,7 +201,10 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     ContextPaneNotifier contextNotifier,
     CanvasNotifier canvasNotifier,
   ) {
-    debugPrint('AG-UI Event: ${event.runtimeType}');
+    // Skip verbose thinking content events
+    if (event is! ag_ui.ThinkingTextMessageContentEvent) {
+      debugPrint('AG-UI Event: ${event.runtimeType}');
+    }
 
     switch (event) {
       case ag_ui.RunStartedEvent():
@@ -156,28 +212,36 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         contextNotifier.addAgUiEvent('Run Started', summary: event.runId);
 
       case ag_ui.TextMessageStartEvent():
-        debugPrint('AG-UI: TextMessageStartEvent received, messageId=${event.messageId}');
-        _currentMessageId = chatNotifier.startAgentMessage();
-        _textBuffer.clear();
-        debugPrint('AG-UI: Text message started, id=$_currentMessageId');
+        final aguiMessageId = event.messageId;
+        debugPrint('AG-UI: TextMessageStartEvent received, messageId=$aguiMessageId');
+        final chatMessageId = chatNotifier.startAgentMessage();
+        _messageIdMap[aguiMessageId] = chatMessageId;
+        _textBuffers[aguiMessageId] = StringBuffer();
+        debugPrint('AG-UI: Text message started, aguiId=$aguiMessageId -> chatId=$chatMessageId');
 
       case ag_ui.TextMessageContentEvent():
-        debugPrint('AG-UI: TextMessageContentEvent received, delta="${event.delta}"');
-        if (_currentMessageId != null) {
-          chatNotifier.appendToStreamingMessage(event.delta);
-          _textBuffer.write(event.delta);
+        final aguiMessageId = event.messageId;
+        final chatMessageId = _messageIdMap[aguiMessageId];
+        debugPrint('AG-UI: TextMessageContentEvent received, messageId=$aguiMessageId, delta="${event.delta}"');
+        if (chatMessageId != null) {
+          chatNotifier.appendToStreamingMessage(chatMessageId, event.delta);
+          _textBuffers[aguiMessageId]?.write(event.delta);
         } else {
-          debugPrint('AG-UI: WARNING - TextMessageContentEvent but no _currentMessageId');
+          debugPrint('AG-UI: WARNING - TextMessageContentEvent but no mapping for messageId=$aguiMessageId');
         }
 
       case ag_ui.TextMessageEndEvent():
-        debugPrint('AG-UI: TextMessageEndEvent received');
-        if (_currentMessageId != null) {
-          chatNotifier.finalizeStreamingMessage();
-          contextNotifier.addTextMessage(_textBuffer.toString(), isUser: false);
-          _currentMessageId = null;
+        final aguiMessageId = event.messageId;
+        final chatMessageId = _messageIdMap[aguiMessageId];
+        debugPrint('AG-UI: TextMessageEndEvent received, messageId=$aguiMessageId');
+        if (chatMessageId != null) {
+          chatNotifier.finalizeStreamingMessage(chatMessageId);
+          final text = _textBuffers[aguiMessageId]?.toString() ?? '';
+          contextNotifier.addTextMessage(text, isUser: false);
+          _messageIdMap.remove(aguiMessageId);
+          _textBuffers.remove(aguiMessageId);
         } else {
-          debugPrint('AG-UI: WARNING - TextMessageEndEvent but no _currentMessageId');
+          debugPrint('AG-UI: WARNING - TextMessageEndEvent but no mapping for messageId=$aguiMessageId');
         }
 
       case ag_ui.ToolCallStartEvent():
@@ -224,7 +288,8 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         debugPrint('AG-UI: Thinking text started');
 
       case ag_ui.ThinkingTextMessageContentEvent():
-        debugPrint('AG-UI: Thinking: ${event.delta}');
+        // Suppressed - too verbose
+        break;
 
       case ag_ui.ThinkingTextMessageEndEvent():
         debugPrint('AG-UI: Thinking text ended');
@@ -402,8 +467,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         },
       ),
       inputOptions: dash.InputOptions(
+        sendOnEnter: true,
         inputDecoration: InputDecoration(
-          hintText: 'Type a message...',
+          hintText: 'Type a message, SHIFT+ENTER multiple lines',
           filled: true,
           fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           border: OutlineInputBorder(

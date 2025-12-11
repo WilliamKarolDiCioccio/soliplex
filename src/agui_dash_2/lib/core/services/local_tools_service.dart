@@ -352,7 +352,7 @@ Example for LocationCard:
   }
 }
 
-Example for GISCard (interactive map):
+Example for GISCard (single location):
 {
   "widget_name": "GISCard",
   "data": {
@@ -363,7 +363,22 @@ Example for GISCard (interactive map):
     "title": "Your Location",
     "showAccuracyCircle": true
   }
-}''',
+}
+
+Example for GISCard with MULTIPLE locations (use "coordinates" array):
+{
+  "widget_name": "GISCard",
+  "data": {
+    "coordinates": [
+      {"latitude": 37.7749, "longitude": -122.4194, "label": "San Francisco", "color": "#FF0000"},
+      {"latitude": 34.0522, "longitude": -118.2437, "label": "Los Angeles", "color": "#00FF00"},
+      {"latitude": 47.6062, "longitude": -122.3321, "label": "Seattle", "color": "#0000FF"}
+    ],
+    "title": "West Coast Cities",
+    "showAccuracyCircle": false
+  }
+}
+Note: When using "coordinates" array, the map automatically zooms to fit all points.''',
       parameters: {
         'type': 'object',
         'properties': {

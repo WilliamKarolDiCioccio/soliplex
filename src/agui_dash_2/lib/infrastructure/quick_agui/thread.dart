@@ -35,7 +35,8 @@ class Thread {
   ag_ui.State? currentState;
   final List<ag_ui.Message> messageHistory = [];
 
-  var _textBuffer = TextMessageBuffer('');
+  // Per-message text buffers to support concurrent message streams
+  final Map<String, TextMessageBuffer> _textBuffers = {};
 
   Thread({
     required this.id,
@@ -74,19 +75,14 @@ class Thread {
 
   /// Add a tool dynamically.
   ///
-  /// Returns true if the tool was newly added, false if it already exists.
+  /// If a tool with the same name already exists, it will be replaced.
   /// This is idempotent - calling with the same tool name multiple times
-  /// will only update the executor but not add duplicate tools.
-  bool addTool(ag_ui.Tool tool, ToolExecutor executor) {
-    // Check if tool already registered by name
-    if (_tools.any((t) => t.name == tool.name)) {
-      // Update executor (in case it changed) but don't add duplicate tool
-      _toolExecutors[tool.name] = executor;
-      return false;
-    }
+  /// will update the executor and tool definition.
+  void addTool(ag_ui.Tool tool, ToolExecutor executor) {
+    // Remove existing tool with same name to prevent duplicates
+    _tools.removeWhere((t) => t.name == tool.name);
     _tools.add(tool);
     _toolExecutors[tool.name] = executor;
-    return true;
   }
 
   /// Remove a tool.
@@ -162,18 +158,19 @@ class Thread {
             _addMessage(message);
 
           case ag_ui.TextMessageStartEvent(messageId: final msgId):
-            _textBuffer = TextMessageBuffer(msgId);
+            _textBuffers[msgId] = TextMessageBuffer(msgId);
 
           case ag_ui.TextMessageContentEvent(
             messageId: final msgId,
             delta: final text,
           ):
-            _textBuffer.add(msgId, text);
+            _textBuffers[msgId]?.add(msgId, text);
 
           case ag_ui.TextMessageEndEvent(messageId: final msgId):
+            final buffer = _textBuffers.remove(msgId);
             final message = ag_ui.AssistantMessage(
               id: msgId,
-              content: _textBuffer.content,
+              content: buffer?.content ?? '',
             );
             messageHistory.add(message);
             _addMessage(message);
@@ -424,6 +421,7 @@ class Thread {
     _runs.clear();
     _toolCallReceptions.clear();
     _toolRegistry.clear();
+    _textBuffers.clear();
     currentState = null;
   }
 
