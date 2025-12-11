@@ -8,7 +8,9 @@ class DataListWidget extends StatelessWidget {
 
   /// Create from JSON data.
   ///
-  /// Expected data format:
+  /// Supports multiple data formats:
+  ///
+  /// Format 1 - items array with title/value:
   /// ```json
   /// {
   ///   "items": [
@@ -17,17 +19,54 @@ class DataListWidget extends StatelessWidget {
   ///   ]
   /// }
   /// ```
+  ///
+  /// Format 2 - items array with title/subtitle (e.g., user lists):
+  /// ```json
+  /// {
+  ///   "items": [
+  ///     {"id": "u1", "title": "John Smith", "subtitle": "Engineering Lead"}
+  ///   ]
+  /// }
+  /// ```
+  ///
+  /// Format 3 - bare array at root:
+  /// ```json
+  /// [
+  ///   {"title": "John Smith", "subtitle": "Engineering Lead"}
+  /// ]
+  /// ```
   factory DataListWidget.fromData(
     Map<String, dynamic> data,
     void Function(String, Map<String, dynamic>)? onEvent,
   ) {
-    final itemsList = data['items'] as List<dynamic>? ?? [];
+    // Handle items either as a nested 'items' key or at root level
+    List<dynamic> itemsList;
+    if (data.containsKey('items')) {
+      itemsList = data['items'] as List<dynamic>? ?? [];
+    } else if (data.containsKey('selected')) {
+      // Handle SearchWidget selection format
+      itemsList = data['selected'] as List<dynamic>? ?? [];
+    } else {
+      itemsList = [];
+    }
+
     return DataListWidget(
       items: itemsList.map((item) {
         final map = item as Map<String, dynamic>;
+        // Support multiple field names for flexibility:
+        // - title: primary display text
+        // - value OR subtitle: secondary display text
+        final title = map['title'] as String? ??
+            map['name'] as String? ??
+            map['label'] as String? ??
+            '';
+        final value = map['value']?.toString() ??
+            map['subtitle']?.toString() ??
+            map['description']?.toString() ??
+            '';
         return DataListItem(
-          title: map['title'] as String? ?? '',
-          value: map['value']?.toString() ?? '',
+          title: title,
+          value: value,
         );
       }).toList(),
     );

@@ -27,6 +27,7 @@ class ChatContent extends ConsumerStatefulWidget {
 
 class _ChatContentState extends ConsumerState<ChatContent> {
   late final MessageBuilder _messageBuilder;
+  final TextEditingController _inputController = TextEditingController();
 
   @override
   void initState() {
@@ -34,9 +35,26 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     _messageBuilder = MessageBuilder(onGenUiEvent: _handleGenUiEvent);
   }
 
+  @override
+  void dispose() {
+    _inputController.dispose();
+    super.dispose();
+  }
+
   void _handleGenUiEvent(String eventName, Map<String, Object?> arguments) {
     debugPrint('GenUI Event: $eventName, args: $arguments');
 
+    // Check if this event has a toolCallId that matches a registered callback
+    final toolCallId = arguments['_toolCallId'] as String?;
+    if (toolCallId != null && _searchCallbacks.containsKey(toolCallId)) {
+      final callback = _searchCallbacks[toolCallId];
+      final payload = Map<String, dynamic>.from(arguments);
+      payload.remove('_toolCallId');
+      callback?.call(eventName, payload);
+      return;
+    }
+
+    // Default: show snackbar for other events
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -51,12 +69,21 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     final text = dashMessage.text.trim();
     if (text.isEmpty) return;
 
+    // Clear input immediately after capturing text
+    _inputController.clear();
+
     final chatNotifier = ref.read(chatProvider.notifier);
     final agUiService = ref.read(configuredAgUiServiceProvider);
     final localToolsService = ref.read(localToolsServiceProvider);
     final contextNotifier = ref.read(contextPaneProvider.notifier);
     final canvasNotifier = ref.read(canvasProvider.notifier);
     final toolExecutionNotifier = ref.read(toolExecutionProvider.notifier);
+
+    // Check for slash commands (handled locally, not sent to backend)
+    if (text.startsWith('/')) {
+      final handled = _handleSlashCommand(text, chatNotifier, canvasNotifier);
+      if (handled) return;
+    }
 
     // Add user message
     chatNotifier.addUserMessage(text);
@@ -193,6 +220,9 @@ class _ChatContentState extends ConsumerState<ChatContent> {
 
   // Track tool call message IDs for updating status (key: toolCallId)
   final Map<String, String> _toolCallMessageIds = {};
+
+  // Track active search widgets and their callbacks
+  final Map<String, void Function(String, Map<String, dynamic>)> _searchCallbacks = {};
 
   /// Process a single AG-UI event.
   void _processEvent(
@@ -389,6 +419,422 @@ class _ChatContentState extends ConsumerState<ChatContent> {
     }
   }
 
+  /// Stubbed staff data for /search staff command
+  static const List<Map<String, dynamic>> _stubbedStaffData = [
+    {'id': 'u1', 'title': 'John Smith', 'subtitle': 'Engineering Lead'},
+    {'id': 'u2', 'title': 'Jane Doe', 'subtitle': 'Product Manager'},
+    {'id': 'u3', 'title': 'Bob Wilson', 'subtitle': 'Senior Developer'},
+    {'id': 'u4', 'title': 'Alice Johnson', 'subtitle': 'UX Designer'},
+    {'id': 'u5', 'title': 'Charlie Brown', 'subtitle': 'DevOps Engineer'},
+    {'id': 'u6', 'title': 'Diana Prince', 'subtitle': 'QA Lead'},
+    {'id': 'u7', 'title': 'Edward Norton', 'subtitle': 'Backend Developer'},
+    {'id': 'u8', 'title': 'Fiona Apple', 'subtitle': 'Frontend Developer'},
+    {'id': 'u9', 'title': 'George Lucas', 'subtitle': 'Data Scientist'},
+    {'id': 'u10', 'title': 'Hannah Montana', 'subtitle': 'Marketing Manager'},
+  ];
+
+  /// Stubbed staff skills data (keyed by person ID)
+  static const Map<String, Map<String, dynamic>> _stubbedStaffSkills = {
+    'u1': {
+      'person_id': 'u1',
+      'name': 'John Smith',
+      'title': 'Engineering Lead',
+      'skills': [
+        {'name': 'Flutter', 'level': 5},
+        {'name': 'Dart', 'level': 5},
+        {'name': 'Python', 'level': 4},
+        {'name': 'AWS', 'level': 3},
+        {'name': 'Leadership', 'level': 4},
+      ],
+    },
+    'u2': {
+      'person_id': 'u2',
+      'name': 'Jane Doe',
+      'title': 'Product Manager',
+      'skills': [
+        {'name': 'Product Strategy', 'level': 5},
+        {'name': 'Agile', 'level': 4},
+        {'name': 'Data Analysis', 'level': 3},
+        {'name': 'UX Research', 'level': 4},
+      ],
+    },
+    'u3': {
+      'person_id': 'u3',
+      'name': 'Bob Wilson',
+      'title': 'Senior Developer',
+      'skills': [
+        {'name': 'Python', 'level': 5},
+        {'name': 'Django', 'level': 5},
+        {'name': 'PostgreSQL', 'level': 4},
+        {'name': 'Docker', 'level': 4},
+        {'name': 'AWS', 'level': 3},
+      ],
+    },
+    'u4': {
+      'person_id': 'u4',
+      'name': 'Alice Johnson',
+      'title': 'UX Designer',
+      'skills': [
+        {'name': 'Figma', 'level': 5},
+        {'name': 'User Research', 'level': 4},
+        {'name': 'Prototyping', 'level': 5},
+        {'name': 'CSS', 'level': 3},
+      ],
+    },
+    'u5': {
+      'person_id': 'u5',
+      'name': 'Charlie Brown',
+      'title': 'DevOps Engineer',
+      'skills': [
+        {'name': 'Kubernetes', 'level': 5},
+        {'name': 'Docker', 'level': 5},
+        {'name': 'AWS', 'level': 5},
+        {'name': 'Terraform', 'level': 4},
+        {'name': 'Python', 'level': 3},
+      ],
+    },
+    'u6': {
+      'person_id': 'u6',
+      'name': 'Diana Prince',
+      'title': 'QA Lead',
+      'skills': [
+        {'name': 'Test Automation', 'level': 5},
+        {'name': 'Selenium', 'level': 4},
+        {'name': 'Python', 'level': 4},
+        {'name': 'API Testing', 'level': 5},
+      ],
+    },
+    'u7': {
+      'person_id': 'u7',
+      'name': 'Edward Norton',
+      'title': 'Backend Developer',
+      'skills': [
+        {'name': 'Java', 'level': 5},
+        {'name': 'Spring Boot', 'level': 5},
+        {'name': 'PostgreSQL', 'level': 4},
+        {'name': 'Redis', 'level': 4},
+        {'name': 'Kafka', 'level': 3},
+      ],
+    },
+    'u8': {
+      'person_id': 'u8',
+      'name': 'Fiona Apple',
+      'title': 'Frontend Developer',
+      'skills': [
+        {'name': 'React', 'level': 5},
+        {'name': 'TypeScript', 'level': 5},
+        {'name': 'CSS', 'level': 4},
+        {'name': 'Flutter', 'level': 3},
+      ],
+    },
+    'u9': {
+      'person_id': 'u9',
+      'name': 'George Lucas',
+      'title': 'Data Scientist',
+      'skills': [
+        {'name': 'Python', 'level': 5},
+        {'name': 'Machine Learning', 'level': 5},
+        {'name': 'TensorFlow', 'level': 4},
+        {'name': 'SQL', 'level': 4},
+        {'name': 'Data Viz', 'level': 4},
+      ],
+    },
+    'u10': {
+      'person_id': 'u10',
+      'name': 'Hannah Montana',
+      'title': 'Marketing Manager',
+      'skills': [
+        {'name': 'Digital Marketing', 'level': 5},
+        {'name': 'SEO', 'level': 4},
+        {'name': 'Analytics', 'level': 4},
+        {'name': 'Content Strategy', 'level': 5},
+      ],
+    },
+  };
+
+  /// Stubbed projects data for /list projects command
+  static const List<Map<String, dynamic>> _stubbedProjectsData = [
+    {
+      'id': 'p1',
+      'title': 'Mobile App Redesign',
+      'description': 'Complete overhaul of the customer-facing mobile application',
+      'required_skills': ['Flutter', 'Dart', 'Figma', 'UX Research'],
+      'status': 'open',
+    },
+    {
+      'id': 'p2',
+      'title': 'Data Pipeline Migration',
+      'description': 'Migrate legacy ETL pipelines to cloud-native architecture',
+      'required_skills': ['Python', 'AWS', 'Kubernetes', 'Docker'],
+      'status': 'open',
+    },
+    {
+      'id': 'p3',
+      'title': 'ML Recommendation Engine',
+      'description': 'Build personalized recommendation system for e-commerce',
+      'required_skills': ['Python', 'Machine Learning', 'TensorFlow', 'PostgreSQL'],
+      'status': 'open',
+    },
+    {
+      'id': 'p4',
+      'title': 'API Gateway Modernization',
+      'description': 'Replace monolithic API with microservices architecture',
+      'required_skills': ['Java', 'Spring Boot', 'Kubernetes', 'Kafka'],
+      'status': 'open',
+    },
+    {
+      'id': 'p5',
+      'title': 'Marketing Analytics Dashboard',
+      'description': 'Real-time dashboard for marketing campaign performance',
+      'required_skills': ['React', 'TypeScript', 'Data Viz', 'Analytics'],
+      'status': 'open',
+    },
+  ];
+
+  /// Demo definitions with walkthrough steps
+  static const Map<String, Map<String, dynamic>> _demos = {
+    'team-builder': {
+      'title': 'Team Builder',
+      'description': 'Build an optimal team for a project based on required skills',
+      'steps': [
+        '1. Type: /list projects',
+        '2. Pick a project (e.g., "Mobile App Redesign")',
+        '3. Say: "Build me a team for the Mobile App Redesign project"',
+        '4. The LLM will show SkillsCards for recommended team members',
+        '5. Try: "Pin these to the canvas" to save them',
+      ],
+    },
+    'skill-match': {
+      'title': 'Skill Matching',
+      'description': 'Find the best project fit for selected staff members',
+      'steps': [
+        '1. Type: /search staff',
+        '2. Select 2-3 people (e.g., John Smith, Bob Wilson)',
+        '3. Complete the message: "Show their skills"',
+        '4. Then ask: "Which projects are these people best suited for?"',
+        '5. LLM shows ProjectCards with matched_skills highlighted',
+      ],
+    },
+    'gap-analysis': {
+      'title': 'Skill Gap Analysis',
+      'description': 'Identify missing skills for a project',
+      'steps': [
+        '1. Type: /list projects',
+        '2. Say: "What skills are we missing for the API Gateway project?"',
+        '3. LLM analyzes staff skills vs project requirements',
+        '4. Shows which required skills have no expert available',
+        '5. Try: "Who should we hire to fill these gaps?"',
+      ],
+    },
+    'compare': {
+      'title': 'Staff Comparison',
+      'description': 'Compare candidates for a specific role or project',
+      'steps': [
+        '1. Type: /search staff',
+        '2. Select 2 people to compare',
+        '3. Say: "Compare these two for the ML Recommendation Engine project"',
+        '4. LLM shows side-by-side skills with match percentages',
+        '5. Ask: "Who would you recommend and why?"',
+      ],
+    },
+    'coverage': {
+      'title': 'Project Coverage Ranking',
+      'description': 'Rank projects by how well current staff can cover them',
+      'steps': [
+        '1. Say: "Rank all projects by how well we can staff them"',
+        '2. LLM analyzes all staff skills vs all project requirements',
+        '3. Shows ProjectCards sorted by skill coverage percentage',
+        '4. Try: "What would it take to fully staff the bottom-ranked project?"',
+      ],
+    },
+  };
+
+  /// Handle slash commands locally (not sent to backend).
+  /// Returns true if command was handled, false to send to backend.
+  bool _handleSlashCommand(
+    String text,
+    ChatNotifier chatNotifier,
+    CanvasNotifier canvasNotifier,
+  ) {
+    final parts = text.split(' ');
+    final command = parts[0].toLowerCase();
+    final args = parts.skip(1).toList();
+
+    switch (command) {
+      case '/search':
+        final searchType = args.isNotEmpty ? args[0] : 'items';
+        _showSearchWidget(searchType, chatNotifier, canvasNotifier);
+        return true;
+
+      case '/list':
+        final listType = args.isNotEmpty ? args[0] : 'items';
+        _showListWidget(listType, chatNotifier, canvasNotifier);
+        return true;
+
+      case '/demo':
+        final demoName = args.isNotEmpty ? args.join('-') : '';
+        _showDemo(demoName, chatNotifier);
+        return true;
+
+      case '/help':
+        chatNotifier.addSystemMessage(
+          'Available commands:\n'
+          '• /search staff - Search and select staff members\n'
+          '• /list projects - Show available projects\n'
+          '• /list demos - Show available demos\n'
+          '• /demo <name> - Walk through a specific demo\n'
+          '• /help - Show this help message',
+        );
+        return true;
+
+      default:
+        // Unknown command - let it go to backend
+        return false;
+    }
+  }
+
+  /// Show a search widget in the chat for interactive selection.
+  void _showSearchWidget(
+    String searchType,
+    ChatNotifier chatNotifier,
+    CanvasNotifier canvasNotifier,
+  ) {
+    // Show user's command in chat
+    chatNotifier.addUserMessage('/search $searchType');
+
+    // Determine items based on search type
+    List<Map<String, dynamic>> items;
+    String placeholder;
+
+    switch (searchType) {
+      case 'staff':
+        items = _stubbedStaffData;
+        placeholder = 'Search staff by name or role...';
+      default:
+        items = _stubbedStaffData;
+        placeholder = 'Search...';
+    }
+
+    // Generate unique ID for this search widget
+    final searchId = 'search-${DateTime.now().millisecondsSinceEpoch}';
+
+    // Store callback for this search widget
+    _searchCallbacks[searchId] = (eventName, payload) {
+      _handleSearchWidgetEvent(eventName, payload, searchType, chatNotifier);
+      // Clean up callback after terminal events
+      if (eventName == 'submit' || eventName == 'cancel') {
+        _searchCallbacks.remove(searchId);
+      }
+    };
+
+    // Add SearchWidget as a GenUI message
+    // Include _toolCallId in data so widget can pass it back with events
+    chatNotifier.addGenUiMessage(
+      GenUiContent(
+        toolCallId: searchId,
+        widgetName: 'SearchWidget',
+        data: {
+          '_toolCallId': searchId,  // For event routing
+          'placeholder': placeholder,
+          'multi_select': true,
+          'items': items,
+          'search_type': searchType,
+        },
+      ),
+    );
+  }
+
+  /// Show a list widget in the chat (e.g., projects, demos).
+  void _showListWidget(
+    String listType,
+    ChatNotifier chatNotifier,
+    CanvasNotifier canvasNotifier,
+  ) {
+    // Show user's command in chat
+    chatNotifier.addUserMessage('/list $listType');
+
+    switch (listType) {
+      case 'projects':
+        // Show each project as a ProjectCard in chat
+        for (final project in _stubbedProjectsData) {
+          chatNotifier.addGenUiMessage(
+            GenUiContent(
+              toolCallId: 'project-${project['id']}-${DateTime.now().millisecondsSinceEpoch}',
+              widgetName: 'ProjectCard',
+              data: project,
+            ),
+          );
+        }
+      case 'demos':
+        // Show available demos as a formatted list
+        final demoList = _demos.entries.map((e) {
+          final demo = e.value;
+          return '• /demo ${e.key} - ${demo['title']}\n  ${demo['description']}';
+        }).join('\n\n');
+        chatNotifier.addSystemMessage('Available Demos:\n\n$demoList');
+      default:
+        chatNotifier.addSystemMessage('Unknown list type: $listType\nTry: /list projects or /list demos');
+    }
+  }
+
+  /// Show a specific demo walkthrough.
+  void _showDemo(String demoName, ChatNotifier chatNotifier) {
+    chatNotifier.addUserMessage('/demo $demoName');
+
+    if (demoName.isEmpty) {
+      chatNotifier.addSystemMessage('Usage: /demo <name>\nType /list demos to see available demos.');
+      return;
+    }
+
+    final demo = _demos[demoName];
+    if (demo == null) {
+      final available = _demos.keys.join(', ');
+      chatNotifier.addSystemMessage('Unknown demo: $demoName\nAvailable: $available');
+      return;
+    }
+
+    final steps = (demo['steps'] as List<dynamic>).join('\n');
+    chatNotifier.addSystemMessage(
+      '${demo['title']}\n'
+      '${'-' * (demo['title'] as String).length}\n'
+      '${demo['description']}\n\n'
+      'Walkthrough:\n$steps',
+    );
+  }
+
+  /// Handle events from SearchWidget.
+  void _handleSearchWidgetEvent(
+    String eventName,
+    Map<String, dynamic> payload,
+    String searchType,
+    ChatNotifier chatNotifier,
+  ) {
+    debugPrint('SearchWidget event: $eventName, payload: $payload');
+
+    switch (eventName) {
+      case 'submit':
+        final selected = payload['selected'] as List<dynamic>? ?? [];
+        if (selected.isNotEmpty) {
+          // Format selection as text to pre-fill the input
+          final names = selected.map((item) {
+            final map = item as Map<String, dynamic>;
+            return '${map['title']} (${map['subtitle']})';
+          }).join(', ');
+
+          // Pre-fill the input with selection, let user complete the message
+          final prefill = 'Selected $searchType: $names\n';
+          _inputController.text = prefill;
+          // Move cursor to end so user can continue typing
+          _inputController.selection = TextSelection.fromPosition(
+            TextPosition(offset: prefill.length),
+          );
+        }
+
+      case 'cancel':
+        chatNotifier.addSystemMessage('Search cancelled.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
@@ -467,6 +913,7 @@ class _ChatContentState extends ConsumerState<ChatContent> {
         },
       ),
       inputOptions: dash.InputOptions(
+        textController: _inputController,
         sendOnEnter: true,
         inputDecoration: InputDecoration(
           hintText: 'Type a message, SHIFT+ENTER multiple lines',

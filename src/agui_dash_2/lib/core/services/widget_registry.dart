@@ -10,6 +10,9 @@ import '../../widgets/registry/action_button_widget.dart';
 import '../../widgets/registry/progress_card_widget.dart';
 import '../../widgets/registry/location_card_widget.dart';
 import '../../widgets/registry/gis_card_widget.dart';
+import '../../widgets/registry/search_widget.dart';
+import '../../widgets/registry/skills_card_widget.dart';
+import '../../widgets/registry/project_card_widget.dart';
 
 /// Widget builder function signature.
 ///
@@ -96,6 +99,18 @@ void _registerDefaultWidgets(WidgetRegistry registry) {
 
   registry.register('GISCard', (context, data, onEvent) {
     return GISCardWidget.fromData(data, onEvent);
+  });
+
+  registry.register('SearchWidget', (context, data, onEvent) {
+    return SearchWidget(data: data, onEvent: onEvent);
+  });
+
+  registry.register('SkillsCard', (context, data, onEvent) {
+    return SkillsCardWidget.fromData(data, onEvent);
+  });
+
+  registry.register('ProjectCard', (context, data, onEvent) {
+    return ProjectCardWidget.fromData(data, onEvent);
   });
 }
 
