@@ -366,7 +366,36 @@ class SearchResult(pydantic.BaseModel):
     document_uri: str | None = None
 
 
+# ----------------------------------------------------------------------------
+#   Room-related models
+# ----------------------------------------------------------------------------
+
+
+class RAGDocument(pydantic.BaseModel):
+    """Documents from a room's RAG database"""
+
+    id: str
+    uri: str | None
+    title: str | None
+    metadata: dict[str, typing.Any]
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+
+RAGDocumentSet = dict[str, RAGDocument]
+
+
+class RoomDocuments(pydantic.BaseModel):
+    room_id: str
+    document_set: RAGDocumentSet
+
+
+# ----------------------------------------------------------------------------
+#   Authentication-related models
+# ----------------------------------------------------------------------------
+
 UserInfo = dict[str, typing.Any]
+
 
 # ----------------------------------------------------------------------------
 #   AG-UI-related models

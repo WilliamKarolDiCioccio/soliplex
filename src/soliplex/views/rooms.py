@@ -1,6 +1,7 @@
 import fastapi
 from fastapi import responses
 from fastapi import security
+from haiku.rag import client as rag_client
 
 from soliplex import auth
 from soliplex import installation
@@ -112,3 +113,52 @@ async def get_room_mcp_token(
     secret = the_installation.get_secret("URL_SAFE_TOKEN_SECRET")
     token = mcp_auth.generate_url_safe_token(secret, room_id, **user)
     return models.MCPToken(room_id=room_id, mcp_token=token)
+
+
+@util.logfire_span("GET /v1/rooms/{room_id}/documents")
+@router.get("/v1/rooms/{room_id}/documents")
+async def get_room_documents(
+    request: fastapi.Request,
+    room_id: str,
+    the_installation: installation.Installation = depend_the_installation,
+    token: security.HTTPAuthorizationCredentials = auth.oauth2_predicate,
+) -> models.RoomDocuments:
+    """Return a list of the documents in the room's RAG database"""
+    user = auth.authenticate(the_installation, token)
+
+    try:
+        room_config = the_installation.get_room_config(room_id, user)
+    except KeyError:
+        raise fastapi.HTTPException(
+            status_code=404,
+            detail=f"No such room: {room_id}",
+        ) from None
+
+    document_set = {}
+
+    for tool_config in room_config.tool_configs.values():
+        hr_config = getattr(tool_config, "haiku_rag_config", None)
+
+        if hr_config is not None:
+            hr_client_kw = {
+                "db_path": tool_config.rag_lancedb_path,
+                "config": hr_config,
+            }
+
+            async with rag_client.HaikuRAG(**hr_client_kw) as rag:
+                results = await rag.list_documents()
+
+            for document in results:
+                document_set[document.id] = models.RAGDocument(
+                    id=document.id,
+                    uri=document.uri,
+                    title=document.title,
+                    metadata=document.metadata,
+                    created_at=document.created_at,
+                    updated_at=document.updated_at,
+                )
+
+    return models.RoomDocuments(
+        room_id=room_id,
+        document_set=document_set,
+    )

@@ -267,24 +267,44 @@ async def test__check_user_thread(
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "w_miss, expectation",
+    "w_error, expectation",
     [
-        (False, no_error()),
-        (True, raises_httpexc(code=404, match="No such run")),
+        (None, no_error()),
+        ("no_run", raises_httpexc(code=404, match="No such run")),
+        (
+            "room_mismatch",
+            raises_httpexc(code=400, match="Expected thread.room_id"),
+        ),
     ],
 )
 async def test__check_user_thread_run(
     the_threads,
+    test_thread,
     test_run,
-    w_miss,
+    w_error,
     expectation,
 ):
-    if w_miss:
+    if w_error == "no_run":
         the_threads.get_run.side_effect = agui_package.UnknownRun(
             run_id=TEST_RUN_ID,
         )
     else:
         the_threads.get_run.return_value = test_run
+        test_run.awaitable_attrs.thread = _awaitable(
+            "thread",
+            test_thread,
+        )
+
+        if w_error == "room_mismatch":
+            test_thread.awaitable_attrs.room_id = _awaitable(
+                "thread_room_id",
+                OTHER_ROOM_ID,
+            )
+        else:
+            test_thread.awaitable_attrs.room_id = _awaitable(
+                "thread_room_id",
+                TEST_ROOM_ID,
+            )
 
     with expectation as expected:
         found_run = await agui_views._check_user_thread_run(
@@ -299,7 +319,6 @@ async def test__check_user_thread_run(
         assert found_run is the_threads.get_run.return_value
 
     the_threads.get_run.assert_called_once_with(
-        room_id=TEST_ROOM_ID,
         user_name=USER_NAME,
         thread_id=TEST_THREAD_ID,
         run_id=TEST_RUN_ID,
@@ -742,7 +761,6 @@ async def test_post_room_agui_thread_id(
         assert found.parent_run_id == w_parent_id
 
         the_threads.new_run.assert_called_once_with(
-            room_id=TEST_ROOM_ID,
             user_name=USER_NAME,
             thread_id=TEST_THREAD_ID,
             run_metadata=run_meta_kw,
@@ -989,7 +1007,6 @@ async def test_post_room_agui_thread_id_run_id_meta(cuir, the_threads, w_meta):
     assert found.status_code == 205
 
     the_threads.update_run.assert_called_once_with(
-        room_id=TEST_ROOM_ID,
         user_name=USER_NAME,
         thread_id=TEST_THREAD_ID,
         run_id=TEST_RUN_ID,
