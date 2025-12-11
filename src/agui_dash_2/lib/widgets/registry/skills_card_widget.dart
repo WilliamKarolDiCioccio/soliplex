@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// SkillsCard widget for displaying a person's skills and proficiency levels.
 ///
@@ -34,6 +35,26 @@ class SkillsCardWidget extends StatelessWidget {
     this.onEvent,
   });
 
+  String _copyableText() {
+    final buffer = StringBuffer();
+    buffer.writeln('$name - $title');
+    buffer.writeln('Skills:');
+    for (final skill in skills) {
+      buffer.writeln('  ${skill.name}: ${_levelLabel(skill.level)}');
+    }
+    return buffer.toString();
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _copyableText()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
   factory SkillsCardWidget.fromData(
     Map<String, dynamic> data,
     void Function(String, Map<String, dynamic>)? onEvent,
@@ -67,7 +88,7 @@ class SkillsCardWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with avatar and name
+            // Header with avatar, name, and copy button
             Row(
               children: [
                 CircleAvatar(
@@ -86,13 +107,13 @@ class SkillsCardWidget extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      SelectableText(
                         name,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Text(
+                      SelectableText(
                         title,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.hintColor,
@@ -100,6 +121,12 @@ class SkillsCardWidget extends StatelessWidget {
                       ),
                     ],
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: () => _copyToClipboard(context),
+                  tooltip: 'Copy to clipboard',
+                  visualDensity: VisualDensity.compact,
                 ),
               ],
             ),
@@ -113,10 +140,9 @@ class SkillsCardWidget extends StatelessWidget {
                 children: [
                   SizedBox(
                     width: 100,
-                    child: Text(
+                    child: SelectableText(
                       skill.name,
                       style: theme.textTheme.bodyMedium,
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -124,7 +150,7 @@ class SkillsCardWidget extends StatelessWidget {
                     child: _SkillLevelBar(level: skill.level),
                   ),
                   const SizedBox(width: 8),
-                  Text(
+                  SelectableText(
                     _levelLabel(skill.level),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.hintColor,

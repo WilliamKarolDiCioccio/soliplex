@@ -1,10 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// DataList widget for displaying key-value pairs in a list format.
 class DataListWidget extends StatelessWidget {
   final List<DataListItem> items;
 
   const DataListWidget({super.key, required this.items});
+
+  String _copyableText() {
+    final buffer = StringBuffer();
+    for (final item in items) {
+      buffer.writeln('${item.title}: ${item.value}');
+    }
+    return buffer.toString();
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _copyableText()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
 
   /// Create from JSON data.
   ///
@@ -75,21 +94,41 @@ class DataListWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: items.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return ListTile(
-            title: Text(item.title),
-            trailing: Text(
-              item.value,
-              style: Theme.of(context).textTheme.titleMedium,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with copy button
+          Padding(
+            padding: const EdgeInsets.only(right: 4, top: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: () => _copyToClipboard(context),
+                  tooltip: 'Copy to clipboard',
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ),
-          );
-        },
+          ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: items.length,
+            separatorBuilder: (context, index) => const Divider(height: 1),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return ListTile(
+                title: SelectableText(item.title),
+                trailing: SelectableText(
+                  item.value,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

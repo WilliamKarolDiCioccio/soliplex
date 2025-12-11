@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// ProjectCard widget for displaying project info with required skills.
 ///
@@ -30,6 +31,27 @@ class ProjectCardWidget extends StatelessWidget {
     this.matchedSkills,
     this.onEvent,
   });
+
+  String _copyableText() {
+    final buffer = StringBuffer();
+    buffer.writeln('$title ($status)');
+    buffer.writeln(description);
+    buffer.writeln('Required Skills: ${requiredSkills.join(", ")}');
+    if (matchedSkills != null && matchedSkills!.isNotEmpty) {
+      buffer.writeln('Matched Skills: ${matchedSkills!.join(", ")}');
+    }
+    return buffer.toString();
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _copyableText()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
 
   factory ProjectCardWidget.fromData(
     Map<String, dynamic> data,
@@ -63,7 +85,7 @@ class ProjectCardWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with title and status
+            // Header with title, status, and copy button
             Row(
               children: [
                 Icon(
@@ -73,7 +95,7 @@ class ProjectCardWidget extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
+                  child: SelectableText(
                     title,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -81,21 +103,26 @@ class ProjectCardWidget extends StatelessWidget {
                   ),
                 ),
                 _StatusChip(status: status),
+                IconButton(
+                  icon: const Icon(Icons.copy, size: 18),
+                  onPressed: () => _copyToClipboard(context),
+                  tooltip: 'Copy to clipboard',
+                  visualDensity: VisualDensity.compact,
+                ),
               ],
             ),
             const SizedBox(height: 8),
             // Description
-            Text(
+            SelectableText(
               description,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.hintColor,
               ),
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
             // Required skills
-            Text(
+            SelectableText(
               'Required Skills:',
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,

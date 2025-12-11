@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// InfoCard widget for displaying information with title, subtitle, and optional icon.
 class InfoCardWidget extends StatelessWidget {
@@ -16,6 +17,25 @@ class InfoCardWidget extends StatelessWidget {
     this.color,
     this.onTap,
   });
+
+  String _copyableText() {
+    final buffer = StringBuffer();
+    buffer.writeln(title);
+    if (subtitle != null) {
+      buffer.writeln(subtitle);
+    }
+    return buffer.toString();
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: _copyableText()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Copied to clipboard'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
 
   /// Create from JSON data.
   ///
@@ -72,21 +92,25 @@ class InfoCardWidget extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    SelectableText(
                       title,
                       style: Theme.of(context).textTheme.titleMedium,
-                      overflow: TextOverflow.ellipsis,
                       maxLines: 2,
                     ),
                     if (subtitle != null)
-                      Text(
+                      SelectableText(
                         subtitle!,
                         style: Theme.of(context).textTheme.bodySmall,
-                        overflow: TextOverflow.ellipsis,
                         maxLines: 3,
                       ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.copy, size: 18),
+                onPressed: () => _copyToClipboard(context),
+                tooltip: 'Copy to clipboard',
+                visualDensity: VisualDensity.compact,
               ),
             ],
           ),
