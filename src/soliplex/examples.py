@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import dataclasses
 import random
-import time
 import typing
 import uuid
 from collections import abc
@@ -83,7 +83,7 @@ async def faux_tool(ctx: pydantic_ai.RunContext) -> str:
     agui_emitter = ctx.deps.agui_emitter
     activity_id = str(uuid.uuid4())
 
-    time.sleep(random.uniform(0.25, 0.5))
+    await asyncio.sleep(random.uniform(0.25, 0.5))
 
     agui_emitter.update_activity(
         "idling",
@@ -91,7 +91,7 @@ async def faux_tool(ctx: pydantic_ai.RunContext) -> str:
         activity_id,
     )
 
-    time.sleep(random.uniform(0.25, 0.5))
+    await asyncio.sleep(random.uniform(0.25, 0.5))
 
     return "something random"
 
@@ -181,7 +181,7 @@ class FauxAgent:
         )
         last_message = message_history[-1]
 
-        time.sleep(random.uniform(0.5, 2.0))
+        await asyncio.sleep(random.uniform(0.5, 2.0))
 
         if isinstance(last_message, ai_messages.ModelRequest):
             ups = [
@@ -200,7 +200,7 @@ class FauxAgent:
                     ),
                 )
 
-            time.sleep(random.uniform(0.5, 2.0))
+            await asyncio.sleep(random.uniform(0.5, 2.0))
 
         yield ai_messages.PartEndEvent(
             index=part_index,
@@ -224,14 +224,14 @@ class FauxAgent:
 
             await tool_config.tool(ctx)
 
-            time.sleep(random.uniform(0.5, 2.0))
+            await asyncio.sleep(random.uniform(0.5, 2.0))
 
             yield ai_messages.PartEndEvent(
                 index=part_index,
                 part=tc_part,
             )
 
-        time.sleep(random.uniform(2.5, 3.0))
+        await asyncio.sleep(random.uniform(2.5, 3.0))
 
         text_part = ai_messages.TextPart("I don't know!")
         part_index += 1
