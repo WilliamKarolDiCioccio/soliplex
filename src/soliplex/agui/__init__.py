@@ -1,41 +1,68 @@
 from __future__ import annotations
 
 import abc
+import collections.abc
 import datetime
+import typing
 
 import fastapi
 from ag_ui import core as agui_core
 from sqlalchemy.ext import asyncio as sqla_asyncio
 
-AGUI_Events = list[agui_core.BaseEvent]
+AGUI_Events = list[agui_core.Event]
+AGUI_EventStream = collections.abc.AsyncIterator[agui_core.Event]
+AGUI_State = dict[str, typing.Any]
 
 
-class UnknownThread(fastapi.HTTPException):
+class AGUI_Exception(ValueError):
+    status_code = 400
+
+
+class UnknownThread(AGUI_Exception):
+    status_code = 404
+
     def __init__(self, user_name: str, thread_id: str):
         self.user_name = user_name
         self.thread_id = thread_id
         message = f"Unknown thread: UUID {thread_id} for user {user_name}"
-        super().__init__(status_code=404, detail=message)
+        super().__init__(message)
 
 
-class UnknownRun(ValueError):
+class UnknownRun(AGUI_Exception):
+    status_code = 404
+
     def __init__(self, run_id: str):
         self.run_id = run_id
-        super().__init__(f"Run input run ID {run_id} does not exist in thread")
-
-
-class MissingParentRun(ValueError):
-    def __init__(self, parent_run_id: str):
-        self.parent_run_id = parent_run_id
         super().__init__(
-            f"Run input parent run ID {parent_run_id} does not exist in thread"
+            f"Unknown run: UUID {run_id} does not exist in thread"
         )
 
 
-class RunInputMismatch(ValueError):
-    def __init__(self, which: str):
-        self.which = which
-        super().__init__(f"Run input field does not match run: {which}")
+class ThreadRoomMismatch(AGUI_Exception):
+    def __init__(self, room_id: str, thread_room_id: str):
+        self.room_id = room_id
+        self.thread_room_id = thread_room_id
+        super().__init__(
+            f"Thread room ID '{thread_room_id}' "
+            f"does not match room ID '{room_id}'"
+        )
+
+
+class MissingParentRun(AGUI_Exception):
+    def __init__(self, parent_run_id: str):
+        self.parent_run_id = parent_run_id
+        super().__init__(
+            f"Unknown parent run: UUID {parent_run_id} "
+            f"does not exist in thread"
+        )
+
+
+class RunAlreadyStarted(AGUI_Exception):
+    def __init__(self, user_name: str, thread_id: str, run_id: str):
+        self.user_name = user_name
+        self.thread_id = thread_id
+        self.run_id = run_id
+        super().__init__(f"Run already started: UUID {run_id}")
 
 
 #
@@ -131,6 +158,7 @@ class ThreadStorage(abc.ABC):
         self,
         *,
         user_name: str,
+        room_id: str,
         thread_id: str,
     ) -> Thread:
         """Return the actual thread instance
@@ -154,10 +182,11 @@ class ThreadStorage(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def update_thread(
+    async def update_thread_metadata(
         self,
         *,
         user_name: str,
+        room_id: str,
         thread_id: str,
         thread_metadata: ThreadMetadata | dict = None,
     ) -> Thread:
@@ -175,6 +204,7 @@ class ThreadStorage(abc.ABC):
         self,
         *,
         user_name: str,
+        room_id: str,
         thread_id: str,
     ) -> None:
         """Remove a thread"""
@@ -184,6 +214,7 @@ class ThreadStorage(abc.ABC):
         self,
         *,
         user_name: str,
+        room_id: str,
         thread_id: str,
         run_metadata: RunMetadata = None,
         parent_run_id: str = None,
@@ -199,16 +230,30 @@ class ThreadStorage(abc.ABC):
     async def get_run(
         self,
         user_name: str,
+        room_id: str,
         thread_id: str,
         run_id: str,
     ) -> Run:
         """Return an existing run for a thread"""
 
     @abc.abstractmethod
-    async def update_run(
+    async def add_run_input(
         self,
         *,
         user_name: str,
+        room_id: str,
+        thread_id: str,
+        run_id: str,
+        run_input: agui_core.RunAgentInput,
+    ) -> Run:
+        """Update a run with the given 'run_agent_input'"""
+
+    @abc.abstractmethod
+    async def update_run_metadata(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
         thread_id: str,
         run_id: str,
         run_metadata: RunMetadata | dict = None,
@@ -220,6 +265,18 @@ class ThreadStorage(abc.ABC):
         If 'run_metadata' is None, or an empty dict, remove any existing
         metadata on the run.
         """
+
+    @abc.abstractmethod
+    async def save_run_events(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+        thread_id: str,
+        run_id: str,
+        events: AGUI_Events,
+    ) -> AGUI_Events:
+        """Save the events for a gven run"""
 
 
 async def get_the_threads(request: fastapi.Request) -> ThreadStorage:
