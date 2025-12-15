@@ -1,6 +1,6 @@
 {
-    "name": "soliplex_client",
-    "short_name": "soliplex_client",
+    "name": "Soliplex",
+    "short_name": "Soliplex",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
