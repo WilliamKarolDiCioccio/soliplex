@@ -52,8 +52,17 @@ embeddings:
 
 qa:
   model:
-    name: qwen3:latest
+    name: gpt-oss:latest
     provider: ollama
+
+research:
+  model:
+    name: gpt-oss:latest
+    provider: ollama
+  max_iterations: 2
+  confidence_threshold: 0.7
+  max_concurrency: 1
+
 
 #
 # Omit this section to accept the defaults.
