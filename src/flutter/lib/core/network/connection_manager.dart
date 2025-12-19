@@ -395,6 +395,24 @@ class ConnectionManager extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
+  /// Make an HTTP DELETE request using the active server's transport.
+  Future<http.Response> delete(
+    Uri uri, {
+    Map<String, String>? additionalHeaders,
+  }) async {
+    if (_disposed) {
+      throw StateError('ConnectionManager is disposed');
+    }
+    final transport = _activeServerState?.transportLayer;
+    if (transport == null) {
+      throw StateError(
+        'No server configured. Call switchServer() first.',
+      );
+    }
+
+    return transport.delete(uri, additionalHeaders: additionalHeaders);
+  }
+
   /// Remove a server and all its sessions.
   void removeServer(String serverId) {
     if (_disposed) return;
