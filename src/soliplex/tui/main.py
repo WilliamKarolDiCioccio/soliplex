@@ -1,3 +1,4 @@
+import importlib.metadata
 import json
 
 import requests
@@ -12,6 +13,22 @@ from textual import widget as t_widget
 from textual import widgets as t_widgets
 
 from soliplex.agui import parser as agui_parser
+
+PYDANTIC_AI_SLIM_VERSION = importlib.metadata.version("pydantic-ai-slim")
+B0RKEN_PYDANTIC_AI_SLIM_VERSIONS = ("1.36.0", "1.37.0")
+
+
+class ListHeaderWidget(t_widget.Widget):
+    DEFAULT_CSS = """
+    ListHeaderWidget {
+        layout: horizontal;
+        height: auto;
+        padding: 1;
+    }
+    ListHeaderWidget Label {
+        padding-right: 2;
+    }
+    """
 
 
 class LabeledInputWidget(t_widget.Widget):
@@ -344,9 +361,10 @@ class ThreadRunsView(t_screen.Screen):
     }
     """
 
-    def __init__(self, room_id, thread_id, *args, **kwargs):
+    def __init__(self, room_id, thread_id, thread_name, *args, **kwargs):
         self.room_id = room_id
         self.thread_id = thread_id
+        self.thread_name = thread_name
         self._runs = None
         super().__init__()
 
@@ -364,21 +382,26 @@ class ThreadRunsView(t_screen.Screen):
     def compose(self) -> t_app.ComposeResult:
         yield t_widgets.Header()
 
-        yield t_widgets.Label(f"Runs in thread: {self.thread_id}")
+        with ListHeaderWidget():
+            yield t_widgets.Label(
+                f"Runs in thread: {self.thread_name or self.thread_id}",
+            )
 
         with t_containers.VerticalScroll(id="runs-list"):
             for run_id, run_info in self.runs.items():
+                meta = run_info["metadata"]
+
+                if meta is not None:
+                    button_label = f"{meta['label']}:\n{run_id}"
+                else:
+                    button_label = run_id
+
                 with RunButtonWidget():
                     yield t_widgets.Button(
                         name=run_id,
-                        label=f"{run_id}",
+                        label=button_label,
+                        variant="primary",
                     )
-
-                    if run_info["metadata"] is not None:
-                        yield t_widgets.Label(
-                            run_info["metadata"]["label"],
-                            classes="run-label",
-                        )
 
         yield t_widgets.Footer()
 
@@ -434,25 +457,28 @@ class RoomThreadsView(t_screen.Screen):
         yield t_widgets.Header()
         threads = self.threads
 
-        if threads:
-            yield t_widgets.Label(f"Threads in room: {self.room_id}")
-        else:
-            yield t_widgets.Label(f"No threads in room: {self.room_id}")
+        with ListHeaderWidget():
+            if threads:
+                yield t_widgets.Label(f"Threads in room: {self.room_id}")
+            else:
+                yield t_widgets.Label(f"No threads in room: {self.room_id}")
 
         with t_containers.VerticalScroll(id="threads-list"):
             for thread_info in self.threads:
                 thread_id = thread_info["thread_id"]
                 meta = thread_info.get("metadata")
+
+                if meta is not None:
+                    button_label = f"{meta['name']}:\n{thread_id}"
+                else:
+                    button_label = thread_id
+
                 with ThreadButtonWidget():
                     yield t_widgets.Button(
                         name=thread_id,
-                        label=f"{thread_id}",
+                        label=button_label,
+                        variant="primary",
                     )
-                    if meta is not None:
-                        yield t_widgets.Label(
-                            meta["name"],
-                            classes="thread-name",
-                        )
 
         yield t_widgets.Footer()
 
@@ -581,7 +607,11 @@ class RoomView(t_screen.Screen):
 
     @textual.work
     async def action_list_runs(self) -> None:
-        thread_runs_view = ThreadRunsView(self.room_id, self.thread_id)
+        thread_runs_view = ThreadRunsView(
+            self.room_id,
+            self.thread_id,
+            self.thread_name,
+        )
 
         await self.app.push_screen_wait(thread_runs_view)
 
@@ -684,6 +714,7 @@ class RoomView(t_screen.Screen):
                 json=new_thread_request_json,
             ).json()
             self.thread_id = thread_id = new_thread["thread_id"]
+            self.thread_name = None
             (run_id,) = new_thread["runs"].keys()
 
             self.run_agent_input = agui_core.RunAgentInput(
@@ -717,10 +748,17 @@ class RoomView(t_screen.Screen):
             )
 
         event_log = []
+
+        esp_kw = {}
+
+        if PYDANTIC_AI_SLIM_VERSION in B0RKEN_PYDANTIC_AI_SLIM_VERSIONS:
+            print("XXX: stripping 'ActivityMessage'")
+            esp_kw["stripped_message_types"] = agui_core.ActivityMessage
+
         esp = agui_parser.EventStreamParser(
             self.run_agent_input,
             event_log=event_log,
-            stripped_message_types=agui_core.ActivityMessage,
+            **esp_kw,
         )
         request_json = self.run_agent_input.model_dump()
 
@@ -785,6 +823,14 @@ class SoliplexTUI(t_app.App):
     BINDINGS = [
         t_binding.Binding("ctrl+q", "quit", "quit", id="quit"),
     ]
+    DEFAULT_CSS = """
+    VerticalScroll {
+        width: 100%;
+    }
+    VerticalScroll Button {
+        width: 100%;
+    }
+    """
 
     def __init__(self, soliplex_url="http://localhost:8000", *args, **kw):
         self.soliplex_url = soliplex_url
@@ -806,12 +852,16 @@ class SoliplexTUI(t_app.App):
 
     def compose(self) -> t_app.ComposeResult:
         yield t_widgets.Header()
-        yield t_widgets.Label("Available rooms:")
+
+        with ListHeaderWidget():
+            yield t_widgets.Label("Available rooms:")
+
         with t_containers.VerticalScroll(id="rooms-list"):
             for room_id, room_info in self.rooms.items():
                 yield t_widgets.Button(
                     name=room_id,
-                    label=f"{room_id}: {room_info['description']}",
+                    label=f"{room_id}:\n{room_info['description']}",
+                    variant="primary",
                 )
         yield t_widgets.Footer()
 
