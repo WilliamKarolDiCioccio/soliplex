@@ -16,6 +16,7 @@ from soliplex import config
 from soliplex import installation
 from soliplex import main
 from soliplex import models
+from soliplex import ollama
 from soliplex import secrets
 
 
@@ -64,6 +65,8 @@ installation_path_type = typing.Annotated[
 def get_installation(
     installation_path: pathlib.Path,
 ) -> installation.Installation:
+    if installation_path.is_dir():
+        installation_path = installation_path / "installation.yaml"
     i_config = config.load_installation(installation_path)
     i_config.reload_configurations()
     return installation.Installation(i_config)
@@ -489,6 +492,66 @@ def agui_feature_schemas(
     }
 
     print(json.dumps(feature_schemas))
+
+
+@the_cli.command(
+    "pull-models",
+)
+def pull_models(
+    ctx: typer.Context,
+    installation_path: installation_path_type,
+    ollama_url: str = typer.Option(
+        os.environ.get("OLLAMA_BASE_URL", ollama.DEFAULT_OLLAMA_URL),
+        "-u",
+        "--ollama-url",
+        help="Ollama API base URL (default: $OLLAMA_BASE_URL or "
+        f"{ollama.DEFAULT_OLLAMA_URL})",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "-n",
+        "--dry-run",
+        help="Show which models would be pulled without actually pulling them",
+    ),
+):
+    """Pull Ollama models referenced in the installation configuration"""
+    the_console.line()
+    the_console.rule("Scanning for Ollama models")
+    the_console.line()
+
+    the_installation = get_installation(installation_path)
+    models = the_installation.get_all_models()
+
+    if not models:
+        the_console.print("No Ollama models found in configuration files.")
+        return
+
+    the_console.line()
+    the_console.rule(f"Found {len(models)} unique Ollama model(s)")
+    the_console.line()
+    for model in sorted(models):
+        the_console.print(f"  - {model}")
+
+    if dry_run:
+        return
+
+    the_console.line()
+    the_console.rule(f"Pulling models from {ollama_url}")
+
+    def on_status(msg, is_error=False):
+        style = "red" if is_error else None
+        the_console.print(f"  {msg}", style=style)
+
+    success_count = 0
+    for model in sorted(models):
+        the_console.print(f"\nPulling: {model}")
+        if ollama.pull_model(model, ollama_url, on_status=on_status):
+            success_count += 1
+
+    the_console.line()
+    msg = f"Pulled {success_count}/{len(models)} model(s) successfully"
+    the_console.rule(msg)
+    the_console.line()
 
 
 if __name__ == "__main__":
