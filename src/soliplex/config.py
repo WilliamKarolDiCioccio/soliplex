@@ -18,6 +18,7 @@ from collections import abc
 from urllib import parse as url_parse
 
 import dotenv
+import logfire
 import yaml
 from haiku.rag import config as hr_config
 from pydantic_ai import settings as ai_settings
@@ -1647,6 +1648,220 @@ AGUI_FEATURES_BY_NAME = {
 }
 
 # ============================================================================
+#   Logfire configuration types
+# ============================================================================
+
+
+@dataclasses.dataclass(kw_only=True)
+class LogfireInstrumentPydanticAI:
+    include_binary_content: bool = True
+    include_content: bool = True
+
+    # Set by `from_yaml` factory
+    _config_path: pathlib.Path = None
+
+    @classmethod
+    def from_yaml(
+        cls,
+        config_path: pathlib.Path,
+        config: dict | None,
+    ):
+        try:
+            return cls(
+                _config_path=config_path,
+                **config,
+            )
+        except Exception as exc:
+            raise FromYamlException(
+                config_path,
+                "logfire_instrument_pydantic_ai",
+                config,
+            ) from exc
+
+    @property
+    def instrument_pydantic_ai_kwargs(self) -> dict[str, typing.Any]:
+        return {
+            "include_binary_content": self.include_binary_content,
+            "include_content": self.include_content,
+        }
+
+    @property
+    def as_yaml(self) -> dict[str, typing.Any]:
+        return self.instrument_pydantic_ai_kwargs
+
+
+@dataclasses.dataclass(kw_only=True)
+class LogfireInstrumentFastAPI:
+    capture_headers: bool = False
+    excluded_urls: list[str] = None
+    record_send_receive: bool = False
+    extra_spans: bool = False
+
+    # Set by `from_yaml` factory
+    _config_path: pathlib.Path = None
+
+    @classmethod
+    def from_yaml(
+        cls,
+        config_path: pathlib.Path,
+        config: dict | None,
+    ):
+        try:
+            return cls(
+                _config_path=config_path,
+                **config,
+            )
+        except Exception as exc:
+            raise FromYamlException(
+                config_path,
+                "logfire_instrument_fast_api",
+                config,
+            ) from exc
+
+    @property
+    def instrument_fast_api_kwargs(self) -> dict[str, typing.Any]:
+        return {
+            "capture_headers": self.capture_headers,
+            "excluded_urls": self.excluded_urls,
+            "record_send_receive": self.record_send_receive,
+            "extra_spans": self.extra_spans,
+        }
+
+    @property
+    def as_yaml(self) -> dict[str, typing.Any]:
+        return self.instrument_fast_api_kwargs
+
+
+@dataclasses.dataclass(kw_only=True)
+class LogfireConfig:
+    token: str  # "secret:LOGFIRE_TOKEN" or similar
+    service_name: str = "env:LOGFIRE_SERVICE_NAME"
+    service_version: str = "env:LOGFIRE_SERVICE_VERSION"
+    environment: str = "env:LOGFIRE_ENVIRONMENT"
+    config_dir: pathlib.Path | str = "env:LOGFIRE_CONFIG_DIR"
+    data_dir: pathlib.Path | str = "env:LOGFIRE_DATA_DIR"
+    min_level: int | logfire.LevelName = "env:LOGFIRE_MIN_LEVEL"
+    inspect_arguments: bool = None
+    add_baggage_to_attributes: bool = True
+    distributed_tracing: bool = None
+    base_url: str = None
+    scrubbing_patterns: list[str] = None
+
+    instrument_pydantic_ai: LogfireInstrumentPydanticAI = None
+    instrument_fast_api: LogfireInstrumentFastAPI = None
+
+    # Set by `from_yaml` factory
+    _installation_config: InstallationConfig = _no_repr_none()
+    _config_path: pathlib.Path = None
+
+    @property
+    def logfire_config_kwargs(self) -> dict[str, typing.Any]:
+        getenv = self._installation_config.get_environment
+
+        kwargs = {
+            "token": self._installation_config.get_secret(self.token),
+            "service_name": getenv(self.service_name),
+            "service_version": getenv(self.service_version),
+            "environment": getenv(self.environment),
+            "config_dir": getenv(self.config_dir),
+            "data_dir": getenv(self.data_dir),
+            "min_level": getenv(self.min_level),
+            "add_baggage_to_attributes": self.add_baggage_to_attributes,
+        }
+
+        if self.inspect_arguments is not None:
+            kwargs["inspect_arguments"] = self.inspect_arguments
+
+        if self.distributed_tracing is not None:
+            kwargs["distributed_tracing"] = self.distributed_tracing
+
+        if self.base_url is not None:
+            kwargs["advanced"] = {
+                "base_url": getenv(self.base_url),
+            }
+
+        if self.scrubbing_patterns is not None:
+            kwargs["scrubbing"] = {
+                "extra_patterns": self.scrubbing_patterns,
+            }
+
+        return kwargs
+
+    @property
+    def as_yaml(self) -> dict[str, typing.Any]:
+        result = {
+            "token": self.token,
+            "service_name": self.service_name,
+            "service_version": self.service_version,
+            "environment": self.environment,
+            "config_dir": self.config_dir,
+            "data_dir": self.data_dir,
+            "min_level": self.min_level,
+            "add_baggage_to_attributes": self.add_baggage_to_attributes,
+        }
+
+        if self.inspect_arguments is not None:
+            result["inspect_arguments"] = self.inspect_arguments
+
+        if self.distributed_tracing is not None:
+            result["distributed_tracing"] = self.distributed_tracing
+
+        if self.base_url is not None:
+            result["base_url"] = self.base_url
+
+        if self.scrubbing_patterns is not None:
+            result["scrubbing_patterns"] = self.scrubbing_patterns
+
+        if self.instrument_pydantic_ai is not None:
+            result["instrument_pydantic_ai"] = (
+                self.instrument_pydantic_ai.as_yaml
+            )
+
+        if self.instrument_fast_api is not None:
+            result["instrument_fast_api"] = self.instrument_fast_api.as_yaml
+
+        return result
+
+    @classmethod
+    def from_yaml(
+        cls,
+        installation_config: InstallationConfig,
+        config_path: pathlib.Path,
+        config: dict,
+    ):
+        try:
+            ipydai = config.pop("instrument_pydantic_ai", None)
+
+            if ipydai is not None:
+                ipydai = LogfireInstrumentPydanticAI.from_yaml(
+                    config_path,
+                    ipydai,
+                )
+                config["instrument_pydantic_ai"] = ipydai
+
+            ifapi = config.pop("instrument_fast_api", None)
+
+            if ifapi is not None:
+                ifapi = LogfireInstrumentFastAPI.from_yaml(
+                    config_path,
+                    ifapi,
+                )
+                config["instrument_fast_api"] = ifapi
+
+            return cls(
+                _installation_config=installation_config,
+                _config_path=config_path,
+                **config,
+            )
+        except Exception as exc:
+            raise FromYamlException(
+                config_path,
+                "logfire_config",
+                config,
+            ) from exc
+
+
+# ============================================================================
 #   Installation configuration types
 # ============================================================================
 
@@ -2217,7 +2432,12 @@ class InstallationConfig:
     quizzes_paths: list[pathlib.Path] = None
 
     #
-    #   DB-URI secret handling
+    # Logfire configuration
+    #
+    logfire_config: LogfireConfig = None
+
+    #
+    # DB-URI secret handling
     #
     def _dburi_w_secret(self, dburi: str | None, default: str) -> str:
         if dburi is None:
@@ -2317,6 +2537,17 @@ class InstallationConfig:
             ]
             config["agent_configs"] = agent_configs
 
+            logfire_cfg = config.pop("logfire_config", None)
+
+            if logfire_cfg is not None:
+                logfire_cfg = LogfireConfig.from_yaml(
+                    None,
+                    config_path,
+                    logfire_cfg,
+                )
+
+            config["logfire_config"] = logfire_cfg
+
             tp_dburi = config.pop("thread_persistence_dburi", {})
             config["_thread_persistence_dburi_sync"] = tp_dburi.get("sync")
             config["_thread_persistence_dburi_async"] = tp_dburi.get("async")
@@ -2347,6 +2578,11 @@ class InstallationConfig:
             )
             for agent_config in self.agent_configs
         ]
+        if self.logfire_config is not None:
+            self.logfire_config = dataclasses.replace(
+                self.logfire_config,
+                _installation_config=self,
+            )
 
         if self.oidc_paths is None:
             self.oidc_paths = ["./oidc"]
@@ -2389,7 +2625,7 @@ class InstallationConfig:
 
     @property
     def as_yaml(self) -> dict:
-        return {
+        result = {
             "id": self.id,
             "meta": self.meta.as_yaml,
             "secrets": [secret.as_yaml for secret in self.secrets],
@@ -2401,6 +2637,11 @@ class InstallationConfig:
             "completion_paths": [str(path) for path in self.completion_paths],
             "quizzes_paths": [str(path) for path in self.quizzes_paths],
         }
+
+        if self.logfire_config is not None:
+            result["logfire_config"] = self.logfire_config.as_yaml
+
+        return result
 
     def _load_oidc_auth_system_configs(self) -> list[OIDCAuthSystemConfig]:
         oas_configs = []

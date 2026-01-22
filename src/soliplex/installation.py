@@ -3,6 +3,7 @@ import dataclasses
 import pathlib
 
 import fastapi
+import logfire
 import pydantic_ai
 from ag_ui import core as agui_core
 from haiku.rag import config as hr_config
@@ -114,6 +115,10 @@ class Installation:
             ollama_url_info[base_url] = base_url_models | no_url_models
 
         return found
+
+    @property
+    def logfire_config(self) -> config.LogfireConfig | None:
+        return self._config.logfire_config
 
     @property
     def thread_persistence_dburi_sync(self) -> str:
@@ -292,6 +297,41 @@ async def get_the_installation(
 depend_the_installation = fastapi.Depends(get_the_installation)
 
 
+def apply_logfire_configuration(
+    app: fastapi.FastAPI,
+    the_installation: Installation,
+):
+    logfire_config = the_installation.logfire_config
+
+    if logfire_config is not None:
+        logfire.configure(**logfire_config.logfire_config_kwargs)
+
+        ipydai = logfire_config.instrument_pydantic_ai
+
+        if ipydai is not None:
+            logfire.instrument_pydantic_ai(
+                **ipydai.instrument_pydantic_ai_kwargs,
+            )
+        else:
+            logfire.instrument_pydantic_ai()
+
+        ifapi = logfire_config.instrument_fast_api
+
+        if ifapi is not None:
+            logfire.instrument_fastapi(
+                app,
+                **ifapi.instrument_fast_api_kwargs,
+            )
+        else:
+            logfire.instrument_fastapi(app, capture_headers=True)
+    else:
+        # 'if-token-present' means nothing will be sent (and the example
+        # will work) if you don't have logfire configured
+        logfire.configure(send_to_logfire="if-token-present")
+        logfire.instrument_pydantic_ai()
+        logfire.instrument_fastapi(app, capture_headers=True)
+
+
 async def lifespan(
     app: fastapi.FastAPI,
     installation_path: pathlib.Path,
@@ -306,6 +346,8 @@ async def lifespan(
     the_installation = Installation(i_config)
     the_installation.resolve_secrets()
     the_installation.resolve_environment()
+
+    apply_logfire_configuration(app, the_installation)
 
     tp_engine = sqla_asyncio.create_async_engine(
         the_installation.thread_persistence_dburi_async
