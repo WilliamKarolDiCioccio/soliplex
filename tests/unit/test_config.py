@@ -267,6 +267,7 @@ FULL_HTTP_MCTC_CONFIG_YAML = """
 
 AGENT_ID = "testing-agent"
 TEMPLATE_AGENT_ID = "testing-template"
+W_EXTRA_CONFIG_TEMPLATE_AGENT_ID = "testing-template-w-extra-config"
 BOGUS_TEMPLATE_AGENT_ID = "BOGUS"
 SYSTEM_PROMPT = "You are a test"
 MODEL_NAME = "test-model"
@@ -512,29 +513,58 @@ template_id: "{BOGUS_TEMPLATE_AGENT_ID}"
 system_prompt: ./prompt.txt
 """
 
-WO_CONFIG_PYTHON_AGENT_CONFIG_KW = dict(
+FACTORY_NAME = "soliplex.config.test_factory_wo_config"
+WO_CONFIG_FACTORY_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
-    factory_name="soliplex.config.test_factory_wo_config",
+    factory_name=FACTORY_NAME,
     with_agent_config=False,
 )
-WO_CONFIG_PYTHON_AGENT_CONFIG_YAML = f"""
+WO_CONFIG_FACTORY_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
-factory_name: "soliplex.config.test_factory_wo_config"
+factory_name: "{FACTORY_NAME}"
 with_agent_config: false
 """
 
-W_CONFIG_PYTHON_AGENT_CONFIG_KW = dict(
+W_CONFIG_FACTORY_AGENT_CONFIG_KW = dict(
     id=AGENT_ID,
-    factory_name="soliplex.config.test_factory_w_config",
+    factory_name=FACTORY_NAME,
     with_agent_config=True,
     extra_config={
         "foo": "Bar",
     },
 )
-W_CONFIG_PYTHON_AGENT_CONFIG_YAML = f"""
+W_CONFIG_FACTORY_AGENT_CONFIG_YAML = f"""
 id: "{AGENT_ID}"
-factory_name: "soliplex.config.test_factory_w_config"
+factory_name: "{FACTORY_NAME}"
 with_agent_config: true
+extra_config:
+  foo: "Bar"
+"""
+
+W_BOGUS_TEMPLATE_ID_FACTORY_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+template_id: "{BOGUS_TEMPLATE_AGENT_ID}"
+"""
+
+W_TEMPLATE_ID_FACTORY_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    _template_id=TEMPLATE_AGENT_ID,
+)
+W_TEMPLATE_ID_FACTORY_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+template_id: "{TEMPLATE_AGENT_ID}"
+"""
+
+W_TEMPLATE_ID_W_EXTRA_CONFIG_FACTORY_AGENT_CONFIG_KW = dict(
+    id=AGENT_ID,
+    _template_id=W_EXTRA_CONFIG_TEMPLATE_AGENT_ID,
+    extra_config={
+        "foo": "Bar",
+    },
+)
+W_TEMPLATE_ID_W_EXTRA_CONFIG_FACTORY_AGENT_CONFIG_YAML = f"""
+id: "{AGENT_ID}"
+template_id: "{W_EXTRA_CONFIG_TEMPLATE_AGENT_ID}"
 extra_config:
   foo: "Bar"
 """
@@ -1893,7 +1923,7 @@ def test_toolconfig_from_yaml_w_error(temp_dir):
         config.ToolConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config={
+            config_dict={
                 "tool_name": tool_name,
                 "allow_mcp": True,
                 "nonesuch": "BOGUS",
@@ -1917,7 +1947,7 @@ def test_toolconfig_from_yaml(installation_config, temp_dir):
     tool_config = config.ToolConfig.from_yaml(
         installation_config=installation_config,
         config_path=config_path,
-        config={
+        config_dict={
             "tool_name": tool_name,
             "allow_mcp": True,
         },
@@ -2269,7 +2299,7 @@ def test_sdtc_from_yaml(
             config.SearchDocumentsToolConfig.from_yaml(
                 installation_config=installation_config,
                 config_path=config_path,
-                config=config_dict,
+                config_dict=config_dict,
             )
 
         assert exc.value._config_path == config_path
@@ -2278,7 +2308,7 @@ def test_sdtc_from_yaml(
         sdt_config = config.SearchDocumentsToolConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config=config_dict,
+            config_dict=config_dict,
         )
         expected = config.SearchDocumentsToolConfig(
             _installation_config=installation_config,
@@ -2528,7 +2558,7 @@ def test_rrtc_from_yaml(
             config.RAGResearchToolConfig.from_yaml(
                 installation_config=installation_config,
                 config_path=config_path,
-                config=config_dict,
+                config_dict=config_dict,
             )
 
         assert exc.value._config_path == config_path
@@ -2537,7 +2567,7 @@ def test_rrtc_from_yaml(
         rrt_config = config.RAGResearchToolConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config=config_dict,
+            config_dict=config_dict,
         )
         expected = config.RAGResearchToolConfig(
             _installation_config=installation_config,
@@ -2609,7 +2639,7 @@ def test_awrctc_from_yaml(
             config.AskWithRichCitationsToolConfig.from_yaml(
                 installation_config=installation_config,
                 config_path=config_path,
-                config=config_dict,
+                config_dict=config_dict,
             )
 
         assert exc.value._config_path == config_path
@@ -2618,7 +2648,7 @@ def test_awrctc_from_yaml(
         awrct_config = config.AskWithRichCitationsToolConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config=config_dict,
+            config_dict=config_dict,
         )
         expected = config.AskWithRichCitationsToolConfig(
             _installation_config=installation_config,
@@ -2656,7 +2686,7 @@ def test_stdio_mctc_from_yaml(
             config.Stdio_MCP_ClientToolsetConfig.from_yaml(
                 installation_config=installation_config,
                 config_path=config_path,
-                config=config_dict,
+                config_dict=config_dict,
             )
 
         assert exc.value._config_path == config_path
@@ -2665,7 +2695,7 @@ def test_stdio_mctc_from_yaml(
         stdio_mctc = config.Stdio_MCP_ClientToolsetConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config=config_dict,
+            config_dict=config_dict,
         )
         expected = config.Stdio_MCP_ClientToolsetConfig(
             _installation_config=installation_config,
@@ -2747,7 +2777,7 @@ def test_http_mctc_from_yaml(
             config.HTTP_MCP_ClientToolsetConfig.from_yaml(
                 installation_config=installation_config,
                 config_path=config_path,
-                config=config_dict,
+                config_dict=config_dict,
             )
 
         assert exc.value._config_path == config_path
@@ -2756,7 +2786,7 @@ def test_http_mctc_from_yaml(
         http_mctc = config.HTTP_MCP_ClientToolsetConfig.from_yaml(
             installation_config=installation_config,
             config_path=config_path,
-            config=config_dict,
+            config_dict=config_dict,
         )
         expected = config.HTTP_MCP_ClientToolsetConfig(
             _installation_config=installation_config,
@@ -3277,8 +3307,8 @@ def test_agentconfig_as_yaml(
 @pytest.mark.parametrize(
     "kw",
     [
-        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
-        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        WO_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
     ],
 )
 def test_factoryagentconfig_ctor(kw):
@@ -3294,8 +3324,8 @@ def test_factoryagentconfig_ctor(kw):
 @pytest.mark.parametrize(
     "kw",
     [
-        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
-        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        WO_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
     ],
 )
 def test_factoryagentconfig_factory(kw, w_existing):
@@ -3335,12 +3365,21 @@ def test_factoryagentconfig_factory(kw, w_existing):
     [
         (BOGUS_AGENT_CONFIG_YAML, None),
         (
-            WO_CONFIG_PYTHON_AGENT_CONFIG_YAML,
-            WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+            WO_CONFIG_FACTORY_AGENT_CONFIG_YAML,
+            WO_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
         ),
         (
-            W_CONFIG_PYTHON_AGENT_CONFIG_YAML,
-            W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+            W_CONFIG_FACTORY_AGENT_CONFIG_YAML,
+            W_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
+        ),
+        (W_BOGUS_TEMPLATE_ID_FACTORY_AGENT_CONFIG_YAML, None),
+        (
+            W_TEMPLATE_ID_FACTORY_AGENT_CONFIG_YAML,
+            W_TEMPLATE_ID_FACTORY_AGENT_CONFIG_KW.copy(),
+        ),
+        (
+            W_TEMPLATE_ID_W_EXTRA_CONFIG_FACTORY_AGENT_CONFIG_YAML,
+            W_TEMPLATE_ID_W_EXTRA_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
         ),
     ],
 )
@@ -3356,6 +3395,23 @@ def test_factoryagentconfig_from_yaml(
     with yaml_file.open() as stream:
         config_dict = yaml.safe_load(stream)
 
+    if config_dict is not None:
+        template_id = config_dict.get("template_id")
+    else:
+        template_id = None
+
+    if template_id not in (None, BOGUS_TEMPLATE_AGENT_ID):
+        template_kw = {
+            "factory_name": FACTORY_NAME,
+            "with_agent_config": True,
+        }
+        installation_config.agent_configs = [
+            config.FactoryAgentConfig(id=template_id, **template_kw),
+        ]
+    else:
+        template_kw = {}
+        installation_config.agent_configs = []
+
     if expected_kw is None:
         with pytest.raises(config.FromYamlException):
             config.FactoryAgentConfig.from_yaml(
@@ -3367,7 +3423,7 @@ def test_factoryagentconfig_from_yaml(
         expected = config.FactoryAgentConfig(
             _installation_config=installation_config,
             _config_path=yaml_file,
-            **expected_kw,
+            **(template_kw | expected_kw),
         )
 
         found = config.FactoryAgentConfig.from_yaml(
@@ -3378,12 +3434,15 @@ def test_factoryagentconfig_from_yaml(
 
         assert found == expected
 
+        # See #180.
+        assert found._installation_config is installation_config
+
 
 @pytest.mark.parametrize(
     "kw",
     [
-        WO_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
-        W_CONFIG_PYTHON_AGENT_CONFIG_KW.copy(),
+        WO_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
+        W_CONFIG_FACTORY_AGENT_CONFIG_KW.copy(),
     ],
 )
 def test_factoryagentconfig_as_yaml(
