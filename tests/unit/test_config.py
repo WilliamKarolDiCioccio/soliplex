@@ -2258,7 +2258,7 @@ ok_ovr = contextlib.nullcontext("override")
         (True, None, "./override", ok_ovr, ok_ovr),
     ],
 )
-def test__rtb_ctor(
+def test__rcb_ctor(
     installation_config,
     temp_dir,
     w_config_path,
@@ -2298,7 +2298,7 @@ def test__rtb_ctor(
         kw["rag_lancedb_override_path"] = override
 
     with ctor_expectation as which:
-        rtb_config = config._RAGToolBase(**kw)
+        rcb_config = config._RAGConfigBase(**kw)
 
     if isinstance(which, str):
         if which == "stem":
@@ -2306,10 +2306,10 @@ def test__rtb_ctor(
         else:
             expected = from_override
 
-        assert rtb_config._config_path == exp_config_path
+        assert rcb_config._config_path == exp_config_path
 
         with rlp_expectation as which:
-            found = rtb_config.rag_lancedb_path
+            found = rcb_config.rag_lancedb_path
 
         if isinstance(which, str):
             assert found.resolve() == expected.resolve()
@@ -2318,7 +2318,7 @@ def test__rtb_ctor(
                 "rag_lancedb_path": expected.resolve(),
             }
 
-            assert rtb_config.get_extra_parameters() == expected_ep
+            assert rcb_config.get_extra_parameters() == expected_ep
 
 
 def test_sdtc_ctor(installation_config, temp_dir):
@@ -2978,6 +2978,64 @@ def test_withquerymcpwrapper_call():
 
     assert found is func.return_value
     func.assert_called_once_with("text", tool_config=tool_config)
+
+
+@pytest.mark.parametrize(
+    "config_dict, expected",
+    [
+        ({}, {}),
+        ({"template_id": BOGUS_TEMPLATE_AGENT_ID}, None),
+        ({"other": "OTHER"}, {"other": "OTHER"}),
+        (
+            {"template_id": TEMPLATE_AGENT_ID, "other": "OTHER"},
+            {
+                "other": "OTHER",
+                "key": "from_template",
+                "_template_id": TEMPLATE_AGENT_ID,
+            },
+        ),
+        (
+            {"template_id": TEMPLATE_AGENT_ID, "key": "from_local"},
+            {"key": "from_local", "_template_id": TEMPLATE_AGENT_ID},
+        ),
+        (
+            {
+                "template_id": TEMPLATE_AGENT_ID,
+                "key": "from_local",
+                "other": "OTHER",
+            },
+            {
+                "other": "OTHER",
+                "key": "from_local",
+                "_template_id": TEMPLATE_AGENT_ID,
+            },
+        ),
+    ],
+)
+def test__apply_agent_config_template(temp_dir, config_dict, expected):
+    template_ac = mock.Mock(spec_set=["id", "as_yaml"])
+    template_ac.id = TEMPLATE_AGENT_ID
+    template_ac.as_yaml = {"key": "from_template"}
+    i_config = mock.create_autospec(config.InstallationConfig)
+    i_config.agent_configs = [template_ac]
+    config_path = temp_dir / "test.yaml"
+
+    if expected is None:
+        with pytest.raises(config.InvalidAgentTemplateID):
+            config._apply_agent_config_template(
+                config_dict,
+                i_config,
+                config_path,
+            )
+
+    else:
+        found = config._apply_agent_config_template(
+            config_dict,
+            i_config,
+            config_path,
+        )
+
+        assert found == expected
 
 
 @pytest.mark.parametrize(
