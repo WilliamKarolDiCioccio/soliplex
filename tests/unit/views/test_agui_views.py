@@ -11,6 +11,7 @@ from soliplex import agui as agui_package
 from soliplex import authz as authz_package
 from soliplex import config
 from soliplex import installation
+from soliplex import loggers
 from soliplex import models
 from soliplex.agui import features as agui_features
 from soliplex.views import agui as agui_views
@@ -179,6 +180,7 @@ def raises_httpexc(*, match, code) -> pytest.raises:
 async def test__check_user_in_room(w_miss, expectation):
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     if w_miss:
         the_installation.get_room_config.side_effect = KeyError("testing")
@@ -189,6 +191,7 @@ async def test__check_user_in_room(w_miss, expectation):
             the_installation=the_installation,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected_username, str):
@@ -198,6 +201,7 @@ async def test__check_user_in_room(w_miss, expectation):
         room_id=TEST_ROOM_ID,
         user=THE_USER_CLAIMS,
         the_authz_policy=the_authz_policy,
+        the_logger=the_logger,
     )
 
 
@@ -212,6 +216,7 @@ async def test__check_user_in_room(w_miss, expectation):
 async def test__check_user_room_agent(w_miss, expectation):
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     if w_miss:
         the_installation.get_agent_for_room.side_effect = KeyError("testing")
@@ -222,6 +227,7 @@ async def test__check_user_room_agent(w_miss, expectation):
             the_installation=the_installation,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected, str):
@@ -233,6 +239,7 @@ async def test__check_user_room_agent(w_miss, expectation):
         room_id=TEST_ROOM_ID,
         user=THE_USER_CLAIMS,
         the_authz_policy=the_authz_policy,
+        the_logger=the_logger,
     )
 
 
@@ -251,6 +258,7 @@ async def test_get_room_agui_only(
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     if w_thread_meta:
         thread_meta = test_thread.thread_metadata = _make_thread_metadata()
@@ -273,6 +281,7 @@ async def test_get_room_agui_only(
         the_threads=the_threads,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
 
     (m_thread,) = found.threads
@@ -296,7 +305,10 @@ async def test_get_room_agui_only(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_GET_ROOM)
 
 
 @pytest.mark.anyio
@@ -375,6 +387,7 @@ async def test_get_room_agui_thread_id_only(
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     if tsgt_side_effect is not None:
         the_threads.get_thread.side_effect = tsgt_side_effect
@@ -390,6 +403,7 @@ async def test_get_room_agui_thread_id_only(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if expected is None:
@@ -425,7 +439,10 @@ async def test_get_room_agui_thread_id_only(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_GET_ROOM_THREAD)
 
 
 @pytest.mark.anyio
@@ -506,6 +523,7 @@ async def test_get_room_agui_thread_id_run_id(
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     if tsgr_side_effect is not None:
         the_threads.get_run.side_effect = tsgr_side_effect
@@ -522,6 +540,7 @@ async def test_get_room_agui_thread_id_run_id(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if expected is None:
@@ -552,7 +571,10 @@ async def test_get_room_agui_thread_id_run_id(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_GET_ROOM_THREAD_RUN)
 
 
 @pytest.mark.anyio
@@ -617,6 +639,7 @@ async def test_post_room_agui_only(
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     the_threads.new_thread.return_value = test_thread
     test_thread.list_runs.return_value = [test_run]
@@ -639,6 +662,7 @@ async def test_post_room_agui_only(
         the_threads=the_threads,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
 
     assert found.room_id == TEST_ROOM_ID
@@ -670,7 +694,10 @@ async def test_post_room_agui_only(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_POST_ROOM)
 
 
 @pytest.mark.anyio
@@ -744,6 +771,7 @@ async def test_post_room_agui_thread_id_only(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     with expectation as expected:
         found = await agui_views.post_room_agui_thread_id(
@@ -755,6 +783,7 @@ async def test_post_room_agui_thread_id_only(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if expected is None:
@@ -782,7 +811,10 @@ async def test_post_room_agui_thread_id_only(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_POST_ROOM_THREAD)
 
 
 @pytest.mark.anyio
@@ -824,6 +856,7 @@ async def test_post_room_agui_thread_id_meta(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     the_threads.update_thread_metadata.side_effect = tsutm_side_effect
 
@@ -837,6 +870,7 @@ async def test_post_room_agui_thread_id_meta(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected, int):
@@ -854,6 +888,10 @@ async def test_post_room_agui_thread_id_meta(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
+    )
+    the_logger.debug.assert_called_once_with(
+        loggers.AGUI_POST_ROOM_THREAD_META,
     )
 
 
@@ -954,6 +992,7 @@ async def test_post_room_agui_thread_id_run_id(
     the_installation = mock.create_autospec(installation.Installation)
     the_installation.get_agent_for_room.return_value = agent
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     exp_deps = the_installation.get_agent_deps_for_room.return_value
 
@@ -983,6 +1022,7 @@ async def test_post_room_agui_thread_id_run_id(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if expected is None:
@@ -1052,6 +1092,7 @@ async def test_post_room_agui_thread_id_run_id(
             room_id=TEST_ROOM_ID,
             user=USER_PROFILE,
             run_agent_input=exp_adapter.run_input,
+            the_logger=the_logger,
         )
 
         aga.from_request.assert_called_once_with(
@@ -1072,7 +1113,10 @@ async def test_post_room_agui_thread_id_run_id(
             the_installation=the_installation,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
+
+    the_logger.debug.assert_called_once_with(loggers.AGUI_POST_ROOM_THREAD_RUN)
 
 
 @pytest.mark.anyio
@@ -1114,6 +1158,7 @@ async def test_post_room_agui_thread_id_run_id_meta(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     the_threads.update_run_metadata.side_effect = tsurm_side_effect
 
@@ -1128,6 +1173,7 @@ async def test_post_room_agui_thread_id_run_id_meta(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected, int):
@@ -1146,6 +1192,10 @@ async def test_post_room_agui_thread_id_run_id_meta(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
+    )
+    the_logger.debug.assert_called_once_with(
+        loggers.AGUI_POST_ROOM_THREAD_RUN_META,
     )
 
 
@@ -1178,6 +1228,7 @@ async def test_post_room_agui_thread_id_run_id_feedback(
 
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     the_threads.save_run_feedback.side_effect = tssrf_side_effect
 
@@ -1192,6 +1243,7 @@ async def test_post_room_agui_thread_id_run_id_feedback(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected, int):
@@ -1211,6 +1263,10 @@ async def test_post_room_agui_thread_id_run_id_feedback(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
+    )
+    the_logger.debug.assert_called_once_with(
+        loggers.AGUI_POST_ROOM_THREAD_RUN_FEEDBACK,
     )
 
 
@@ -1237,6 +1293,7 @@ async def test_delete_room_agui_thread_id(
     request = fastapi.Request(scope={"type": "http"})
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
 
     the_threads.delete_thread.side_effect = tsdr_side_effect
 
@@ -1249,6 +1306,7 @@ async def test_delete_room_agui_thread_id(
             the_threads=the_threads,
             the_authz_policy=the_authz_policy,
             the_user_claims=THE_USER_CLAIMS,
+            the_logger=the_logger,
         )
 
     if isinstance(expected, int):
@@ -1265,4 +1323,6 @@ async def test_delete_room_agui_thread_id(
         the_installation=the_installation,
         the_authz_policy=the_authz_policy,
         the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
     )
+    the_logger.debug.assert_called_once_with(loggers.AGUI_DELETE_ROOM_THREAD)
