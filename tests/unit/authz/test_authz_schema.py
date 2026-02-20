@@ -2,8 +2,6 @@ import datetime
 from unittest import mock
 
 import pytest
-import pytest_asyncio
-import sqlalchemy
 from sqlalchemy import orm as sqla_orm
 from sqlalchemy.ext import asyncio as sqla_asyncio
 
@@ -16,9 +14,6 @@ from soliplex.authz import schema as authz_schema
 NOW = datetime.datetime.now(datetime.UTC)
 
 EMAIL = "phreddy@example.com"
-USER_TOKEN = {
-    "email": EMAIL,
-}
 
 ROOM_ID = "test-room"
 
@@ -45,26 +40,6 @@ def test__timestamp(dt, tz):
     assert found is dt.now.return_value
 
     dt.now.assert_called_once_with(tz.utc)
-
-
-@pytest.fixture
-def the_engine():
-    engine = sqlalchemy.create_engine(config.SYNC_MEMORY_ENGINE_URL)
-
-    yield engine
-
-    engine.dispose()
-
-
-@pytest.fixture
-def the_session(the_engine):
-    with the_engine.connect() as connection:
-        authz_schema.Base.metadata.create_all(connection)
-
-    assert connection.closed
-
-    with sqla_orm.Session(bind=the_engine) as session:
-        yield session
 
 
 def test_adminuser_ctor(the_session):
@@ -384,300 +359,105 @@ def test_aclentry_check_token_w_email(
         assert found is None
 
 
-@pytest.fixture
-def faux_sqlaa_session():
-    return mock.create_autospec(
-        sqla_asyncio.AsyncSession,
-    )
-
-
-@pytest.mark.anyio
-async def test_authorizationpolicy_session(faux_sqlaa_session):
-    ap = authz_schema.AuthorizationPolicy(faux_sqlaa_session)
-    begin = faux_sqlaa_session.begin
-
-    async with ap.session as session:
-        assert session is faux_sqlaa_session
-
-        begin.assert_called_once_with()
-        begin.return_value.__aenter__.assert_called_once_with()
-        begin.return_value.__aexit__.assert_not_called()
-
-    begin.return_value.__aenter__.assert_called_once_with()
-
-
-@pytest_asyncio.fixture()
-async def the_async_engine():  # pragma: NO COVER
-    engine = sqla_asyncio.create_async_engine(
-        config.ASYNC_MEMORY_ENGINE_URL,
-    )
-    async with engine.begin() as connection:
-        await connection.run_sync(authz_schema.Base.metadata.create_all)
-
-    yield engine
-
-    await engine.dispose()
-
-
-@pytest_asyncio.fixture()
-async def the_async_session(the_async_engine):  # pragma: NO COVER
-    session = sqla_asyncio.AsyncSession(bind=the_async_engine)
-    yield session
-    await session.close()
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_crud_admin_user(the_async_session):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    found = await ap.list_admin_users()
-
-    assert found == []
-
-    await ap.add_admin_user(email=EMAIL)
-    user = await authz_schema._find_admin_user(
-        email=EMAIL,
-        session=the_async_session,
-    )
-    assert user is not None
-    await the_async_session.commit()
-
-    found = await ap.list_admin_users()
-    assert found == [EMAIL]
-    await the_async_session.commit()
-
-    with pytest.raises(authz_schema.AdminUserExists):
-        await ap.add_admin_user(email=EMAIL)
-
-    no_dupe = await authz_schema._find_admin_user(
-        email=EMAIL,
-        session=the_async_session,
-    )
-    assert no_dupe is user
-    await the_async_session.commit()
-
-    found = await ap.list_admin_users()
-    assert found == [EMAIL]
-    await the_async_session.commit()
-
-    await ap.remove_admin_user(email=EMAIL)
-    gone = await authz_schema._find_admin_user(
-        email=EMAIL,
-        session=the_async_session,
-    )
-    assert gone is None
-    await the_async_session.commit()
-
-    found = await ap.list_admin_users()
-    assert found == []
-    await the_async_session.commit()
-
-    with pytest.raises(authz_schema.NoSuchAdminUser):
-        await ap.remove_admin_user(email=EMAIL)
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_check_admin_access(the_async_session):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    assert not await ap.check_admin_access(USER_TOKEN)
-
-    await ap.add_admin_user(email=EMAIL)
-
-    assert await ap.check_admin_access(USER_TOKEN)
-
-    await ap.remove_admin_user(email=EMAIL)
-
-    assert not await ap.check_admin_access(USER_TOKEN)
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_check_room_access(the_async_session):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    # No policy -> public room
-    assert await ap.check_room_access(ROOM_ID, None)
-
-    # Policy w/ deny as default, no ACL entries
-    denier = authz_schema.RoomPolicy(room_id=ROOM_ID)
-    the_async_session.add(denier)
-    await the_async_session.commit()
-
-    assert not await ap.check_room_access(ROOM_ID, None)
-
-    allower = authz_schema.ACLEntry(
-        room_policy=denier,
-        allow_deny=authz_package.AllowDeny.ALLOW,
-        everyone=True,
-    )
-    the_async_session.add(allower)
-    await the_async_session.commit()
-
-    assert await ap.check_room_access(ROOM_ID, None)
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_filter_room_ids(the_async_session):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    room_ids = [ROOM_ID]
-
-    # No policy -> public room
-    assert await ap.filter_room_ids(room_ids, None) == room_ids
-
-    # Policy w/ deny as default, no ACL entries
-    denier = authz_schema.RoomPolicy(room_id=ROOM_ID)
-    the_async_session.add(denier)
-    await the_async_session.commit()
-
-    assert await ap.filter_room_ids(room_ids, None) == []
-
-    allower = authz_schema.ACLEntry(
-        room_policy=denier,
-        allow_deny=authz_package.AllowDeny.ALLOW,
-        everyone=True,
-    )
-    the_async_session.add(allower)
-    await the_async_session.commit()
-
-    assert await ap.filter_room_ids(room_ids, None) == room_ids
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_room_policy_crud_not_admin(
-    the_async_session,
-):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    with pytest.raises(authz_schema.NotAdminUser):
-        await ap.get_room_policy(ROOM_ID, USER_TOKEN)
-
-    acl_entry_model = models.ACLEntry(
-        allow_deny=authz_package.AllowDeny.ALLOW,
-        everyone=True,
-    )
-    policy_model = models.RoomPolicy(
-        room_id=ROOM_ID,
-        acl_entries=[acl_entry_model],
-    )
-
-    with pytest.raises(authz_schema.NotAdminUser):
-        await ap.update_room_policy(ROOM_ID, policy_model, USER_TOKEN)
-
-    with pytest.raises(authz_schema.NotAdminUser):
-        await ap.delete_room_policy(ROOM_ID, USER_TOKEN)
-
-
-@pytest.mark.asyncio
-async def test_authorizationpolicy_room_policy_crud(the_async_session):
-    ap = authz_schema.AuthorizationPolicy(the_async_session)
-
-    await ap.add_admin_user(email=EMAIL)
-    await the_async_session.commit()
-
-    # No policy -> public room
-    policy = await ap.get_room_policy(ROOM_ID, USER_TOKEN)
-    assert policy is None
-
-    acl_entry_model = models.ACLEntry(
-        allow_deny=authz_package.AllowDeny.ALLOW,
-        everyone=True,
-    )
-    policy_model = models.RoomPolicy(
-        room_id=ROOM_ID,
-        acl_entries=[acl_entry_model],
-    )
-    await ap.update_room_policy(ROOM_ID, policy_model, USER_TOKEN)
-    await the_async_session.commit()
-
-    after = await ap.get_room_policy(ROOM_ID, USER_TOKEN)
-    assert after == policy_model
-    await the_async_session.commit()
-
-    new_acl_entry_model = models.ACLEntry(
-        allow_deny=authz_package.AllowDeny.ALLOW,
-        preferred_username="phreddy",
-    )
-    new_policy_model = policy_model.model_copy(
-        update={"acl_entries": [new_acl_entry_model]},
-    )
-    await ap.update_room_policy(ROOM_ID, new_policy_model, USER_TOKEN)
-    await the_async_session.commit()
-
-    policy = await ap.get_room_policy(ROOM_ID, USER_TOKEN)
-    assert policy == new_policy_model
-    await the_async_session.commit()
-
-    await ap.delete_room_policy(ROOM_ID, USER_TOKEN)
-    await the_async_session.commit()
-
-    gone = await ap.get_room_policy(ROOM_ID, USER_TOKEN)
-    assert gone is None
-    await the_async_session.commit()
-
-    await ap.delete_room_policy(ROOM_ID, USER_TOKEN)
-    await the_async_session.commit()
-
-
-@pytest.mark.parametrize("init_schema", [False, True])
+@pytest.mark.parametrize("init_schema", [None, False, True])
 @mock.patch("sqlalchemy.create_engine")
 @mock.patch("soliplex.authz.schema.metadata.create_all")
-def test_get_session(
+def test_get_engine(
     ca,
     ce,
     init_schema,
 ):
     kwargs = {}
 
+    if init_schema is not None:
+        kwargs["init_schema"] = init_schema
+
+    found = authz_schema.get_engine(**kwargs)
+
+    assert found is ce.return_value
+
+    ce.assert_called_once_with(
+        config.SYNC_MEMORY_ENGINE_URL,
+        json_serializer=util.serialize_sqla_json,
+    )
+
     if init_schema:
-        kwargs["init_schema"] = True
+        connection = ce.return_value.connect.return_value
+        ca.assert_called_once_with(connection.__enter__.return_value)
+    else:
+        ca.assert_not_called()
+
+
+@pytest.mark.parametrize("init_schema", [None, False, True])
+@mock.patch("soliplex.authz.schema.get_engine")
+def test_get_session(
+    ge,
+    init_schema,
+):
+    kwargs = {}
+
+    if init_schema is not None:
+        kwargs["init_schema"] = init_schema
+        exp_kwargs = kwargs
+    else:
+        exp_kwargs = {"init_schema": False}
 
     with authz_schema.get_session(**kwargs) as session:
         assert isinstance(session, sqla_orm.Session)
-        assert session.bind is ce.return_value
+        assert session.bind is ge.return_value
 
-        ce.assert_called_once_with(
-            config.SYNC_MEMORY_ENGINE_URL,
-            json_serializer=util.serialize_sqla_json,
+        ge.assert_called_once_with(
+            engine_url=config.SYNC_MEMORY_ENGINE_URL,
+            **exp_kwargs,
         )
-
-        if init_schema:
-            connection = ce.return_value.connect.return_value
-            ca.assert_called_once_with(connection.__enter__.return_value)
-        else:
-            ca.assert_not_called()
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("init_schema", [False, True])
+@pytest.mark.parametrize("init_schema", [None, False, True])
 @mock.patch("sqlalchemy.ext.asyncio.create_async_engine")
 @mock.patch("soliplex.authz.schema.metadata.create_all")
-async def test_get_async_session(
-    ca,
-    cae,
-    init_schema,
-):
-    engine = cae.return_value
-
+async def test_get_async_engine(ca, cae, init_schema):
     kwargs = {}
 
     if init_schema:
         kwargs["init_schema"] = True
 
+    found = await authz_schema.get_async_engine(**kwargs)
+
+    assert found is cae.return_value
+
+    cae.assert_called_once_with(
+        config.ASYNC_MEMORY_ENGINE_URL,
+        json_serializer=util.serialize_sqla_json,
+    )
+
+    if init_schema:
+        found.begin.assert_called_once_with()
+        connection = found.begin.return_value.__aenter__.return_value
+        connection.run_sync.assert_called_once_with(ca)
+    else:
+        found.begin.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("init_schema", [None, False, True])
+@mock.patch("soliplex.authz.schema.get_async_engine")
+async def test_get_async_session(gae, init_schema):
+    kwargs = {}
+
+    if init_schema is not None:
+        kwargs["init_schema"] = init_schema
+        exp_kwargs = kwargs
+    else:
+        exp_kwargs = {"init_schema": False}
+
     session_maker = await authz_schema.get_async_session(**kwargs)
 
     async with session_maker as session:
         assert isinstance(session, sqla_asyncio.AsyncSession)
-        assert session.bind is engine
+        assert session.bind is gae.return_value
 
-        cae.assert_called_once_with(
-            config.ASYNC_MEMORY_ENGINE_URL,
-            json_serializer=util.serialize_sqla_json,
+        gae.assert_called_once_with(
+            engine_url=config.ASYNC_MEMORY_ENGINE_URL,
+            **exp_kwargs,
         )
-
-        if init_schema:
-            engine.begin.assert_called_once_with()
-            connection = engine.begin.return_value.__aenter__.return_value
-            connection.run_sync.assert_called_once_with(ca)
-        else:
-            engine.begin.assert_not_called()
