@@ -11,6 +11,7 @@ import uvicorn
 import uvicorn.config
 import yaml
 from rich import console
+from skills_ref import validator as skill_validator
 
 import soliplex
 from soliplex import authz as authz_package
@@ -474,6 +475,21 @@ def check_config(
     the_console.line()
 
     the_console.line()
+    the_console.rule("Validating skills")
+    the_console.line()
+    for skills_path in the_installation._config.skills_paths:
+        the_console.print(f"Skills path: {skills_path}")
+        for skill_path in config._find_skill_paths(skills_path):
+            the_console.print(f"- {skill_path.name}")
+            errors = skill_validator.validate(skill_path)
+            if errors:
+                for error in errors:
+                    the_console.print(f"  {error}")
+            else:
+                the_console.print("  OK")
+        the_console.line()
+
+    the_console.line()
     the_console.rule("Validating Logfire config")
     the_console.line()
     l_config = the_installation._config.logfire_config
@@ -601,6 +617,32 @@ def list_completions(
     available_completions = the_installation._config.completion_configs
     for compl_config in available_completions.values():
         the_console.print(f"- [ {compl_config.id} ] {compl_config.name}: ")
+        the_console.line()
+
+
+@the_cli.command(
+    "list-skills",
+)
+def list_skills(
+    ctx: typer.Context,
+    installation_path: installation_path_type,
+):
+    """List skills defined in the installation"""
+    the_installation = get_installation(installation_path)
+
+    the_console.line()
+    the_console.rule("Configured Skills")
+    the_console.line()
+
+    available_skills = the_installation._config.skill_configs
+    for skill_name, skill_config in available_skills.items():
+        the_console.print(f"- [ {skill_name} ]")
+        if skill_config.errors:
+            the_console.print("  Validation errors:")
+            for error in skill_config.errors:
+                the_console.print(f"  - {error}")
+        else:
+            the_console.print(f"  {skill_config.description}")
         the_console.line()
 
 
