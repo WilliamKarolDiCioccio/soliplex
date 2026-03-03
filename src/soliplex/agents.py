@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import abc
 import dataclasses
 import typing
-from collections import abc
 
 import pydantic_ai
+from haiku.skills import agent as hs_agent
 from pydantic_ai import agent as ai_agent
 from pydantic_ai import mcp as ai_mcp
 from pydantic_ai import models as ai_models
@@ -23,6 +24,12 @@ from soliplex import models
 ToolConfigMap = dict[str, typing.Any]
 
 
+class SkillToolsetConfig(typing.Protocol):
+    # contract for config.RoomSkillsConfig etc.
+    @abc.abstractproperty
+    def skill_toolset(self) -> hs_agent.SkillToolset: ...
+
+
 @dataclasses.dataclass
 class AgentDependencies:
     """Agent dependencies implementing StateHandler protocol.
@@ -39,14 +46,17 @@ class AgentDependencies:
 
 
 SoliplexAgent = ai_agent.AbstractAgent[AgentDependencies, typing.Any]
-AgentFactory = abc.Callable[
-    [
-        config.AgentConfig,
-        ToolConfigMap,
-        config.MCP_ClientToolsetConfigMap,
-    ],
-    SoliplexAgent,
-]
+
+
+class AgentFactory(typing.Protocol):
+    def __call__(
+        self,
+        *,
+        tool_configs: ToolConfigMap,
+        mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+        skill_toolset_config: SkillToolsetConfig | None = None,
+    ) -> SoliplexAgent: ...
+
 
 # Cache for agents to avoid recreating them
 _agent_cache: dict[str, pydantic_ai.Agent] = {}
@@ -101,6 +111,7 @@ def get_default_agent_from_configs(
     agent_config: config.AgentConfig,
     tool_configs: ToolConfigMap,
     mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+    skill_toolset_config: SkillToolsetConfig | None = None,
 ) -> SoliplexAgent:
     """Build a Pydantic AI agent from a config"""
     model = get_model_from_config(agent_config=agent_config)
@@ -112,6 +123,9 @@ def get_default_agent_from_configs(
         make_mcp_client_toolset(mctc)
         for mctc in mcp_client_toolset_configs.values()
     ]
+
+    if skill_toolset_config is not None:
+        toolsets.append(skill_toolset_config.skill_toolset)
 
     return pydantic_ai.Agent(
         model=model,
@@ -128,6 +142,7 @@ def get_agent_from_configs(
     agent_config: config.AgentConfig,
     tool_configs: ToolConfigMap,
     mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+    skill_toolset_config: SkillToolsetConfig | None = None,
 ) -> SoliplexAgent:
     """Get or create an agent from the specified agent and tool configs."""
 
@@ -137,12 +152,15 @@ def get_agent_from_configs(
                 agent_config=agent_config,
                 tool_configs=tool_configs,
                 mcp_client_toolset_configs=mcp_client_toolset_configs,
+                skill_toolset_config=skill_toolset_config,
             )
 
         else:
+            # Treat 'agent_config' as an 'AgentFactory'
             agent = agent_config.factory(
                 tool_configs=tool_configs,
                 mcp_client_toolset_configs=mcp_client_toolset_configs,
+                skill_toolset_config=skill_toolset_config,
             )
 
         _agent_cache[agent_config.id] = agent

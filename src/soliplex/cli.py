@@ -319,6 +319,38 @@ Incompatible with '--no-auth-mode'.
         uvicorn.run(app, **uvicorn_kw)
 
 
+def _find_skill_paths(to_search: pathlib.Path):
+    """Yield a sequence of skill paths under 'to_search'
+
+    Yielded values are paths, suitable for passing to
+    'skill_parser.read_properties'.
+
+    If 'to_search' has its own copy of 'SKILL.md', just yield the one
+    config parsed from it.
+
+    Otherwise, iterate over immediate subdirectories, yielding configs
+    parsed from any which have copies of 'SKILL.md'
+    """
+    filename = "SKILL.md"
+    config_file = to_search / filename
+
+    if config_file.is_file():
+        yield to_search
+
+    else:
+        for sub in sorted(to_search.glob("*")):
+            # See #233
+            if sub.name.startswith("."):
+                continue
+
+            if sub.is_dir():
+                sub_config = sub / filename
+                if sub_config.is_file():
+                    yield sub
+            else:  # pragma: NO COVER
+                pass
+
+
 @the_cli.command(
     "check-config",
 )
@@ -477,9 +509,9 @@ def check_config(
     the_console.line()
     the_console.rule("Validating skills")
     the_console.line()
-    for skills_path in the_installation._config.skills_paths:
-        the_console.print(f"Skills path: {skills_path}")
-        for skill_path in config._find_skill_paths(skills_path):
+    for skills_path in the_installation._config.filesystem_skills_paths:
+        the_console.print(f"Filesystem skills path: {skills_path}")
+        for skill_path in _find_skill_paths(skills_path):
             the_console.print(f"- {skill_path.name}")
             errors = skill_validator.validate(skill_path)
             if errors:
@@ -636,10 +668,11 @@ def list_skills(
 
     available_skills = the_installation._config.skill_configs
     for skill_name, skill_config in available_skills.items():
-        the_console.print(f"- [ {skill_name} ]")
-        if skill_config.errors:
+        the_console.print(f"- [ {skill_config.kind}:{skill_name}  ]")
+        errors = getattr(skill_config, "errors", None)
+        if errors:
             the_console.print("  Validation errors:")
-            for error in skill_config.errors:
+            for error in errors:
                 the_console.print(f"  - {error}")
         else:
             the_console.print(f"  {skill_config.description}")

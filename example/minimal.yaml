@@ -228,7 +228,27 @@ room_paths:
   - "./rooms/joker"
   - "./rooms/faux"
   - "./rooms/quiztest"
+  - "./rooms/skillstest"
+
+#==========================================================================
+# Skills configuration
 #
+# Default is equivalent to::
+#
+# filesystem_skills_paths:
+#   - "./skills"
+#==========================================================================
+
+filesystem_skills_paths:
+  - "./skills"
+
+skill_configs:
+  - skill_name: "bare-bones"
+    kind: "filesystem"
+# See: https://github.com/ggozad/haiku.skills/issues/27
+# - skill_name: "image-generation"
+#   kind: "entrypoint"
+
 #==========================================================================
 # Completions configuration
 #==========================================================================
