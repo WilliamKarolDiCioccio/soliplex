@@ -18,9 +18,10 @@ from pydantic_ai.providers import ollama as ollama_providers
 from pydantic_ai.providers import openai as openai_providers
 
 from soliplex import agui
-from soliplex import config
 from soliplex import mcp_client
 from soliplex import models
+from soliplex.config import agents as config_agents
+from soliplex.config import tools as config_tools
 
 ToolConfigMap = dict[str, typing.Any]
 
@@ -54,7 +55,7 @@ class AgentFactory(typing.Protocol):
         self,
         *,
         tool_configs: ToolConfigMap,
-        mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+        mcp_client_toolset_configs: config_tools.MCP_ClientToolsetConfigMap,
         skill_toolset_config: SkillToolsetConfig | None = None,
     ) -> SoliplexAgent: ...
 
@@ -63,7 +64,7 @@ class AgentFactory(typing.Protocol):
 _agent_cache: dict[str, pydantic_ai.Agent] = {}
 
 
-def make_ai_tool(tool_config: config.ToolConfig) -> ai_tools.Tool:
+def make_ai_tool(tool_config: config_tools.ToolConfig) -> ai_tools.Tool:
     tool_func = tool_config.tool_with_config
 
     return ai_tools.Tool(
@@ -73,7 +74,7 @@ def make_ai_tool(tool_config: config.ToolConfig) -> ai_tools.Tool:
 
 
 def make_mcp_client_toolset(
-    toolset_config: config.MCP_ClientToolsetConfig,
+    toolset_config: config_tools.MCP_ClientToolsetConfig,
 ) -> ai_mcp.MCPServer:
     toolset_klass = mcp_client.TOOLSET_CLASS_BY_KIND[toolset_config.kind]
     return toolset_klass(**toolset_config.tool_kwargs)
@@ -81,18 +82,18 @@ def make_mcp_client_toolset(
 
 def get_model_from_config(
     *,
-    agent_config: config.AgentConfig,
+    agent_config: config_agents.AgentConfig,
 ) -> ai_models.Model:
     provider_kw = agent_config.llm_provider_kw
 
-    if agent_config.provider_type == config.LLMProviderType.GOOGLE:
+    if agent_config.provider_type == config_agents.LLMProviderType.GOOGLE:
         provider = google_providers.GoogleProvider(**provider_kw)
         return google_models.GoogleModel(
             model_name=agent_config.model_name,
             provider=provider,
         )
 
-    elif agent_config.provider_type == config.LLMProviderType.OLLAMA:
+    elif agent_config.provider_type == config_agents.LLMProviderType.OLLAMA:
         provider_kw["api_key"] = "dummy"
         provider = ollama_providers.OllamaProvider(**provider_kw)
         return openai_models.OpenAIChatModel(
@@ -109,9 +110,9 @@ def get_model_from_config(
 
 def get_default_agent_from_configs(
     *,
-    agent_config: config.AgentConfig,
+    agent_config: config_agents.AgentConfig,
     tool_configs: ToolConfigMap,
-    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+    mcp_client_toolset_configs: config_tools.MCP_ClientToolsetConfigMap,
     skill_toolset_config: SkillToolsetConfig | None = None,
 ) -> SoliplexAgent:
     """Build a Pydantic AI agent from a config"""
@@ -147,9 +148,9 @@ def get_default_agent_from_configs(
 
 def get_agent_from_configs(
     *,
-    agent_config: config.AgentConfig,
+    agent_config: config_agents.AgentConfig,
     tool_configs: ToolConfigMap,
-    mcp_client_toolset_configs: config.MCP_ClientToolsetConfigMap,
+    mcp_client_toolset_configs: config_tools.MCP_ClientToolsetConfigMap,
     skill_toolset_config: SkillToolsetConfig | None = None,
 ) -> SoliplexAgent:
     """Get or create an agent from the specified agent and tool configs."""

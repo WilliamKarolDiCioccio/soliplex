@@ -4,9 +4,11 @@ from unittest import mock
 import pytest
 from fastmcp import tools as fmcp_tools
 
-from soliplex import config
 from soliplex import installation
 from soliplex import mcp_server
+from soliplex.config import installation as config_installation
+from soliplex.config import rooms as config_rooms
+from soliplex.config import tools as config_tools
 
 ROOM_ID = "testing"
 
@@ -16,50 +18,50 @@ def tool_for_testing():
 
 
 TOOL_CONFIG_WO_MCP = mock.create_autospec(
-    config.ToolConfig,
+    config_tools.ToolConfig,
     kind="testing",
     tool_name="soliplex.config.testing",
     tool=tool_for_testing,
     tool_id="mcp_false_bare",
     allow_mcp=False,
-    tool_requires=config.ToolRequires.BARE,
+    tool_requires=config_tools.ToolRequires.BARE,
 )
 TOOL_CONFIG_W_MCP_WO_REQ_CTX = mock.create_autospec(
-    config.ToolConfig,
+    config_tools.ToolConfig,
     kind="testing",
     tool_name="soliplex.tools.testing",
     tool=tool_for_testing,
     allow_mcp=True,
     tool_id="mcp_true_bare",
-    tool_requires=config.ToolRequires.BARE,
+    tool_requires=config_tools.ToolRequires.BARE,
 )
 TOOL_CONFIG_W_MCP_W_REQ_CTX = mock.create_autospec(
-    config.ToolConfig,
+    config_tools.ToolConfig,
     kind="testing",
     tool_name="soliplex.tools.testing",
     tool=tool_for_testing,
     tool_id="mcp_true_w_ctx",
     allow_mcp=True,
-    tool_requires=config.ToolRequires.FASTAPI_CONTEXT,
+    tool_requires=config_tools.ToolRequires.FASTAPI_CONTEXT,
 )
 
 SDTC_WO_MCP = mock.create_autospec(
-    config.ToolConfig,
+    config_tools.ToolConfig,
     kind="search_documents",
     tool_name="soliplex.tools.search_documents",
     tool=tool_for_testing,
     allow_mcp=False,
     tool_id="mcp_false_sdtc",
-    tool_requires=config.ToolRequires.TOOL_CONFIG,
+    tool_requires=config_tools.ToolRequires.TOOL_CONFIG,
 )
 SDTC_W_MCP = mock.create_autospec(
-    config.ToolConfig,
+    config_tools.ToolConfig,
     kind="search_documents",
     tool_name="soliplex.tools.search_documents",
     tool=tool_for_testing,
     allow_mcp=True,
     tool_id="mcp_true_sdtc",
-    tool_requires=config.ToolRequires.TOOL_CONFIG,
+    tool_requires=config_tools.ToolRequires.TOOL_CONFIG,
 )
 
 MCP_TOOL = object()
@@ -89,18 +91,18 @@ def test_mcp_tool(tool_config, hit):
 def test_mcp_tool_w_wrapper():
     tool_name = "soliplex.tools.testing"
     tc = mock.create_autospec(
-        config.ToolConfig,
+        config_tools.ToolConfig,
         kind="testing",
         tool_name=tool_name,
         tool=tool_for_testing,
         tool_id="mcp_true_w_wrapper",
         allow_mcp=True,
-        tool_requires=config.ToolRequires.TOOL_CONFIG,
+        tool_requires=config_tools.ToolRequires.TOOL_CONFIG,
     )
 
     with mock.patch.dict(
-        config.MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME,
-        {tool_name: config.WithQueryMCPWrapper},
+        config_tools.MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME,
+        {tool_name: config_tools.WithQueryMCPWrapper},
     ):
         found = mcp_server.mcp_tool(tc)
 
@@ -128,7 +130,7 @@ def test_mcp_tool_w_wrapper():
 @mock.patch("soliplex.mcp_server.mcp_tool")
 def test_room_mcp_tools(mcp_tool, tool_configs, exp_mcp_tools, allow_mcp):
     mcp_tool.side_effect = lambda tc: MCP_TOOL if tc.allow_mcp else None
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     room_config.allow_mcp = allow_mcp
     room_config.tool_configs = tool_configs
 
@@ -147,11 +149,13 @@ def test_room_mcp_tools(mcp_tool, tool_configs, exp_mcp_tools, allow_mcp):
 @mock.patch("soliplex.mcp_auth.FastMCPTokenProvider")
 @mock.patch("fastmcp.server.FastMCP")
 def test_setup_mcp_for_rooms(fmcp_klass, fmtp_klass, rmt, w_max_age):
-    i_config = mock.create_autospec(config.InstallationConfig)
+    i_config = mock.create_autospec(config_installation.InstallationConfig)
     i_config.room_configs = room_configs = {
-        "room1": mock.create_autospec(config.RoomConfig, allow_mcp=True),
-        "room2": mock.create_autospec(config.RoomConfig, allow_mcp=True),
-        "room3": mock.create_autospec(config.RoomConfig, allow_mcp=False),
+        "room1": mock.create_autospec(config_rooms.RoomConfig, allow_mcp=True),
+        "room2": mock.create_autospec(config_rooms.RoomConfig, allow_mcp=True),
+        "room3": mock.create_autospec(
+            config_rooms.RoomConfig, allow_mcp=False
+        ),
     }
     the_installation = mock.create_autospec(installation.Installation)
     the_installation._config = i_config

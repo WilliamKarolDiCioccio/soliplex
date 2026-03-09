@@ -11,8 +11,16 @@ from ag_ui import core as agui_core
 from haiku.skills import models as hs_models
 
 from soliplex import agui as agui_package
-from soliplex import config
 from soliplex import models
+from soliplex.config import agents as config_agents
+from soliplex.config import authsystem as config_authsystem
+from soliplex.config import completions as config_completions
+from soliplex.config import installation as config_installation
+from soliplex.config import quizzes as config_quizzes
+from soliplex.config import rooms as config_rooms
+from soliplex.config import secrets as config_secrets
+from soliplex.config import skills as config_skills
+from soliplex.config import tools as config_tools
 
 NOW = datetime.datetime.now(datetime.UTC)
 
@@ -59,10 +67,6 @@ OTHER_AGENT_KIND = "other-agent-kind"
 
 FACTORY_NAME = "some.package.function"
 
-AGUI_FEATURE_NAME = "test-agui-feature"
-AGUI_FEATURE_DESCRIPTION = "This is a test AG-UI feature"
-AGUI_FEATURE_MODEL_KLASS = "soliplex.agui.features.testing"
-
 INSTALLATION_ID = "test-installation"
 INSTALLATION_SECRET = "Seeeeeekrit!"
 INSTALLATION_ENVVAR_NAME = "TEST_ENVVAR"
@@ -82,7 +86,7 @@ INSTALLATION_OIDC_AUTH_SYSTEM_SERVER_URL = "https://oidc.example.com/"
 INSTALLATION_OIDC_AUTH_SYSTEM_TOKEN_VALIDATION_PEM = "PEM GOES HERE"
 INSTALLATION_OIDC_AUTH_SYSTEM_CLIENT_ID = "oicd-client-test"
 INSTALLATION_OIDC_AUTH_SYSTEM_SCOPE = "oicd-client-scope"
-INSTALLATION_OIDC_AUTH_SYSTEM_CONFIG = config.OIDCAuthSystemConfig(
+INSTALLATION_OIDC_AUTH_SYSTEM_CONFIG = config_authsystem.OIDCAuthSystemConfig(
     id=INSTALLATION_OIDC_AUTH_SYSTEM_ID,
     title=INSTALLATION_OIDC_AUTH_SYSTEM_TITLE,
     server_url=INSTALLATION_OIDC_AUTH_SYSTEM_SERVER_URL,
@@ -215,10 +219,10 @@ def run_input():
 
 @pytest.fixture
 def qa_question():
-    return config.QuizQuestion(
+    return config_quizzes.QuizQuestion(
         inputs=INPUTS,
         expected_output=EXPECTED_ANSWER,
-        metadata=config.QuizQuestionMetadata(
+        metadata=config_quizzes.QuizQuestionMetadata(
             uuid=QA_QUESTION_UUID,
             type=QUESTION_TYPE_QA,
             options=None,
@@ -228,10 +232,10 @@ def qa_question():
 
 @pytest.fixture
 def mc_question():
-    return config.QuizQuestion(
+    return config_quizzes.QuizQuestion(
         inputs=INPUTS,
         expected_output=EXPECTED_ANSWER,
-        metadata=config.QuizQuestionMetadata(
+        metadata=config_quizzes.QuizQuestionMetadata(
             uuid=MC_QUESTION_UUID,
             type=QUESTION_TYPE_MC,
             options=MC_OPTIONS,
@@ -271,11 +275,11 @@ def quiz_max_questions(request):
 
 
 def test_quizquestion_from_config():
-    question_config = config.QuizQuestion(
+    question_config = config_quizzes.QuizQuestion(
         inputs="What color is the sky?",
         expected_output="Blue",
-        metadata=config.QuizQuestionMetadata(
-            type=config.QuizQuestionType.QA,
+        metadata=config_quizzes.QuizQuestionMetadata(
+            type=config_quizzes.QuizQuestionType.QA,
             uuid=QA_QUESTION_UUID,
             options=[],
         ),
@@ -285,7 +289,9 @@ def test_quizquestion_from_config():
 
     assert question_model.inputs == question_config.inputs
     assert question_model.expected_output == question_config.expected_output
-    assert question_model.metadata.type == str(config.QuizQuestionType.QA)
+    assert question_model.metadata.type == str(
+        config_quizzes.QuizQuestionType.QA
+    )
     assert question_model.metadata.uuid == QA_QUESTION_UUID
     assert question_model.metadata.options == []
 
@@ -297,7 +303,7 @@ def test_quiz_from_config(
     quiz_randomize,
     quiz_max_questions,
 ):
-    quiz_config = config.QuizConfig(
+    quiz_config = config_quizzes.QuizConfig(
         id=QUIZ_ID,
         title=QUIZ_TITLE,
         _question_file_path_override=str(quiz_path),
@@ -335,7 +341,7 @@ def test_tool_from_config_w_toolconfig():
     def test_tool():
         """This is a test tool"""
 
-    tool_config = config.ToolConfig(
+    tool_config = config_tools.ToolConfig(
         tool_name="soliplex.tools.test_tool",
     )
 
@@ -345,17 +351,17 @@ def test_tool_from_config_w_toolconfig():
     assert tool_model.kind == "test_tool"
     assert tool_model.tool_name == "soliplex.tools.test_tool"
     assert tool_model.tool_description == test_tool.__doc__.strip()
-    assert tool_model.tool_requires == config.ToolRequires.BARE
+    assert tool_model.tool_requires == config_tools.ToolRequires.BARE
     assert tool_model.allow_mcp is False
     assert tool_model.agui_feature_names == []
     assert tool_model.extra_parameters == {}
 
 
-def test_mcp_client_toolset_from_config_w_toolconfig():
+def test_mcp_client_toolset_from_config_w_stdio():
     def test_tool():
         """This is a test tool"""
 
-    mcp_ct_config = config.Stdio_MCP_ClientToolsetConfig(
+    mcp_ct_config = config_tools.Stdio_MCP_ClientToolsetConfig(
         command="cat",
         args=["-"],
         env={"foo": "env:not_in_my_environment_really"},
@@ -373,8 +379,8 @@ def test_mcp_client_toolset_from_config_w_toolconfig():
     assert params["env"] == mcp_ct_config.env
 
 
-def test_mcp_client_toolset_from_config_w_sdtc():
-    mcp_ct_config = config.HTTP_MCP_ClientToolsetConfig(
+def test_mcp_client_toolset_from_config_w_http():
+    mcp_ct_config = config_tools.HTTP_MCP_ClientToolsetConfig(
         url="https://example.com/mcp",
         headers={"Authorization": "Bearer env:{BEARER_TOKEN}"},
         query_params={"foo": "env:not_in_my_environment_really"},
@@ -437,7 +443,7 @@ def filesystem_skill_config(
         metadata=w_metadata,
     )
     skill_metadata.name = SKILL_NAME  # mock quirk
-    return config.FilesystemSkillConfig(
+    return config_skills.FilesystemSkillConfig(
         _skill_metadata=skill_metadata,
         _skill_path=skill_path,
         model_name=SKILL_MODEL_NAME,
@@ -481,7 +487,7 @@ def entrypoint_skill_config(
         metadata=w_metadata,
     )
     skill_metadata.name = SKILL_NAME  # mock quirk
-    return config.EntrypointSkillConfig(
+    return config_skills.EntrypointSkillConfig(
         _skill_metadata=skill_metadata,
         model_name=SKILL_MODEL_NAME,
         state_type=StateModelTest,
@@ -513,7 +519,7 @@ def agent_retries(request):
 @pytest.fixture
 def installation_config():
     environ = {"OLLAMA_BASE_URL": OLLAMA_BASE_URL}
-    installation = mock.create_autospec(config.InstallationConfig)
+    installation = mock.create_autospec(config_installation.InstallationConfig)
     installation.get_environment = environ.get
     return installation
 
@@ -523,33 +529,33 @@ def installation_config():
     [
         (  # Ollama, default URL
             {
-                "provider_type": config.LLMProviderType.OLLAMA,
+                "provider_type": config_agents.LLMProviderType.OLLAMA,
             },
             f"{OLLAMA_BASE_URL}/v1",
         ),
         (  # Ollama, explicit URL
             {
-                "provider_type": config.LLMProviderType.OLLAMA,
+                "provider_type": config_agents.LLMProviderType.OLLAMA,
                 "provider_base_url": AGENT_BASE_URL,
             },
             f"{AGENT_BASE_URL}/v1",
         ),
         (  # OpenAI, no URL
             {
-                "provider_type": config.LLMProviderType.OPENAI,
+                "provider_type": config_agents.LLMProviderType.OPENAI,
             },
             None,
         ),
         (  # OpenAI, explicit URL
             {
-                "provider_type": config.LLMProviderType.OPENAI,
+                "provider_type": config_agents.LLMProviderType.OPENAI,
                 "provider_base_url": AGENT_BASE_URL,
             },
             f"{AGENT_BASE_URL}/v1",
         ),
         (  # Google, no URL
             {
-                "provider_type": config.LLMProviderType.GOOGLE,
+                "provider_type": config_agents.LLMProviderType.GOOGLE,
             },
             None,
         ),
@@ -561,7 +567,7 @@ def test_defaultagent_from_config(
     agent_provider_kw,
     exp_base,
 ):
-    agent_config = config.AgentConfig(
+    agent_config = config_agents.AgentConfig(
         id=AGENT_ID,
         model_name=AGENT_MODEL,
         system_prompt=AGENT_PROMPT,
@@ -584,51 +590,14 @@ def test_defaultagent_from_config(
     assert agent_model.provider_base_url == exp_base
 
 
-class FeatureModel(pydantic.BaseModel):
-    """Feature model for testing"""
-
-    foo: str
-    bar: str | None = None
-
-    @classmethod
-    def model_json_schema(cls):
-        return {
-            "type": "object",
-            "title": cls.__name__,
-            "description": cls.__doc__,
-            "properties": {
-                "foo": {
-                    "title": "Foo",
-                    "type": "string",
-                },
-                "bar": {
-                    "title": "Bar",
-                    "anyOf:": [
-                        {"type": "string"},
-                        {"type": "null"},
-                    ],
-                    "default": None,
-                },
-            },
-        }
-
-
-@pytest.fixture
-def the_agui_feature():
-    return config.AGUI_Feature(
-        name=AGUI_FEATURE_NAME,
-        model_klass=FeatureModel,
-        source=config.AGUI_FeatureSource.CLIENT,
-    )
-
-
 def test_aguifeature_from_config(the_agui_feature):
     feature_model = models.AGUI_Feature.from_config(the_agui_feature)
 
-    assert feature_model.name == AGUI_FEATURE_NAME
+    assert feature_model.name == the_agui_feature.name
     assert feature_model.description == the_agui_feature.description
     assert feature_model.source == the_agui_feature.source
-    assert feature_model.json_schema == FeatureModel.model_json_schema()
+    model_klass = the_agui_feature.model_klass
+    assert feature_model.json_schema == model_klass.model_json_schema()
 
 
 @pytest.fixture(params=[False, True])
@@ -646,7 +615,7 @@ def test_factoryagent_from_config(
     with_agent_config,
     extra_config,
 ):
-    agent_config = config.FactoryAgentConfig(
+    agent_config = config_agents.FactoryAgentConfig(
         id=AGENT_ID,
         factory_name=FACTORY_NAME,
         _installation_config=installation_config,
@@ -685,7 +654,7 @@ def test_otheragent_from_config(
 
 @pytest.fixture
 def gcd_tool_config():
-    return config.ToolConfig(
+    return config_tools.ToolConfig(
         tool_name="soliplex.tools.get_current_datetime",
         agui_feature_names=(FEATURE_NAME,),
     )
@@ -693,7 +662,7 @@ def gcd_tool_config():
 
 @pytest.fixture
 def a_quiz(quiz_path):
-    return config.QuizConfig(
+    return config_quizzes.QuizConfig(
         id=QUIZ_ID,
         title=QUIZ_TITLE,
         _question_file_path_override=str(quiz_path),
@@ -707,7 +676,7 @@ def room_allow_mcp(request):
 
 @pytest.fixture
 def default_agent(installation_config):
-    return config.AgentConfig(
+    return config_agents.AgentConfig(
         id=AGENT_ID,
         model_name=AGENT_MODEL,
         system_prompt=AGENT_PROMPT,
@@ -717,7 +686,7 @@ def default_agent(installation_config):
 
 @pytest.fixture
 def factory_agent(installation_config):
-    return config.FactoryAgentConfig(
+    return config_agents.FactoryAgentConfig(
         id=AGENT_ID,
         factory_name=FACTORY_NAME,
         with_agent_config=False,
@@ -726,12 +695,12 @@ def factory_agent(installation_config):
 
 
 @pytest.fixture
-def w_agui_features_agent(installation_config):
+def w_agui_features_agent(installation_config, the_agui_feature):
     return mock.Mock(
         spec_set=["id", "kind", "agui_feature_names"],
         id=AGENT_ID,
         kind=OTHER_AGENT_KIND,
-        agui_feature_names=(AGUI_FEATURE_NAME,),
+        agui_feature_names=(the_agui_feature.name,),
     )
 
 
@@ -752,7 +721,7 @@ def which_agent(
 
 @pytest.fixture
 def room_ic():
-    return config.InstallationConfig(
+    return config_installation.InstallationConfig(
         id=INSTALLATION_ID,
         oidc_paths=[],
         room_paths=[],
@@ -765,7 +734,7 @@ def room_ic():
 
 
 def test_room_from_config_bare(room_ic, which_agent):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -805,7 +774,7 @@ def test_room_from_config_bare(room_ic, which_agent):
 
 
 def test_room_from_config_w_welcome(room_ic, default_agent):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -820,7 +789,7 @@ def test_room_from_config_w_welcome(room_ic, default_agent):
 
 
 def test_room_from_config_w_suggestions(room_ic, default_agent):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -835,7 +804,7 @@ def test_room_from_config_w_suggestions(room_ic, default_agent):
 
 
 def test_room_from_config_w_tools(room_ic, default_agent, gcd_tool_config):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -860,12 +829,12 @@ def test_room_from_config_w_fs_skills(
 ):
     room_ic._skill_configs[SKILL_NAME] = filesystem_skill_config
 
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
         agent_config=default_agent,
-        skills=config.RoomSkillsConfig(
+        skills=config_skills.RoomSkillsConfig(
             installation_skill_names=[SKILL_NAME],
             _installation_config=room_ic,
         ),
@@ -886,12 +855,12 @@ def test_room_from_config_w_ep_skills(
 ):
     room_ic._skill_configs[SKILL_NAME] = entrypoint_skill_config
 
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
         agent_config=default_agent,
-        skills=config.RoomSkillsConfig(
+        skills=config_skills.RoomSkillsConfig(
             installation_skill_names=[SKILL_NAME],
             _installation_config=room_ic,
         ),
@@ -906,7 +875,7 @@ def test_room_from_config_w_ep_skills(
 
 
 def test_room_from_config_w_quizzes(room_ic, default_agent, a_quiz):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -921,7 +890,7 @@ def test_room_from_config_w_quizzes(room_ic, default_agent, a_quiz):
 
 
 def test_room_from_config_w_allow_mcp(room_ic, default_agent, room_allow_mcp):
-    room_config = config.RoomConfig(
+    room_config = config_rooms.RoomConfig(
         id=ROOM_ID,
         name=ROOM_NAME,
         description=ROOM_DESCRIPTION,
@@ -936,7 +905,7 @@ def test_room_from_config_w_allow_mcp(room_ic, default_agent, room_allow_mcp):
 
 
 def test_completion_from_config_bare(which_agent):
-    completion_config = config.CompletionConfig(
+    completion_config = config_completions.CompletionConfig(
         id=COMPLETION_ID,
         name=COMPLETION_NAME,
         agent_config=which_agent,
@@ -967,7 +936,7 @@ def test_completion_from_config_bare(which_agent):
 
 
 def test_completion_from_config_w_tools(default_agent, gcd_tool_config):
-    completion_config = config.CompletionConfig(
+    completion_config = config_completions.CompletionConfig(
         id=COMPLETION_ID,
         name=COMPLETION_NAME,
         agent_config=default_agent,
@@ -983,7 +952,7 @@ def test_completion_from_config_w_tools(default_agent, gcd_tool_config):
 
 @pytest.fixture
 def bare_installation_config():
-    return config.InstallationConfig(
+    return config_installation.InstallationConfig(
         id=INSTALLATION_ID,
         oidc_paths=[],
         room_paths=[],
@@ -1009,11 +978,11 @@ def test_installation_from_config_bare(bare_installation_config):
     assert installation_model.oidc_auth_systems == []
     assert (
         installation_model.thread_persistence_dburi_sync
-        == config.SYNC_MEMORY_ENGINE_URL
+        == config_installation.SYNC_MEMORY_ENGINE_URL
     )
     assert (
         installation_model.thread_persistence_dburi_async
-        == config.ASYNC_MEMORY_ENGINE_URL
+        == config_installation.ASYNC_MEMORY_ENGINE_URL
     )
     assert installation_model.logging_config_file is None
     assert installation_model.logging_headers_map == {}
@@ -1022,7 +991,7 @@ def test_installation_from_config_bare(bare_installation_config):
 
 @pytest.fixture
 def a_secret():
-    return config.SecretConfig(secret_name=INSTALLATION_SECRET)
+    return config_secrets.SecretConfig(secret_name=INSTALLATION_SECRET)
 
 
 def test_installation_from_config_w_secrets(
@@ -1098,14 +1067,14 @@ def test_installation_from_config_w_haiku_rag_config_file(
 
 @pytest.fixture(
     params=[
-        config.AgentConfig(
+        config_agents.AgentConfig(
             id=INSTALLATION_AGENT_ID,
             model_name=INSTALLATION_AGENT_MODEL_NAME,
             system_prompt=INSTALLATION_AGENT_SYSTEM_PROMPT,
-            provider_type=config.LLMProviderType.OLLAMA,
+            provider_type=config_agents.LLMProviderType.OLLAMA,
             provider_base_url=AGENT_BASE_URL,
         ),
-        config.FactoryAgentConfig(
+        config_agents.FactoryAgentConfig(
             id=INSTALLATION_AGENT_ID,
             factory_name=FACTORY_NAME,
             with_agent_config=False,
@@ -1129,7 +1098,7 @@ def test_installation_from_config_w_agent(
 
     (m_agent,) = installation_model.agents
 
-    if isinstance(installation_agent, config.FactoryAgentConfig):
+    if isinstance(installation_agent, config_agents.FactoryAgentConfig):
         assert m_agent.factory_name == installation_agent.factory_name
     else:
         assert m_agent.model_name == installation_agent.model_name
@@ -1226,17 +1195,15 @@ def test_installation_from_config_w_logging_config_file(
 
 def test_installation_from_config_w_agui_feature(
     bare_installation_config,
+    patched_agui_features,
     the_agui_feature,
 ):
     # Ensure that the registry has only a  single, known feature.
-    with mock.patch.dict(
-        "soliplex.config.AGUI_FEATURES_BY_NAME",
-        clear=True,
-        the_agui_feature=the_agui_feature,
-    ):
-        installation_model = models.Installation.from_config(
-            bare_installation_config,
-        )
+    patched_agui_features[the_agui_feature.name] = the_agui_feature
+
+    installation_model = models.Installation.from_config(
+        bare_installation_config,
+    )
 
     for m_feature, c_feature in zip(
         installation_model.agui_features,

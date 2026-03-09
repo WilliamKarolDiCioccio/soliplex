@@ -5,17 +5,20 @@ import inspect
 from fastmcp import server as fmcp_server
 from fastmcp import tools as fmcp_tools
 
-from soliplex import config
 from soliplex import installation
 from soliplex import mcp_auth
+from soliplex.config import rooms as config_rooms
+from soliplex.config import tools as config_tools
 
 
-def mcp_tool(tool_config: config.ToolConfig) -> fmcp_tools.Tool | None:
+def mcp_tool(tool_config: config_tools.ToolConfig) -> fmcp_tools.Tool | None:
     if (
         tool_config.allow_mcp
-        and tool_config.tool_requires != config.ToolRequires.FASTAPI_CONTEXT
+        and tool_config.tool_requires
+        != config_tools.ToolRequires.FASTAPI_CONTEXT
     ):
-        wrapper_type = config.MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME.get(
+        wrapper_registry = config_tools.MCP_TOOL_CONFIG_WRAPPERS_BY_TOOL_NAME
+        wrapper_type = wrapper_registry.get(
             tool_config.tool_name,
         )
 
@@ -38,7 +41,9 @@ def mcp_tool(tool_config: config.ToolConfig) -> fmcp_tools.Tool | None:
             )
 
 
-def room_mcp_tools(room_config: config.RoomConfig) -> list[fmcp_tools.Tool]:
+def room_mcp_tools(
+    room_config: config_rooms.RoomConfig,
+) -> list[fmcp_tools.Tool]:
     """Return room tools which do not require the FastAPI context"""
 
     if room_config.allow_mcp:

@@ -11,7 +11,16 @@ from haiku.skills import models as hs_models
 
 from soliplex import agui as agui_package
 from soliplex import authz as authz_package
-from soliplex import config
+from soliplex.config import agents as config_agents
+from soliplex.config import agui as config_agui
+from soliplex.config import authsystem as config_authsystem
+from soliplex.config import completions as config_completions
+from soliplex.config import installation as config_installation
+from soliplex.config import quizzes as config_quizzes
+from soliplex.config import rooms as config_rooms
+from soliplex.config import secrets as config_secrets
+from soliplex.config import skills as config_skills
+from soliplex.config import tools as config_tools
 
 KW_ONLY = pydantic.Field(kw_only=True)
 KW_ONLY_NONE = pydantic.Field(kw_only=True, default=None)
@@ -30,7 +39,7 @@ class QuizQuestionMetadata(pydantic.BaseModel):
     options: list[str] | None
 
     @classmethod
-    def from_config(cls, qq_meta: config.QuizQuestionMetadata):
+    def from_config(cls, qq_meta: config_quizzes.QuizQuestionMetadata):
         return cls(
             type=str(qq_meta.type),
             uuid=qq_meta.uuid,
@@ -44,7 +53,7 @@ class QuizQuestion(pydantic.BaseModel):
     metadata: QuizQuestionMetadata
 
     @classmethod
-    def from_config(cls, question: config.QuizQuestionMetadata):
+    def from_config(cls, question: config_quizzes.QuizQuestionMetadata):
         return cls(
             inputs=question.inputs,
             expected_output=question.expected_output,
@@ -67,7 +76,7 @@ class Quiz(pydantic.BaseModel):
     questions: list[QuizQuestion]
 
     @classmethod
-    def from_config(cls, quiz_config: config.QuizConfig):
+    def from_config(cls, quiz_config: config_quizzes.QuizConfig):
         questions = [
             QuizQuestion.from_config(question)
             for question in quiz_config.get_questions()
@@ -88,13 +97,13 @@ class Tool(pydantic.BaseModel):
     kind: str
     tool_name: str
     tool_description: str
-    tool_requires: config.ToolRequires  # enum, not dataclass
+    tool_requires: config_tools.ToolRequires  # enum, not dataclass
     allow_mcp: bool
     agui_feature_names: list[str]
     extra_parameters: dict[str, typing.Any]
 
     @classmethod
-    def from_config(cls, tool_config: config.ToolConfig):
+    def from_config(cls, tool_config: config_tools.ToolConfig):
         return cls(
             kind=tool_config.kind,
             tool_name=tool_config.tool_name,
@@ -146,7 +155,7 @@ class Skill(pydantic.BaseModel):
     state_namespace: str | None = None
 
     @classmethod
-    def from_config(cls, skill_config: config.SkillConfigTypes):
+    def from_config(cls, skill_config: config_skills.SkillConfigTypes):
         kwargs = {}
         if skill_config.state_type is not None:
             kwargs["state_type_schema"] = (
@@ -173,13 +182,13 @@ class DefaultAgent(pydantic.BaseModel):
     model_name: str
     retries: int
     system_prompt: str | None
-    provider_type: config.LLMProviderType  # enum, not dataclass
+    provider_type: config_agents.LLMProviderType  # enum, not dataclass
     provider_base_url: str | None
     provider_key: str
     agui_feature_names: list[str] = pydantic.Field(default_factory=list)
 
     @classmethod
-    def from_config(cls, agent_config: config.AgentConfig):
+    def from_config(cls, agent_config: config_agents.AgentConfig):
         llm_provider_kw = agent_config.llm_provider_kw
         return cls(
             id=agent_config.id,
@@ -200,7 +209,7 @@ class FactoryAgent(pydantic.BaseModel):
     agui_feature_names: list[str] = pydantic.Field(default_factory=list)
 
     @classmethod
-    def from_config(cls, agent_config: config.AgentConfig):
+    def from_config(cls, agent_config: config_agents.AgentConfig):
         agui_feature_names = getattr(agent_config, "agui_feature_names", [])
         return cls(
             id=agent_config.id,
@@ -232,11 +241,11 @@ Agent = DefaultAgent | FactoryAgent | OtherAgent
 class AGUI_Feature(pydantic.BaseModel):
     name: str
     description: str
-    source: config.AGUI_FeatureSource
+    source: config_agui.AGUI_FeatureSource
     json_schema: dict[str, typing.Any]
 
     @classmethod
-    def from_config(cls, agui_feature: config.AGUI_Feature):
+    def from_config(cls, agui_feature: config_agui.AGUI_Feature):
         return cls(
             name=agui_feature.name,
             description=agui_feature.description,
@@ -261,7 +270,7 @@ class Room(pydantic.BaseModel):
     allow_mcp: bool
 
     @classmethod
-    def from_config(cls, room_config: config.RoomConfig):
+    def from_config(cls, room_config: config_rooms.RoomConfig):
         agent_config = room_config.agent_config
 
         if agent_config.kind == "factory":
@@ -314,7 +323,10 @@ class Completion(pydantic.BaseModel):
     agent: Agent
 
     @classmethod
-    def from_config(cls, completion_config: config.CompletionConfig):
+    def from_config(
+        cls,
+        completion_config: config_completions.CompletionConfig,
+    ):
         agent_config = completion_config.agent_config
 
         if agent_config.kind == "factory":
@@ -350,7 +362,7 @@ class OIDCAuthSystem(pydantic.BaseModel):
     scope: str | None = None
 
     @classmethod
-    def from_config(cls, oas_config: config.OIDCAuthSystemConfig):
+    def from_config(cls, oas_config: config_authsystem.OIDCAuthSystemConfig):
         kwargs = dataclasses.asdict(
             dataclasses.replace(oas_config, _installation_config=None)
         )
@@ -365,7 +377,7 @@ class SecretSource(pydantic.BaseModel):
     extra_arguments: dict[str, typing.Any]
 
     @classmethod
-    def from_config(cls, source_config: config.SecretSource):
+    def from_config(cls, source_config: config_secrets.SecretSource):
         return cls(
             kind=source_config.kind,
             extra_arguments=source_config.extra_arguments,
@@ -377,7 +389,7 @@ class Secret(pydantic.BaseModel):
     sources: list[SecretSource]
 
     @classmethod
-    def from_config(cls, secret_config: config.SecretConfig):
+    def from_config(cls, secret_config: config_secrets.SecretConfig):
         return cls(
             secret_name=secret_config.secret_name,
             sources=[
@@ -410,7 +422,9 @@ class Installation(pydantic.BaseModel):
     logging_claims_map: dict[str, str] | None = {}
 
     @classmethod
-    def from_config(cls, installation_config: config.InstallationConfig):
+    def from_config(
+        cls, installation_config: config_installation.InstallationConfig
+    ):
         oidc_auth_systems = [
             OIDCAuthSystem.from_config(oas_config)
             for oas_config in installation_config.oidc_auth_system_configs
@@ -457,11 +471,11 @@ class Installation(pydantic.BaseModel):
             # interpolated secrets
             thread_persistence_dburi_sync=(
                 installation_config._thread_persistence_dburi_sync
-                or config.SYNC_MEMORY_ENGINE_URL
+                or config_installation.SYNC_MEMORY_ENGINE_URL
             ),
             thread_persistence_dburi_async=(
                 installation_config._thread_persistence_dburi_async
-                or config.ASYNC_MEMORY_ENGINE_URL
+                or config_installation.ASYNC_MEMORY_ENGINE_URL
             ),
             # Don't resolve path to logging config
             logging_config_file=installation_config._logging_config_file,

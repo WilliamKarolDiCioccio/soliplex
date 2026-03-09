@@ -4,9 +4,10 @@ import pytest
 from pydantic_ai import tools as ai_tools
 
 from soliplex import agents
-from soliplex import config
 from soliplex import mcp_client
 from soliplex import tools
+from soliplex.config import agents as config_agents
+from soliplex.config import tools as config_tools
 
 MODEL = "testing"
 SYSTEM_PROMPT = "You are a test"
@@ -30,15 +31,15 @@ MODEL_SETTINGS = {
 ROOM_ID = "test-room"
 RAG_LANCEDB_OVERRIDE_PATH = "/path/to/db/rag"
 
-TC_TOOL_CONFIG = config.ToolConfig(tool_name="soliplex.tools.test_tool")
+TC_TOOL_CONFIG = config_tools.ToolConfig(tool_name="soliplex.tools.test_tool")
 
 
 @pytest.mark.parametrize(
     "provider_type, llm_provider_kw",
     [
-        (config.LLMProviderType.OLLAMA, OLLAMA_PROVIDER_KW),
-        (config.LLMProviderType.OPENAI, OPENAI_PROVIDER_KW),
-        (config.LLMProviderType.GOOGLE, GOOGLE_PROVIDER_KW),
+        (config_agents.LLMProviderType.OLLAMA, OLLAMA_PROVIDER_KW),
+        (config_agents.LLMProviderType.OPENAI, OPENAI_PROVIDER_KW),
+        (config_agents.LLMProviderType.GOOGLE, GOOGLE_PROVIDER_KW),
     ],
 )
 @mock.patch("pydantic_ai.providers.google.GoogleProvider")
@@ -55,7 +56,7 @@ def test_get_model_from_config(
     provider_type,
     llm_provider_kw,
 ):
-    agent_config = mock.create_autospec(config.AgentConfig)
+    agent_config = mock.create_autospec(config_agents.AgentConfig)
     agent_config.kind = "default"
     agent_config.id = ROOM_ID
     agent_config.model_name = MODEL
@@ -65,7 +66,7 @@ def test_get_model_from_config(
 
     model = agents.get_model_from_config(agent_config=agent_config)
 
-    if provider_type == config.LLMProviderType.GOOGLE:
+    if provider_type == config_agents.LLMProviderType.GOOGLE:
         assert model is google_model_klass.return_value
         google_model_klass.assert_called_once_with(
             model_name=MODEL,
@@ -77,7 +78,7 @@ def test_get_model_from_config(
         oai_provider_klass.assert_not_called()
         oll_provider_klass.assert_not_called()
 
-    elif provider_type == config.LLMProviderType.OPENAI:
+    elif provider_type == config_agents.LLMProviderType.OPENAI:
         assert model is oai_model_klass.return_value
         oai_model_klass.assert_called_once_with(
             model_name=MODEL,
@@ -124,7 +125,7 @@ def tool_configs_tools(request):
             yield [(tc, ai_tool)]
 
 
-STDIO_MCTC = config.Stdio_MCP_ClientToolsetConfig(
+STDIO_MCTC = config_tools.Stdio_MCP_ClientToolsetConfig(
     command="cat",
     args=["-"],
 )
@@ -134,7 +135,7 @@ STDIO_TOOL = mcp_client.Stdio_MCP_Client_Toolset(
     env={},
 )
 
-HTTP_MCTC = config.HTTP_MCP_ClientToolsetConfig(
+HTTP_MCTC = config_tools.HTTP_MCP_ClientToolsetConfig(
     url="https://example.com/mcp",
 )
 HTTP_TOOL = mcp_client.HTTP_MCP_Client_Toolset(
@@ -169,7 +170,7 @@ def test_get_default_agent_from_configs(
     w_model_settings,
     w_room_skills,
 ):
-    agent_config = mock.create_autospec(config.AgentConfig)
+    agent_config = mock.create_autospec(config_agents.AgentConfig)
     agent_config.kind = "default"
     agent_config.get_system_prompt.return_value = SYSTEM_PROMPT
     agent_config.model_settings = w_model_settings
@@ -247,7 +248,7 @@ def test_get_agent_from_configs_wo_hit_w_default_kind(
     mcp_ct_configs_tools,
     w_room_skills,
 ):
-    agent_config = mock.create_autospec(config.AgentConfig)
+    agent_config = mock.create_autospec(config_agents.AgentConfig)
     agent_config.id = ROOM_ID
     agent_config.kind = "default"
 
@@ -290,14 +291,14 @@ def test_get_agent_from_configs_wo_hit_w_default_kind(
 
 @pytest.mark.parametrize("w_room_skills", [False, True])
 def test_get_agent_from_configs_wo_hit_w_python_kind(w_room_skills):
-    agent_config = mock.create_autospec(config.FactoryAgentConfig)
+    agent_config = mock.create_autospec(config_agents.FactoryAgentConfig)
     agent_config.kind = "factory"
     agent_config.id = ROOM_ID
 
-    tool_config = mock.create_autospec(config.ToolConfig)
+    tool_config = mock.create_autospec(config_tools.ToolConfig)
     tool_configs = {"test_tool": tool_config}
 
-    mcpcts = mock.create_autospec(config.MCP_ClientToolsetConfig)
+    mcpcts = mock.create_autospec(config_tools.MCP_ClientToolsetConfig)
     mcpcts_configs = {"test_mcpcts": mcpcts}
 
     room_skills = mock.create_autospec(agents.SkillToolsetConfig)
@@ -331,7 +332,7 @@ def test_get_agent_from_configs_wo_hit_w_python_kind(w_room_skills):
 
 def test_get_agent_from_configs_w_hit():
     expected = object()
-    a_config = mock.create_autospec(config.AgentConfig)
+    a_config = mock.create_autospec(config_agents.AgentConfig)
     a_config.id = ROOM_ID
 
     with mock.patch.dict("soliplex.agents._agent_cache", clear=True) as ac:

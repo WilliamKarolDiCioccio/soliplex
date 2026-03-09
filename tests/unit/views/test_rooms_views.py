@@ -7,10 +7,13 @@ import pytest
 from haiku.rag.store.models import chunk as hr_chunk
 
 from soliplex import authz as authz_package
-from soliplex import config
 from soliplex import installation
 from soliplex import loggers
 from soliplex import models
+from soliplex.config import agents as config_agents
+from soliplex.config import rag as config_rag
+from soliplex.config import rooms as config_rooms
+from soliplex.config import tools as config_tools
 from soliplex.views import rooms as rooms_views
 
 NOW = datetime.datetime.now(datetime.UTC)
@@ -61,7 +64,10 @@ RAG_DOCUMENT = models.RAGDocument(**DOCUMENT_KWARGS)
 @pytest.fixture(scope="module", params=[(), ROOM_IDS])
 def room_configs(request):
     return {
-        room_id: mock.create_autospec(config.RoomConfig, sort_key=room_id)
+        room_id: mock.create_autospec(
+            config_rooms.RoomConfig,
+            sort_key=room_id,
+        )
         for room_id in request.param
     }
 
@@ -340,19 +346,19 @@ async def test_get_room_documents(
     db_path = pathlib.Path("/tmp/rag.db")
 
     if ROOM_ID in room_configs:
-        non_hr_tool_config = mock.create_autospec(config.ToolConfig)
+        non_hr_tool_config = mock.create_autospec(config_tools.ToolConfig)
         tool_configs = room_configs[ROOM_ID].tool_configs = {
             "non_hr": non_hr_tool_config,
         }
 
         # Agent config without haiku_rag_config (default agent)
-        agent_config_mock = mock.create_autospec(config.AgentConfig)
+        agent_config_mock = mock.create_autospec(config_agents.AgentConfig)
         del agent_config_mock.haiku_rag_config
         room_configs[ROOM_ID].agent_config = agent_config_mock
 
         if w_hr_tool:
             tool_config = mock.create_autospec(
-                config.ToolConfig,
+                config_tools.ToolConfig,
                 haiku_rag_config=hr_config,
                 rag_lancedb_path=db_path,
             )
@@ -465,22 +471,24 @@ async def test_get_chunk_visualization(
 
     if ROOM_ID in room_configs:
         room_config = room_configs[ROOM_ID]
-        room_config.agent_config = mock.create_autospec(config.AgentConfig)
-        non_hr_tool_config = mock.create_autospec(config.ToolConfig)
+        room_config.agent_config = mock.create_autospec(
+            config_agents.AgentConfig,
+        )
+        non_hr_tool_config = mock.create_autospec(config_tools.ToolConfig)
         tool_configs = room_config.tool_configs = {
             "non_hr": non_hr_tool_config,
         }
 
         if w_hr_via == "agent":
             room_config.agent_config = mock.create_autospec(
-                config._RAGConfigBase,
+                config_rag._RAGConfigBase,
                 haiku_rag_config=hr_config,
                 rag_lancedb_path=db_path,
             )
 
         elif w_hr_via == "tool":
             tool_config = mock.create_autospec(
-                config.ToolConfig,
+                config_tools.ToolConfig,
                 haiku_rag_config=hr_config,
                 rag_lancedb_path=db_path,
             )

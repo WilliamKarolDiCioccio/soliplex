@@ -9,11 +9,12 @@ from ag_ui import core as agui_core
 
 from soliplex import agui as agui_package
 from soliplex import authz as authz_package
-from soliplex import config
 from soliplex import installation
 from soliplex import loggers
 from soliplex import models
 from soliplex.agui import features as agui_features
+from soliplex.config import agui as config_agui
+from soliplex.config import rooms as config_rooms
 from soliplex.views import agui as agui_views
 
 NOW = datetime.datetime.now(datetime.UTC)
@@ -50,10 +51,10 @@ TEST_RUN_FEEDBACK = "test-feedback"
 TEST_RUN_FEEDBACK_REASON = "Just because"
 
 EMPTY_FEATURE_NAME = "test-empty-feature"
-EMPTY_FEATURE = config.AGUI_Feature(
+EMPTY_FEATURE = config_agui.AGUI_Feature(
     name=EMPTY_FEATURE_NAME,
     model_klass=agui_features.EmptyFeatureModel,
-    source=config.AGUI_FeatureSource.SERVER,
+    source=config_agui.AGUI_FeatureSource.SERVER,
 )
 
 EMPTY_RUN_INPUT = agui_core.RunAgentInput(
@@ -259,7 +260,7 @@ async def test_get_room_agui_only(
     test_thread,
     w_thread_meta,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})
@@ -344,7 +345,7 @@ async def test_get_room_agui_thread_id_only(
     tsgt_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     test_thread.list_runs.return_value = [test_run]
@@ -481,7 +482,7 @@ async def test_get_room_agui_thread_id_run_id(
     tsgr_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     test_run.list_events.return_value = w_events
@@ -603,13 +604,14 @@ async def test_get_room_agui_thread_id_run_id(
 @mock.patch("soliplex.views.agui._check_user_in_room")
 async def test_post_room_agui_only(
     cuir,
+    patched_agui_features,
     the_threads,
     test_thread,
     test_run,
     w_thread_meta,
     w_agui_feature_names,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     room_config.agui_feature_names = w_agui_feature_names
     cuir.return_value = room_config
 
@@ -654,21 +656,18 @@ async def test_post_room_agui_only(
         test_thread,
     )
 
-    patch_features = {EMPTY_FEATURE_NAME: EMPTY_FEATURE}
-    with mock.patch.dict(
-        "soliplex.config.AGUI_FEATURES_BY_NAME",
-        **patch_features,
-    ):
-        found = await agui_views.post_room_agui(
-            request,
-            room_id=TEST_ROOM_ID,
-            new_thread_request=new_thread_request,
-            the_installation=the_installation,
-            the_threads=the_threads,
-            the_authz_policy=the_authz_policy,
-            the_user_claims=THE_USER_CLAIMS,
-            the_logger=the_logger,
-        )
+    patched_agui_features[EMPTY_FEATURE_NAME] = EMPTY_FEATURE
+
+    found = await agui_views.post_room_agui(
+        request,
+        room_id=TEST_ROOM_ID,
+        new_thread_request=new_thread_request,
+        the_installation=the_installation,
+        the_threads=the_threads,
+        the_authz_policy=the_authz_policy,
+        the_user_claims=THE_USER_CLAIMS,
+        the_logger=the_logger,
+    )
 
     assert found.room_id == TEST_ROOM_ID
     assert found.thread_id == TEST_THREAD_ID
@@ -683,7 +682,7 @@ async def test_post_room_agui_only(
     assert set(m_run_state) == exp_inital_state_keys
 
     for state_key in exp_inital_state_keys:
-        exp_klass = patch_features[state_key].model_klass
+        exp_klass = patched_agui_features[state_key].model_klass
         exp_inst = exp_klass()
         assert m_run_state[state_key] == exp_inst.model_dump(mode="python")
 
@@ -731,7 +730,7 @@ async def test_post_room_agui_thread_id_only(
     missing_parent,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})
@@ -847,7 +846,7 @@ async def test_post_room_agui_thread_id_meta(
     tsutm_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})
@@ -1149,7 +1148,7 @@ async def test_post_room_agui_thread_id_run_id_meta(
     tsurm_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})
@@ -1221,7 +1220,7 @@ async def test_post_room_agui_thread_id_run_id_feedback(
     tssrf_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})
@@ -1292,7 +1291,7 @@ async def test_delete_room_agui_thread_id(
     tsdr_side_effect,
     expectation,
 ):
-    room_config = mock.create_autospec(config.RoomConfig)
+    room_config = mock.create_autospec(config_rooms.RoomConfig)
     cuir.return_value = room_config
 
     request = fastapi.Request(scope={"type": "http"})

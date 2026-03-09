@@ -2,9 +2,11 @@ from unittest import mock
 
 import pytest
 
-from soliplex import config
 from soliplex import models
 from soliplex import quizzes
+from soliplex.config import agents as config_agents
+from soliplex.config import installation as config_installation
+from soliplex.config import quizzes as config_quizzes
 
 INPUTS = "What color is the sky"
 EXPECTED_ANSWER = "Blue"
@@ -27,10 +29,10 @@ def _from_param(request, key):
 
 @pytest.fixture
 def qa_question():
-    return config.QuizQuestion(
+    return config_quizzes.QuizQuestion(
         inputs=INPUTS,
         expected_output=EXPECTED_ANSWER,
-        metadata=config.QuizQuestionMetadata(
+        metadata=config_quizzes.QuizQuestionMetadata(
             uuid=QA_QUESTION_UUID,
             type=QUESTION_TYPE_QA,
         ),
@@ -39,10 +41,10 @@ def qa_question():
 
 @pytest.fixture
 def mc_question():
-    return config.QuizQuestion(
+    return config_quizzes.QuizQuestion(
         inputs=INPUTS,
         expected_output=EXPECTED_ANSWER,
-        metadata=config.QuizQuestionMetadata(
+        metadata=config_quizzes.QuizQuestionMetadata(
             uuid=MC_QUESTION_UUID,
             type=QUESTION_TYPE_MC,
             options=MC_OPTIONS,
@@ -53,15 +55,15 @@ def mc_question():
 @pytest.fixture
 def installation_config():
     environ = {"OLLAMA_BASE_URL": OLLAMA_BASE_URL}
-    installation = mock.create_autospec(config.InstallationConfig)
+    installation = mock.create_autospec(config_installation.InstallationConfig)
     installation.get_environment = environ.get
     return installation
 
 
 @pytest.fixture(
     params=[
-        config.LLMProviderType.OLLAMA,
-        config.LLMProviderType.OPENAI,
+        config_agents.LLMProviderType.OLLAMA,
+        config_agents.LLMProviderType.OPENAI,
     ],
 )
 def agent_provider_type(request) -> dict:
@@ -76,7 +78,7 @@ def a_quiz(
     agent_provider_type,
 ):
     judge_agent = mock.create_autospec(
-        config.AgentConfig,
+        config_agents.AgentConfig,
         id="quiz-testing-judge",
         model_name=QUIZ_JUDGE_AGENT_MODEL,
         llm_provider_kw={
@@ -85,7 +87,7 @@ def a_quiz(
         },
         **agent_provider_type,
     )
-    quiz = config.QuizConfig(
+    quiz = config_quizzes.QuizConfig(
         id="testing",
         question_file="ignored.json",
         judge_agent=judge_agent,
@@ -110,7 +112,8 @@ def test_get_quiz_judge_agent(
     a_quiz,
 ):
     is_openai = (
-        a_quiz.judge_agent.provider_type == config.LLMProviderType.OPENAI
+        a_quiz.judge_agent.provider_type
+        == config_agents.LLMProviderType.OPENAI
     )
 
     found = quizzes.get_quiz_judge_agent(a_quiz)

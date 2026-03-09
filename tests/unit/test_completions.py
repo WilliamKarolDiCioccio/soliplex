@@ -5,16 +5,18 @@ import fastapi
 import pytest
 
 from soliplex import completions
-from soliplex import config
 from soliplex import models
+from soliplex.config import agents as config_agents
+from soliplex.config import completions as config_completions
+from soliplex.config import tools as config_tools
 
 COMPLETION_ID = "testing-completion"
 SYSTEM_PROMPT = "You are a test"
 MODEL_NAME = "test-model"
 
-BARE_CONFIG = config.CompletionConfig(
+BARE_CONFIG = config_completions.CompletionConfig(
     id=COMPLETION_ID,
-    agent_config=config.AgentConfig(
+    agent_config=config_agents.AgentConfig(
         id=f"completions-{COMPLETION_ID}",
         system_prompt=SYSTEM_PROMPT,
         model_name=MODEL_NAME,
@@ -27,15 +29,15 @@ agent:
     model_name: "{MODEL_NAME}"
 """
 
-W_TOOLS_CONFIG = config.CompletionConfig(
+W_TOOLS_CONFIG = config_completions.CompletionConfig(
     id=COMPLETION_ID,
-    agent_config=config.AgentConfig(
+    agent_config=config_agents.AgentConfig(
         id=f"completions-{COMPLETION_ID}",
         system_prompt=SYSTEM_PROMPT,
         model_name=MODEL_NAME,
     ),
     tool_configs={
-        "get_current_datetime": config.ToolConfig(
+        "get_current_datetime": config_tools.ToolConfig(
             tool_name="soliplex.tools.get_current_datetime",
         ),
     },

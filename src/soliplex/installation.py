@@ -13,18 +13,23 @@ from sqlalchemy.ext import asyncio as sqla_asyncio
 
 from soliplex import agents
 from soliplex import authz as authz_package
-from soliplex import config
 from soliplex import loggers
 from soliplex import mcp_server
 from soliplex import secrets
 from soliplex import util
 from soliplex.agui import schema as agui_schema
 from soliplex.authz import schema as authz_schema
+from soliplex.config import agents as config_agents
+from soliplex.config import authsystem as config_authsystem
+from soliplex.config import completions as config_completions
+from soliplex.config import installation as config_installation
+from soliplex.config import logfire as config_logfire
+from soliplex.config import rooms as config_rooms
 
 ProviderURL = str | None
 ProviderModelNames = set[str]
 ProviderTypeInfo = dict[ProviderURL, ProviderModelNames]
-ProviderInfoMap = dict[config.LLMProviderType, ProviderTypeInfo]
+ProviderInfoMap = dict[config_agents.LLMProviderType, ProviderTypeInfo]
 
 
 NO_AUTH_MODE_USER_TOKEN = {
@@ -35,7 +40,7 @@ NO_AUTH_MODE_USER_TOKEN = {
 
 @dataclasses.dataclass
 class Installation:
-    _config: config.InstallationConfig
+    _config: config_installation.InstallationConfig
 
     def get_secret(self, secret_name) -> str:
         secret_config = self._config.secrets_map[secret_name]
@@ -44,7 +49,9 @@ class Installation:
     def resolve_secrets(self):
         secrets.resolve_secrets(self._config.secrets)
 
-    def get_environment_sources(self, key) -> list[config.EnvironmentSource]:
+    def get_environment_sources(
+        self, key
+    ) -> list[config_installation.EnvironmentSource]:
         return self._config.get_environment_sources(key)
 
     def get_environment(self, key, default=None) -> str:
@@ -58,9 +65,9 @@ class Installation:
         return self._config.haiku_rag_config
 
     @property
-    def all_agent_configs(self) -> config.AgentConfigMap:
+    def all_agent_configs(self) -> config_agents.AgentConfigMap:
         """Return a mapping by ID of all defined agent configs"""
-        found: config.AgentConfigMap = {}
+        found: config_agents.AgentConfigMap = {}
 
         for ac in self._config.agent_configs:
             found[ac.id] = ac
@@ -119,7 +126,7 @@ class Installation:
                 ac_models = ac_info.get(hr_url, set())
                 ac_info[hr_url] = ac_models | hr_models
 
-        ollama_url_info = found.get(config.LLMProviderType.OLLAMA)
+        ollama_url_info = found.get(config_agents.LLMProviderType.OLLAMA)
 
         if ollama_url_info is not None:
             no_url_models = ollama_url_info.pop(None, set())
@@ -130,7 +137,7 @@ class Installation:
         return found
 
     @property
-    def logfire_config(self) -> config.LogfireConfig | None:
+    def logfire_config(self) -> config_logfire.LogfireConfig | None:
         return self._config.logfire_config
 
     @property
@@ -154,7 +161,9 @@ class Installation:
         return len(self._config.oidc_auth_system_configs) == 0
 
     @property
-    def oidc_auth_system_configs(self) -> list[config.OIDCAuthSystemConfig]:
+    def oidc_auth_system_configs(
+        self,
+    ) -> list[config_authsystem.OIDCAuthSystemConfig]:
         return self._config.oidc_auth_system_configs
 
     async def get_room_configs(
@@ -163,7 +172,7 @@ class Installation:
         user: dict,
         the_authz_policy: authz_package.AuthorizationPolicy = None,
         the_logger: loggers.LogWrapper = None,
-    ) -> dict[str, config.RoomConfig]:
+    ) -> config_rooms.RoomConfigMap:
         """Return room configs available to the user"""
         if the_logger is None:
             logger = loggers.LogWrapper(
@@ -200,7 +209,7 @@ class Installation:
         user: dict,
         the_authz_policy: authz_package.AuthorizationPolicy = None,
         the_logger: loggers.LogWrapper = None,
-    ) -> config.RoomConfig:
+    ) -> config_rooms.RoomConfig:
         """Return a room configs IFF available to the user"""
         if the_logger is None:
             logger = loggers.LogWrapper(
@@ -227,7 +236,7 @@ class Installation:
         self,
         *,
         user: dict,
-    ) -> dict[str, config.CompletionConfig]:
+    ) -> dict[str, config_completions.CompletionConfig]:
         return self._config.completion_configs
 
     async def get_completion_config(
@@ -235,7 +244,7 @@ class Installation:
         *,
         completion_id: str,
         user: dict,
-    ) -> config.CompletionConfig:
+    ) -> config_completions.CompletionConfig:
         return self._config.completion_configs[completion_id]
 
     def get_agent_by_id(
@@ -343,7 +352,7 @@ class Installation:
 
 async def get_the_installation(
     request: fastapi.Request,
-) -> config.InstallationConfig:
+) -> config_installation.InstallationConfig:
     return request.state.the_installation
 
 
@@ -422,7 +431,7 @@ async def lifespan(
     log_config_file: str = None,
     add_admin_user: str = None,
 ):
-    i_config = config.load_installation(installation_path)
+    i_config = config_installation.load_installation(installation_path)
 
     if no_auth_mode:
         del i_config.oidc_paths[:]
@@ -434,7 +443,9 @@ async def lifespan(
 
     if log_config_file is not None:
         log_config_file = pathlib.Path(log_config_file)
-        logging_config_dict = config._load_config_yaml(log_config_file)
+        logging_config_dict = config_installation._load_config_yaml(
+            log_config_file
+        )
     else:
         logging_config_dict = i_config.logging_config
 
