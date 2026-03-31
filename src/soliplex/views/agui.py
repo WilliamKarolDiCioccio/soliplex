@@ -5,6 +5,7 @@ import functools
 
 import fastapi
 import logfire
+import pydantic
 import pydantic_ai
 from ag_ui import core as agui_core
 from fastapi import responses
@@ -150,7 +151,7 @@ async def _get_run_input(
 async def get_room_agui_thread_id(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
+    thread_id: pydantic.UUID4,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
     the_authz_policy: authz_package.AuthorizationPolicy = depend_the_authz,
@@ -158,6 +159,7 @@ async def get_room_agui_thread_id(
     the_logger: loggers.LogWrapper = depend_the_logger,
 ) -> models.AGUI_Thread:
     """Return metadata about a specific thread and its runs"""
+    thread_id = str(thread_id)
     the_logger.debug(loggers.AGUI_GET_ROOM_THREAD)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -209,8 +211,8 @@ async def get_room_agui_thread_id(
 async def get_room_agui_thread_id_run_id(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
-    run_id: str,
+    thread_id: pydantic.UUID4,
+    run_id: pydantic.UUID4,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
     the_authz_policy: authz_package.AuthorizationPolicy = depend_the_authz,
@@ -218,6 +220,8 @@ async def get_room_agui_thread_id_run_id(
     the_logger: loggers.LogWrapper = depend_the_logger,
 ) -> models.AGUI_Run:
     """Return metadata about a specific run"""
+    thread_id = str(thread_id)
+    run_id = str(run_id)
     the_logger.debug(loggers.AGUI_GET_ROOM_THREAD_RUN)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -348,7 +352,7 @@ async def post_room_agui(
 async def post_room_agui_thread_id(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
+    thread_id: pydantic.UUID4,
     new_run_request: models.AGUI_NewRunRequest,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
@@ -360,6 +364,7 @@ async def post_room_agui_thread_id(
 
     Body of request, if passed, must validate to 'models.AGUI_RunMetadata'.
     """
+    thread_id = str(thread_id)
     the_logger.debug(loggers.AGUI_POST_ROOM_THREAD)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -418,7 +423,7 @@ async def post_room_agui_thread_id(
 async def post_room_agui_thread_id_meta(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
+    thread_id: pydantic.UUID4,
     new_metadata: models.AGUI_ThreadMetadata,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
@@ -434,6 +439,7 @@ async def post_room_agui_thread_id_meta(
 
     Returns an HTTP 205 (Reset Content) on success.
     """
+    thread_id = str(thread_id)
     the_logger.debug(loggers.AGUI_POST_ROOM_THREAD_META)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -473,7 +479,7 @@ async def post_room_agui_thread_id_meta(
 async def delete_room_agui_thread_id(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
+    thread_id: pydantic.UUID4,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
     the_authz_policy: authz_package.AuthorizationPolicy = depend_the_authz,
@@ -481,6 +487,7 @@ async def delete_room_agui_thread_id(
     the_logger: loggers.LogWrapper = depend_the_logger,
 ) -> fastapi.Response:
     """Delete an AGUI thread within the given room"""
+    thread_id = str(thread_id)
     the_logger.debug(loggers.AGUI_DELETE_ROOM_THREAD)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -655,8 +662,8 @@ async def stream_llm_events(event_queue: asyncio.Queue):
 async def post_room_agui_thread_id_run_id(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
-    run_id: str,
+    thread_id: pydantic.UUID4,
+    run_id: pydantic.UUID4,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
     the_authz_policy: authz_package.AuthorizationPolicy = depend_the_authz,
@@ -667,6 +674,8 @@ async def post_room_agui_thread_id_run_id(
 
     Stream AGUI events in the response.
     """
+    thread_id = str(thread_id)
+    run_id = str(run_id)
     the_logger.debug(loggers.AGUI_POST_ROOM_THREAD_RUN)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -769,8 +778,8 @@ async def post_room_agui_thread_id_run_id(
 async def post_room_agui_thread_id_run_id_meta(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
-    run_id: str,
+    thread_id: pydantic.UUID4,
+    run_id: pydantic.UUID4,
     new_metadata: models.AGUI_RunMetadata,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
@@ -786,6 +795,8 @@ async def post_room_agui_thread_id_run_id_meta(
 
     Returns an HTTP 205 (Reset Content) on success.
     """
+    thread_id = str(thread_id)
+    run_id = str(run_id)
     the_logger.debug(loggers.AGUI_POST_ROOM_THREAD_RUN_META)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -828,8 +839,8 @@ async def post_room_agui_thread_id_run_id_meta(
 async def get_room_agui_thread_id_run_id_feedback(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
-    run_id: str,
+    thread_id: pydantic.UUID4,
+    run_id: pydantic.UUID4,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
     the_authz_policy: authz_package.AuthorizationPolicy = depend_the_authz,
@@ -837,6 +848,8 @@ async def get_room_agui_thread_id_run_id_feedback(
     the_logger: loggers.LogWrapper = depend_the_logger,
 ) -> models.AGUI_RunFeedback | None:
     """Retrieve feedback for a run"""
+    thread_id = str(thread_id)
+    run_id = str(run_id)
     the_logger.debug(loggers.AGUI_GET_ROOM_THREAD_RUN_FEEDBACK)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -875,8 +888,8 @@ async def get_room_agui_thread_id_run_id_feedback(
 async def post_room_agui_thread_id_run_id_feedback(
     request: fastapi.Request,
     room_id: str,
-    thread_id: str,
-    run_id: str,
+    thread_id: pydantic.UUID4,
+    run_id: pydantic.UUID4,
     new_feedback: models.AGUI_RunFeedback,
     the_installation: installation.Installation = depend_the_installation,
     the_threads: agui_package.ThreadStorage = depend_the_threads,
@@ -888,6 +901,8 @@ async def post_room_agui_thread_id_run_id_feedback(
 
     Return an HTTP 205 (Reset Content) on success.
     """
+    thread_id = str(thread_id)
+    run_id = str(run_id)
     the_logger.debug(loggers.AGUI_POST_ROOM_THREAD_RUN_FEEDBACK)
 
     user_name = the_user_claims.get("preferred_username", "<unknown>")
@@ -1020,8 +1035,8 @@ async def post_agui_review_recent_feedback(
     review_entry = await the_threads.review_run_feedback(
         user_name=review.user_name,
         room_id=review.room_id,
-        thread_id=review.thread_id,
-        run_id=review.run_id,
+        thread_id=str(review.thread_id),
+        run_id=str(review.run_id),
         note=review.note,
     )
 
@@ -1048,8 +1063,8 @@ async def post_agui_resolve_recent_feedback(
     resolution_entry = await the_threads.resolve_run_feedback(
         user_name=resolution.user_name,
         room_id=resolution.room_id,
-        thread_id=resolution.thread_id,
-        run_id=resolution.run_id,
+        thread_id=str(resolution.thread_id),
+        run_id=str(resolution.run_id),
         note=resolution.note,
     )
 
