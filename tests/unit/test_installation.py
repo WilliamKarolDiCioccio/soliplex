@@ -508,6 +508,20 @@ def test_installation_all_provider_info(
     assert found == expected
 
 
+def test_installation_rooms_upload_path():
+    i_config = mock.create_autospec(config_installation.InstallationConfig)
+    the_installation = installation.Installation(i_config)
+
+    assert the_installation.rooms_upload_path is i_config.rooms_upload_path
+
+
+def test_installation_threads_upload_path():
+    i_config = mock.create_autospec(config_installation.InstallationConfig)
+    the_installation = installation.Installation(i_config)
+
+    assert the_installation.threads_upload_path is i_config.threads_upload_path
+
+
 def test_installation_logfire_config():
     i_config = mock.create_autospec(config_installation.InstallationConfig)
     the_installation = installation.Installation(i_config)
@@ -1076,6 +1090,7 @@ async def test_installation_get_agent_deps_for_room(
             assert isinstance(found, agents.AgentDependencies)
 
             assert found.the_installation is the_installation
+            assert found.room_id == w_room_id
             assert found.user == test_user
             assert found.tool_configs == t_configs
 
@@ -1144,6 +1159,7 @@ async def test_installation_get_agent_deps_for_completion(
         assert isinstance(found, agents.AgentDependencies)
 
         assert found.the_installation is the_installation
+        assert found.room_id is None
         assert found.user == test_user
         assert found.tool_configs == t_configs
 
