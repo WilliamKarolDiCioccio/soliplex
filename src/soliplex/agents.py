@@ -28,8 +28,14 @@ ToolConfigMap = dict[str, typing.Any]
 
 
 class SkillToolsetConfig(typing.Protocol):
-    # contract for config.RoomSkillsConfig etc.
-    @abc.abstractproperty
+    """Contract for config.RoomSkillsConfig etc."""
+
+    @property
+    @abc.abstractmethod
+    def skill_preambles(self) -> list[str]: ...
+
+    @property
+    @abc.abstractmethod
     def skill_toolset(self) -> hs_agent.SkillToolset: ...
 
 
@@ -137,15 +143,20 @@ def get_default_agent_from_configs(
         for mctc in mcp_client_toolset_configs.values()
     ]
 
+    agent_prompt = agent_config.get_system_prompt()
+
     if skill_toolset_config is not None:
         toolset = skill_toolset_config.skill_toolset
         toolsets.append(toolset)
+        preamble = "\n\n".join(
+            [agent_prompt] + skill_toolset_config.skill_preambles
+        )
         instructions = hs_prompts.build_system_prompt(
-            preamble=agent_config.get_system_prompt(),
+            preamble=preamble,
             skill_catalog=toolset.skill_catalog,
         )
     else:
-        instructions = agent_config.get_system_prompt()
+        instructions = agent_prompt
 
     return pydantic_ai.Agent(
         model=model,
