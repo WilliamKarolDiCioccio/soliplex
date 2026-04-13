@@ -1,4 +1,4 @@
-https://pypi.org/project/soliplex/# Soliplex
+# Soliplex
 
 An AI-powered Retrieval-Augmented Generation (RAG) system with a modern web interface.
 
@@ -6,7 +6,7 @@ An AI-powered Retrieval-Augmented Generation (RAG) system with a modern web inte
 
 - **RAG-Powered Search**: Semantic document retrieval using LanceDB vector database
 - **Multi-Room Architecture**: Independent chat environments (rooms) with separate configurations and knowledge bases
-- **Multiple LLM Providers**: OpenAI, Ollama, and compatible APIs
+- **Multiple LLM Providers**: OpenAI, Ollama, Google Gemini, Anthropic, Groq, and compatible APIs
 - **AI Agent System**: Function calling and tool integration for AI agents
 - **OIDC Authentication**: Enterprise SSO with Keycloak integration
 - **Model Context Protocol (MCP)**: Extended AI capabilities through MCP client or exposing Room as MCP server
@@ -17,6 +17,7 @@ An AI-powered Retrieval-Augmented Generation (RAG) system with a modern web inte
 ## Architecture
 
 ### Backend (`/src/soliplex/`)
+
 **Python 3.12+ / FastAPI**
 
 - **Core**: FastAPI application with async support
@@ -33,11 +34,12 @@ Key modules:
 - `views/` - API endpoints (auth, completions, conversations, rooms, quizzes)
 - `agents.py` - AI agent configuration and management
 - `agui/` - AG-UI thread persistence and retrieval
-- `tools.py` - Tool definitions for AI agents
+- `tools/` - Tool definitions for AI agents
 - `mcp_server.py` / `mcp_client.py` - Model Context Protocol integration
 - `tui/` - Terminal user interface
 
 ### Frontend (`/src/flutter/`)
+
 **Flutter 3.35+ / Dart 3.10.0+**
 
 - **Framework**: Flutter web with Material Design
@@ -67,10 +69,8 @@ For detailed installation instructions, see the [Prerequisites Guide](docs/prere
 ### Install Soliplex and dependencies
 
 ```bash
-# Install
-python3.13 -m venv venv
-source venv/bin/activate
-pip install -e .
+# Install (requires uv: https://docs.astral.sh/uv/)
+uv sync
 
 # Configure environment
 cp .env.example .env
@@ -100,55 +100,73 @@ See: `docs/rag.md` for more options.
 The `soliplex-cli` command provides several utilities for managing your Soliplex installation:
 
 #### Check Configuration
+
 Validate your configuration file and report any missing secrets or environment variables:
+
 ```bash
 soliplex-cli check-config example/minimal.yaml
 ```
 
 #### List Rooms
+
 Show all configured chat rooms:
+
 ```bash
 soliplex-cli list-rooms example/minimal.yaml
 ```
 
 #### List Completions
+
 Show all configured completion endpoints:
+
 ```bash
 soliplex-cli list-completions example/minimal.yaml
 ```
 
 #### List Secrets
+
 Display all configured secrets and their status:
+
 ```bash
 soliplex-cli list-secrets example/minimal.yaml
 ```
 
 #### List Environment Variables
+
 Show all environment variables and their values:
+
 ```bash
 soliplex-cli list-environment example/minimal.yaml
 ```
 
 #### List OIDC Providers
+
 Display configured OIDC authentication providers:
+
 ```bash
 soliplex-cli list-oidc-auth-providers example/minimal.yaml
 ```
 
 #### Export Configuration
+
 Export the installation configuration as YAML:
+
 ```bash
 soliplex-cli config example/minimal.yaml
 ```
 
 #### Export AG-UI Feature Schemas
+
 Export AG-UI feature schemas as JSON:
+
 ```bash
 soliplex-cli agui-feature-schemas example/minimal.yaml
 ```
 
 #### Run Backend Server
+
 Start the Soliplex backend server:
+
 ```bash
 export OLLAMA_BASE_URL=<your Ollama server / port>
 soliplex-cli serve example/minimal.yaml --no-auth-mode
@@ -267,11 +285,11 @@ Those files are checked into the Soliplex repository, and cannot know
 the URL of your Ollama server (if you use Ollama), They therefore declare
 the `OLLAMA_BASE_URL` variable without a value, meaning that the configuration
 expects the value to be present in the environments (see:
-https://soliplex.github.io/soliplex/config/environment/).
+<https://soliplex.github.io/soliplex/config/environment/>).
 
 Those files also must not contain secrets (API keys, etc.):  instead,
 they configure secret values to be found from the environment (see
-https://soliplex.github.io/soliplex/config/secrets/).
+<https://soliplex.github.io/soliplex/config/secrets/>).
 
 If your installation configures such values to be found from the OS
 environment, you can create a `.env` file which defines them, and arrange
@@ -309,9 +327,9 @@ docker-compose up
 ```
 
 Access:
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-- Frontend Web UI: http://localhost:9000
+- Backend API: <http://localhost:8000>
+- API Documentation: <http://localhost:8000/docs>
+- Frontend Web UI: <http://localhost:9000>
 
 ## Related Repositories
 

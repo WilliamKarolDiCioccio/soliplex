@@ -8,6 +8,7 @@ configurations.
 ```yaml
 id: "soliplex-example"
 ```
+
 ## Installation Metaconfiguration
 
 The `meta` section allows you to register custom "kinds" of entities (tool
@@ -62,7 +63,7 @@ configuration values for the `haiku.rag` client
 If not configured explicitly, the installation configuration expects to
 find this file in the same directory, with the default name `haiku.rag.yaml`.
 
-Pleas see the `haiku.rag` configuration
+Please see the `haiku.rag` configuration
 [docs](https://ggozad.github.io/haiku.rag/configuration/) for details
 on how to configure the `haiku.rag` client used by Soliplex.
 
@@ -82,6 +83,7 @@ agent_configs:
       ...
 
 ```
+
 Please see [this page](agents.md) for details on configuring agents.
 In addition to the values described there, note that the `id` element is
 required here.
@@ -90,7 +92,6 @@ required here.
 
 An installation can define two DBURIs for the database used to store
 AG-UI threads, runs, events, etc.
-
 
 ### Synchronous DBURI
 
@@ -171,10 +172,12 @@ oidc_paths:
 ```
 
 To disable authentication, list a single, "null" path, e.g.:
+
 ```yaml
 oidc_paths:
   -
 ```
+
 Or else run 'soliplex-cli serve --no-auth-mode'
 
 ## Filesystem Skill Paths
@@ -203,10 +206,11 @@ By default, Soliplex loads skill configurations found under the path
 
 ```yaml
 filesystem_skills_paths:
-  - "./skillss"
+  - "./skills"
 ```
 
 To disable filesystem skill discovery, list a single, "null" path, e.g.:
+
 ```yaml
 filesystem_skills_paths:
   -
@@ -214,7 +218,7 @@ filesystem_skills_paths:
 
 ## Enabling Skill Configurations
 
-To enable discovered filesystem or entryponit skills, add them to the
+To enable discovered filesystem or entrypoint skills, add them to the
 `skill_configs` stanza of the installation configuration.  E.g.:
 
 ```yaml
@@ -257,13 +261,13 @@ just as though we had configured:
 room_paths:
   - "./rooms"
 ```
+
 To disable all rooms, list a single, "null" path, e.g.:
 
 ```yaml
 room_paths:
    -
 ```
-
 
 ## Completion Configuration Paths
 
@@ -296,6 +300,7 @@ completion_paths:
 ```
 
 To disable all completions, list a single, "null" path, e.g.:
+
 ```yaml
 completion_paths:
   -

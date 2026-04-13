@@ -11,23 +11,24 @@ Within that directory should be one or two files:
 - `prompt.txt` (if present) holds the system prompt for conversations
   which are initiated from the room.
 
-
 Example layout without external prompt:
+
 ```yaml
 simple/
-    room_config.yaml
+    completion_config.yaml
 
 ```
 
 Example layout with external prompt:
+
 ```yaml
 chat/
     prompt.txt
-    room_config.yaml
+    completion_config.yaml
 
 ```
 
-# Completions Endpoint Configuration File Schema
+## Completions Endpoint Configuration File Schema
 
 ## Required endpoint elements
 
@@ -48,5 +49,5 @@ elements, e.g.:
         You are an..... #
   ```
 
-Please see [this page](`agents.md`) which documents the `agent` element
+Please see [this page](agents.md) which documents the `agent` element
 schema.
