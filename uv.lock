@@ -304,7 +304,7 @@ wheels = [
 
 [[package]]
 name = "bubble-sandbox"
-version = "0.2.0"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic-ai-backend" },
@@ -312,9 +312,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typer" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/11/07/260bd85c3e6c5309b8091e681cae261dfd2a4a25c520a928b06b997d88d1/bubble_sandbox-0.2.0.tar.gz", hash = "sha256:a5cd876cb452a48db754812d23dd142128003c06b2daeca93f8f43cfc467abef", size = 7444, upload-time = "2026-04-10T19:08:35.09Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/90/24/7c9f559622e4ce24e48c386508c5c4407891c1d730a84c91cb80750d8a6f/bubble_sandbox-0.3.0.tar.gz", hash = "sha256:5c6d3e95f862adb3c6a5c0c2f0cd91535c2037c306fcbef170fca92befaa01a6", size = 7649, upload-time = "2026-04-13T22:02:56.192Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/36/ad/0f331ba697f2e53196cc6c97f7ca2068738bf1d63cea8ca370bd44011895/bubble_sandbox-0.2.0-py3-none-any.whl", hash = "sha256:ed7901ba53d668dfef6c89657587414262535db0d4d074d7315a683b0147aa38", size = 9296, upload-time = "2026-04-10T19:08:34.232Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/d2/0eaaadae34511a78926515fce21a36046c1a3eaa1a08709000fc7bf562bd/bubble_sandbox-0.3.0-py3-none-any.whl", hash = "sha256:33a78a2f84ac1dc76d1dce9f6acb023b1adf81513dbff0b06d9d1b876e54896e", size = 9607, upload-time = "2026-04-13T22:02:55.335Z" },
 ]
 
 [[package]]
@@ -3501,7 +3501,7 @@ requires-dist = [
     { name = "ag-ui-protocol", specifier = ">=0.1.15,<0.2" },
     { name = "aiosqlite" },
     { name = "authlib" },
-    { name = "bubble-sandbox", specifier = ">=0.2.0,<0.3" },
+    { name = "bubble-sandbox", specifier = ">=0.3.0,<0.4" },
     { name = "certifi", specifier = ">=2025.11.12" },
     { name = "fakeredis", specifier = ">=2.34.1,<2.35" },
     { name = "fastapi" },
