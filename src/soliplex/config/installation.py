@@ -250,6 +250,62 @@ class EnvironmentSource:
     value: str | None
 
 
+@dataclasses.dataclass
+class SandboxConfig:
+    _environments_path: pathlib.Path
+    _workdirs_path: pathlib.Path | None = None
+
+    # Set by `from_yaml` factory
+    _config_path: pathlib.Path | None = None
+
+    @classmethod
+    def from_yaml(cls, config_path, config_dict):
+        config_dict["_environments_path"] = config_dict.pop(
+            "environments_path",
+        )
+        config_dict["_workdirs_path"] = config_dict.pop(
+            "workdirs_path",
+            None,
+        )
+        return cls(_config_path=config_path, **config_dict)
+
+    @property
+    def as_yaml(self) -> dict[str, typing.Any]:
+        result = {"environments_path": str(self.environments_path)}
+        if self._workdirs_path is not None:
+            result["workdirs_path"] = str(self.workdirs_path)
+
+        return result
+
+    @property
+    def environments_path(self) -> pathlib.Path:
+        """Subdirectories function as sandboxable environments
+
+        To qualify, they must contain both a 'pyproject.toml' file
+        and a '.venv' virtual environment initialized from it.
+        """
+        if self._config_path is not None:
+            return (
+                self._config_path.parent / self._environments_path
+            ).resolve()
+        else:
+            return None
+
+    @property
+    def workdirs_path(self) -> pathlib.Path:
+        """Directory holding "workdirs" for each run
+
+        A workdir will be named with the run ID, with parent directories
+        for the room ID and thread ID.
+
+        If not set, the sandox workdir will be a temporary directory.
+        """
+        if self._config_path is not None and self._workdirs_path is not None:
+            return (self._config_path.parent / self._workdirs_path).resolve()
+        else:
+            return None
+
+
 @dataclasses.dataclass(kw_only=True)
 class InstallationConfig:
     """Configuration for a set of rooms, completion, etc."""
@@ -563,6 +619,11 @@ class InstallationConfig:
             return self.upload_path / "threads"
 
     #
+    # Sandbox configuration
+    #
+    sandbox_config: SandboxConfig | None = None
+
+    #
     # Path(s) to OIDC Authentication System configs
     #
     # Defaults to one path: './oidc' (set in '__post_init__')
@@ -790,6 +851,13 @@ class InstallationConfig:
             if skill_configs is not None:
                 config_dict["_skill_configs"] = skill_configs
 
+            sandbox_config = config_dict.pop("sandbox_config", None)
+            if sandbox_config is not None:
+                config_dict["sandbox_config"] = SandboxConfig.from_yaml(
+                    config_path,
+                    sandbox_config,
+                )
+
             logging_config_file = config_dict.pop("logging_config_file", None)
 
             if logging_config_file is not None:
@@ -975,6 +1043,12 @@ class InstallationConfig:
             "completion_paths": [str(path) for path in self.completion_paths],
             "quizzes_paths": [str(path) for path in self.quizzes_paths],
         }
+
+        if self.upload_path:
+            result["upload_path"] = str(self.upload_path)
+
+        if self.sandbox_config:
+            result["sandbox_config"] = self.sandbox_config.as_yaml
 
         if self.title_agent_config_id is not None:
             result["title_agent_config_id"] = self.title_agent_config_id

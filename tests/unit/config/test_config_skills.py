@@ -6,17 +6,20 @@ from unittest import mock
 import pydantic
 import pytest
 import yaml
+from bubble_sandbox import config as bs_config
+from bubble_sandbox import models as bs_models
 from haiku.rag import config as hr_config
 from haiku.rag.skills import rag as hr_skills_rag
 from haiku.rag.skills import rlm as hr_skills_rlm
-from haiku.skills import agent as hs_agent
 from haiku.skills import models as hs_models
 from pydantic_ai.models import openai as openai_models
 from pydantic_ai.providers import ollama as ollama_providers
 
 from soliplex.config import agents as config_agents
 from soliplex.config import exceptions as config_exc
+from soliplex.config import installation as config_installation
 from soliplex.config import skills as config_skills
+from soliplex.skills import bwrap_sandbox as sk_bwrap_sandbox
 
 SKILL_NAME = "test-skill"
 FILESYSTEM_SKILL_NAME = "test-fs-skill"
@@ -104,6 +107,10 @@ model_name: "{ROOM_SKILLS_MODEL_NAME}"
 installation_skill_names:
     - "bogus"
 """
+
+TEST_ROOM_ID = "test_room_id"
+TEST_THREAD_ID = "test_thread_id"
+TEST_RUN_ID = "test_run_id"
 
 
 @pytest.fixture
@@ -867,6 +874,110 @@ def test_hr_rlm_skillconfig_from_yaml(
         assert inst.haiku_rag_config is installation_config.haiku_rag_config
 
 
+TEST_SKILL_CONFIG_ID = "test-bwrap-sandbox-id"
+TEST_DEFAULT_ENVIRONMENT = "test-environment"
+TEST_EXEC_TIMEOUT_SECS = 60
+
+
+@pytest.mark.parametrize(
+    "w_config, expectation",
+    [
+        # kwargs, expected_warning_count or exception type
+        (
+            {"not_a_valid_key": "FAIL"},
+            pytest.raises(config_exc.FromYamlException),
+        ),
+        ({}, contextlib.nullcontext(0)),
+        (
+            {
+                "id": TEST_SKILL_CONFIG_ID,
+                "default_environment_name": TEST_DEFAULT_ENVIRONMENT,
+                "sandbox_config": {
+                    "execution_timeout_seconds": TEST_EXEC_TIMEOUT_SECS,
+                },
+            },
+            contextlib.nullcontext(0),
+        ),
+    ],
+)
+def test_bwrapsandboxskillconfig_from_yaml(
+    temp_dir,
+    installation_config,
+    w_config,
+    expectation,
+):
+    config_path = temp_dir / "config_file.yaml"
+
+    with expectation as expected:
+        inst = config_skills.BwrapSandboxSkillConfig.from_yaml(
+            installation_config=installation_config,
+            config_path=config_path,
+            config_dict=w_config.copy(),
+        )
+
+    if not isinstance(expected, pytest.ExceptionInfo):
+        assert inst.id == w_config.get("id")
+        assert inst.default_environment_name == w_config.get(
+            "default_environment_name",
+            "bare",
+        )
+        assert isinstance(inst.sandbox_config, bs_config.Config)
+        sb_config = w_config.get("sandbox_config", {})
+        exp_config = bs_config.Config(
+            config_file_path=config_path,
+            **sb_config,
+        )
+        assert inst.sandbox_config == exp_config
+
+
+def test_bwrapsandboxskillconfig_agui_feature_names():
+    bssc = config_skills.BwrapSandboxSkillConfig()
+
+    (found,) = bssc.agui_feature_names
+
+    assert found == sk_bwrap_sandbox.STATE_NAMESPACE
+
+
+@pytest.mark.parametrize(
+    "w_volumes",
+    [
+        {},
+        {"foo": bs_models.VolumeInfo(host_path="/tmp/foo", writable=False)},
+    ],
+)
+@mock.patch("soliplex.skills.bwrap_sandbox.create_bwrap_sandbox_skill")
+def test_bwrapsandboxskillconfig_skill(
+    cbss,
+    w_volumes,
+):
+    installation_config = mock.create_autospec(
+        config_installation.InstallationConfig
+    )
+    bssc = config_skills.BwrapSandboxSkillConfig(
+        id=TEST_SKILL_CONFIG_ID,
+        default_environment_name=TEST_DEFAULT_ENVIRONMENT,
+        sandbox_config=bs_config.Config(
+            execution_timeout_seconds=TEST_EXEC_TIMEOUT_SECS,
+        ),
+        volumes=w_volumes,
+        _installation_config=installation_config,
+    )
+
+    found = bssc.skill
+
+    assert found is cbss.return_value
+
+    cbss.assert_called_once_with(
+        id=bssc.id,
+        default_environment_name=bssc.default_environment_name,
+        sandbox_config=bssc.sandbox_config,
+        volumes=w_volumes,
+        installation_config=installation_config,
+    )
+
+    assert found._factory is cbss
+
+
 @pytest.mark.parametrize(
     "w_invalid_kind, expectation",
     [
@@ -1114,7 +1225,7 @@ def test_roomskillsconfig_skill_toolset(
 
     found = room_skill_config.skill_toolset
 
-    assert isinstance(found, hs_agent.SkillToolset)
+    assert isinstance(found, config_skills.SoliplexSkillToolset)
     catalog_lines = found.skill_catalog.splitlines()
     assert f"- **{SKILL_NAME}**: {SKILL_DESC}" in catalog_lines
     assert found._skill_model is exp_model
@@ -1123,3 +1234,43 @@ def test_roomskillsconfig_skill_toolset(
         gmfc.assert_called_once_with(agent_config=model_agent_config)
     else:
         gmfc.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "w_deps",
+    [
+        None,
+        mock.Mock(spec_set=["state"], state={}),  # Use outside soliplex app
+        mock.Mock(
+            room_id=TEST_ROOM_ID,
+            thread_id=TEST_THREAD_ID,
+            run_id=TEST_RUN_ID,
+            state={},
+        ),
+    ],
+)
+@pytest.mark.parametrize("w_namespace", [False, True])
+async def test_soliplex_skill_toolset_for_run(
+    w_namespace,
+    w_deps,
+):
+    toolset = config_skills.SoliplexSkillToolset()
+
+    ns = sk_bwrap_sandbox.SandboxState()
+    if w_namespace:
+        toolset._namespaces[sk_bwrap_sandbox.STATE_NAMESPACE] = ns
+
+    ctx = mock.Mock(deps=w_deps)
+    result = await toolset.for_run(ctx)
+
+    assert result is toolset
+
+    if w_namespace and getattr(w_deps, "room_id", None):
+        assert ns.room_id == TEST_ROOM_ID
+        assert ns.thread_id == TEST_THREAD_ID
+        assert ns.run_id == TEST_RUN_ID
+    else:
+        assert ns.room_id is None
+        assert ns.thread_id is None
+        assert ns.run_id is None
