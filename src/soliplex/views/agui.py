@@ -9,6 +9,7 @@ import pydantic
 import pydantic_ai
 from ag_ui import core as agui_core
 from fastapi import responses
+from haiku.skills import agent as hs_agent
 from pydantic_ai.ui import ag_ui as ai_ag_ui
 from sqlalchemy import exc as sqla_exc
 from sqlalchemy.ext import asyncio as sqla_asyncio
@@ -672,6 +673,31 @@ async def stream_llm_events(event_queue: asyncio.Queue):
         yield event
 
 
+def find_skill_toolset(
+    agent: pydantic_ai.Agent,
+) -> hs_agent.SkillToolset | None:
+    for toolset in getattr(agent, "toolsets", ()):
+        if isinstance(toolset, hs_agent.SkillToolset):
+            return toolset
+    return None
+
+
+async def init_agent_stream(
+    *,
+    skill_toolset: hs_agent.SkillToolset | None,
+    agui_adapter: ai_ag_ui.AGUIAdapter,
+    run_stream_kwargs: dict,
+    **drive_kwargs,
+):
+    async with hs_agent.run_agui_stream(
+        agui_adapter,
+        toolset=skill_toolset,
+        **run_stream_kwargs,
+    ) as event_stream:
+        compacted = agui_package.compact_event_stream(event_stream)
+        await drive_llm_stream(llm_stream=compacted, **drive_kwargs)
+
+
 @util.logfire_span("POST /v1/rooms/{room_id}/agui/{thread_id}/{run_id}")
 @router.post("/v1/rooms/{room_id}/agui/{thread_id}/{run_id}")
 async def post_room_agui_thread_id_run_id(
@@ -730,19 +756,7 @@ async def post_room_agui_thread_id_run_id(
         the_logger=the_logger,
     )
 
-    agent_stream = agui_adapter.run_stream(
-        deps=agent_deps,
-        on_complete=functools.partial(
-            capture_usage_after_stream,
-            sqla_engine=request.state.threads_engine,
-            user_name=user_name,
-            room_id=room_id,
-            thread_id=thread_id,
-            run_id=run_id,
-        ),
-    )
-
-    compacted_stream = agui_package.compact_event_stream(agent_stream)
+    skill_toolset = find_skill_toolset(agent)
 
     # We use an unbounded queue here, so that the 'drive_llm_stream'
     # task completes even when the SSE stream gets cancelled due to a
@@ -756,9 +770,20 @@ async def post_room_agui_thread_id_run_id(
 
     bg_tasks = request.app.state.agui_background_tasks
     task = asyncio.create_task(
-        # No 'await' here:  'create_task' *wants* a coroutine
-        drive_llm_stream(
-            llm_stream=compacted_stream,
+        init_agent_stream(
+            skill_toolset=skill_toolset,
+            agui_adapter=agui_adapter,
+            run_stream_kwargs=dict(
+                deps=agent_deps,
+                on_complete=functools.partial(
+                    capture_usage_after_stream,
+                    sqla_engine=request.state.threads_engine,
+                    user_name=user_name,
+                    room_id=room_id,
+                    thread_id=thread_id,
+                    run_id=run_id,
+                ),
+            ),
             sqla_engine=request.state.threads_engine,
             event_queue=event_queue,
             user_name=user_name,
