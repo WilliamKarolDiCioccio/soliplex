@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import abc
 import dataclasses
+import json as _json
 import typing
 
 import pydantic_ai
@@ -25,6 +26,23 @@ from soliplex.config import agents as config_agents
 from soliplex.config import tools as config_tools
 
 ToolConfigMap = dict[str, typing.Any]
+
+_GENUI_TOOL_NAMES = frozenset({"render_form", "render_stock_chart"})
+
+
+def _format_genui_state(state: agui_package.AGUI_State) -> str:
+    genui = state.get("genui")
+    if not genui:
+        return ""
+    widget = genui.get("widget", "")
+    spec = genui.get("spec", {})
+    return (
+        "\n\n[CURRENT UI ON SCREEN]\n"
+        f"Widget type: {widget}\n"
+        f"Current spec:\n{_json.dumps(spec, indent=2)}\n"
+        "If the user asks to modify this widget, call the corresponding tool "
+        "again with the FULL updated spec (include all existing fields plus any changes)."
+    )
 
 
 class SkillToolsetConfig(typing.Protocol):
@@ -159,7 +177,7 @@ def get_default_agent_from_configs(
     else:
         instructions = agent_prompt
 
-    return pydantic_ai.Agent(
+    agent = pydantic_ai.Agent(
         model=model,
         model_settings=agent_config.model_settings,
         tools=tools,
@@ -168,6 +186,15 @@ def get_default_agent_from_configs(
         capabilities=agent_config.capabilities,
         deps_type=AgentDependencies,
     )
+
+    if _GENUI_TOOL_NAMES.intersection(tool_configs):
+        @agent.system_prompt
+        async def _inject_genui_state(
+            ctx: pydantic_ai.RunContext[AgentDependencies],
+        ) -> str:
+            return _format_genui_state(ctx.deps.state)
+
+    return agent
 
 
 def get_agent_from_configs(
