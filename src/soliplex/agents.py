@@ -27,7 +27,11 @@ from soliplex.config import tools as config_tools
 
 ToolConfigMap = dict[str, typing.Any]
 
-_GENUI_TOOL_NAMES = frozenset({"render_form", "render_stock_chart"})
+_GENUI_TOOL_NAMES = frozenset({
+    "render_form",
+    "render_stock_chart",
+    "render_bar_chart_from_script",
+})
 
 
 def _format_genui_state(state: agui_package.AGUI_State) -> str:

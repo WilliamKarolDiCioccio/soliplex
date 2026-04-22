@@ -187,6 +187,12 @@ class Installation:
         return found
 
     @property
+    def sandbox_config(
+        self,
+    ) -> config_installation.SandboxConfig | None:
+        return self._config.sandbox_config
+
+    @property
     def rooms_upload_path(self) -> pathlib.Path | None:
         return self._config.rooms_upload_path
 
