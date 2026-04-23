@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "soliplex"
-version = "0.61dev0"
+version = "0.62dev0"
 description = "An AI-powered Retrieval-Augmented Generation (RAG) system with a modern web interface."
 authors = [{ name = "Enfold", email = "info@enfoldsystems.net" }]
 readme = "README.md"
@@ -17,13 +17,13 @@ dependencies = [
     "ag-ui-protocol >= 0.1.16, < 0.1.18",
     "aiosqlite",
     "authlib",
-    "bubble-sandbox >= 0.7.0, < 0.8",
+    "bubble-sandbox >= 0.8.0, < 0.9",
     "fastapi",
     "fastmcp >= 2.14.0, < 2.15",
     "fakeredis != 2.35.0",  # brownbag
     "greenlet",
-    "haiku.rag-slim >= 0.40.0, < 0.41",
-    "haiku-skills >= 0.14.0, < 0.15",
+    "haiku.rag-slim >= 0.42.1, < 0.43",
+    "haiku-skills >= 0.15.0, < 0.16",
     "itsdangerous",
     "jsonpatch",
     "jwcrypto",
