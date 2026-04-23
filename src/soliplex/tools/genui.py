@@ -38,7 +38,9 @@ class FormField(BaseModel):
     """A single interactive form field."""
 
     label: str = Field(..., description="Display label shown above the input")
-    field_type: Literal["text", "email", "number", "checkbox", "dropdown"] = Field(
+    field_type: Literal[
+        "text", "email", "number", "checkbox", "dropdown", "selector"
+    ] = Field(
         ...,
         description=(
             "Input kind: "
@@ -46,7 +48,8 @@ class FormField(BaseModel):
             "'email' — email address input; "
             "'number' — numeric input; "
             "'checkbox' — yes/no toggle; "
-            "'dropdown' — single choice from the 'options' list."
+            "'dropdown' — single choice from the 'options' list; "
+            "'selector' — multi-select chips from the 'options' list."
         ),
     )
     required: bool = Field(default=True, description="Whether the field is required")
@@ -56,7 +59,10 @@ class FormField(BaseModel):
     )
     options: Optional[list[str]] = Field(
         default=None,
-        description="Required when field_type is 'dropdown': selectable values",
+        description=(
+            "Required when field_type is 'dropdown' or 'selector': "
+            "selectable values"
+        ),
     )
 
 
@@ -76,8 +82,8 @@ async def render_form(
     Call this tool whenever you need to collect structured input from the user.
     Do NOT describe the form in prose — call this tool directly.
 
-    Supported field_type values: text, email, number, checkbox, dropdown.
-    Use 'options' only for 'dropdown' fields.
+    Supported field_type values: text, email, number, checkbox, dropdown,
+    selector. Use 'options' for 'dropdown' and 'selector' fields.
 
     Example — contact form:
       render_form(
