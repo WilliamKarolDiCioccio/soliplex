@@ -208,6 +208,42 @@ def _load_filesystem_skill_configs(i_config) -> config_skills.SkillConfigMap:
     return fs_skill_configs
 
 
+def resolve_skill_configs(
+    explicit: typing.Iterable[dict],
+    available_fs: config_skills.SkillConfigMap,
+    available_ep: config_skills.SkillConfigMap,
+) -> config_skills.SkillConfigMap:
+    """Resolve the effective skill map from explicit config + availability.
+
+    Each kind (filesystem, entrypoint) is handled independently. If
+    'explicit' names any skill of that kind, it acts as a whitelist:
+    only the named skills are included. If 'explicit' names none of
+    that kind, the permissive default applies: every discovered skill
+    of that kind from the matching availability map is included.
+
+    Entrypoint skills go first in the union so that filesystem skills
+    win on name collision.
+    """
+    fs_skills = {}
+    ep_skills = {}
+
+    for entry in explicit:
+        skill_name = entry["skill_name"]
+        if entry["kind"] == config_skills.SkillKind.FILESYSTEM:
+            fs_skills[skill_name] = available_fs[skill_name]
+        elif entry["kind"] == config_skills.SkillKind.ENTRYPOINT:
+            ep_skills[skill_name] = available_ep[skill_name]
+        else:  # pragma: NO COVER
+            pass
+
+    if not fs_skills:
+        fs_skills = dict(available_fs)
+    if not ep_skills:
+        ep_skills = dict(available_ep)
+
+    return ep_skills | fs_skills
+
+
 def _load_entrypoint_skill_configs(i_config) -> config_skills.SkillConfigMap:
     i_config.resolve_environment()
     ep_skill_configs = {}
@@ -562,7 +598,8 @@ class InstallationConfig:
 
     _available_filesystem_skill_configs: config_skills.SkillConfigMap = None
     _available_entrypoint_skill_configs: config_skills.SkillConfigMap = None
-    _skill_configs: config_skills.SkillConfigMap = None
+    _skill_configs: list[dict] | None = None
+    _resolved_skill_configs: config_skills.SkillConfigMap = None
 
     @property
     def available_filesystem_skill_configs(
@@ -588,10 +625,14 @@ class InstallationConfig:
 
     @property
     def skill_configs(self) -> config_skills.SkillConfigMap:
-        if self._skill_configs is not None:
-            return self._skill_configs.copy()
-        else:
-            return {}
+        if self._resolved_skill_configs is None:
+            self._resolved_skill_configs = resolve_skill_configs(
+                self._skill_configs or [],
+                self.available_filesystem_skill_configs,
+                self.available_entrypoint_skill_configs,
+            )
+
+        return self._resolved_skill_configs.copy()
 
     #
     # Path to upload directory
@@ -997,33 +1038,6 @@ class InstallationConfig:
                 if skills_path is not None
             ]
 
-        # Resolve skills after resolving paths
-        if self._skill_configs is not None:
-            available_fs = self.available_filesystem_skill_configs
-            available_ep = self.available_entrypoint_skill_configs
-
-            fs_skills = {}
-
-            if isinstance(self._skill_configs, list):
-                for skill_config_dict in self._skill_configs:
-                    if (
-                        skill_config_dict["kind"]
-                        == config_skills.SkillKind.FILESYSTEM
-                    ):
-                        skill_name = skill_config_dict["skill_name"]
-                        fs_skills[skill_name] = available_fs[skill_name]
-
-                ep_skills = {}
-                for skill_config_dict in self._skill_configs:
-                    if (
-                        skill_config_dict["kind"]
-                        == config_skills.SkillKind.ENTRYPOINT
-                    ):
-                        skill_name = skill_config_dict["skill_name"]
-                        ep_skills[skill_name] = available_ep[skill_name]
-
-                self._skill_configs = ep_skills | fs_skills
-
     @property
     def as_yaml(self) -> dict:
         result = {
@@ -1165,6 +1179,7 @@ class InstallationConfig:
         self._available_entrypoint_configs = _load_entrypoint_skill_configs(
             self,
         )
+        self._resolved_skill_configs = None
         self._oidc_auth_system_configs = self._load_oidc_auth_system_configs()
         self._room_configs = self._load_room_configs()
         self._completion_configs = self._load_completion_configs()

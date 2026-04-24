@@ -620,6 +620,85 @@ authorization_dburi:
 """
 
 
+def test_check_is_dict_passes_through_dict():
+    value = {"foo": "bar"}
+
+    assert config_installation._check_is_dict(value) is value
+
+
+@pytest.mark.parametrize("not_a_dict", [None, [], "string", 42])
+def test_check_is_dict_raises_on_non_dict(not_a_dict):
+    with pytest.raises(config_exc.NotADict) as exc_info:
+        config_installation._check_is_dict(not_a_dict)
+
+    assert exc_info.value.found == not_a_dict
+
+
+def test_find_configs_yaml_direct_hit(temp_dir):
+    config_file = temp_dir / "target.yaml"
+    config_file.write_text('id: "direct"')
+
+    found = list(
+        config_installation._find_configs_yaml(temp_dir, "target.yaml")
+    )
+
+    assert found == [(config_file, {"id": "direct"})]
+
+
+def test_find_configs_yaml_walks_subdirs(temp_dir):
+    # No direct hit at 'temp_dir/target.yaml', so subdirectories are walked.
+    dotted = temp_dir / ".hidden"
+    dotted.mkdir()
+    (dotted / "target.yaml").write_text('id: "hidden"')
+
+    empty_subdir = temp_dir / "no-config"
+    empty_subdir.mkdir()
+
+    with_config = temp_dir / "has-config"
+    with_config.mkdir()
+    sub_yaml = with_config / "target.yaml"
+    sub_yaml.write_text('id: "sub"')
+
+    found = list(
+        config_installation._find_configs_yaml(temp_dir, "target.yaml")
+    )
+
+    # Dotted dirs skipped; empty subdir skipped via NoSuchConfig/continue;
+    # only the populated subdir yields a result.
+    assert found == [(sub_yaml, {"id": "sub"})]
+
+
+def test_resolve_file_prefix_w_file_prefix(temp_dir):
+    config_path = temp_dir / "installation.yaml"
+    (temp_dir / "some.file").write_text("")
+
+    found = config_installation.resolve_file_prefix(
+        "file:some.file",
+        config_path,
+    )
+
+    assert found == str((temp_dir / "some.file").resolve())
+
+
+def test_resolve_file_prefix_wo_file_prefix(temp_dir):
+    config_path = temp_dir / "installation.yaml"
+
+    found = config_installation.resolve_file_prefix(
+        "plain-string",
+        config_path,
+    )
+
+    assert found == "plain-string"
+
+
+def test_resolve_file_prefix_non_string(temp_dir):
+    config_path = temp_dir / "installation.yaml"
+
+    found = config_installation.resolve_file_prefix(42, config_path)
+
+    assert found == 42
+
+
 @pytest.mark.parametrize(
     "config_yaml, expected_kw",
     [
@@ -1597,8 +1676,6 @@ def test_installationconfig_from_yaml(
         assert exc.value._config_path == config_path
 
     else:
-        patched = {"__doc__": "test_installationconfig_from_yaml"}
-
         if "meta" in expected_kw:
             icmeta_kw = expected_kw.pop("meta")
             expected_kw["meta"] = config_meta.InstallationConfigMeta(
@@ -1620,30 +1697,10 @@ def test_installationconfig_from_yaml(
                 config_path.parent / expected_kw["_haiku_rag_config_file"]
             )
 
-        lfssc = mock.Mock(spec_set=())
-        fs_skill_config = mock.create_autospec(
-            config_skills.FilesystemSkillConfig
+        expected = config_installation.InstallationConfig(
+            **expected_kw,
+            _config_path=config_path,
         )
-        lfssc.return_value = {
-            test_skills.FILESYSTEM_SKILL_NAME: fs_skill_config,
-        }
-        lepsc = mock.Mock(spec_set=())
-        ep_skill_config = mock.create_autospec(
-            config_skills.EntrypointSkillConfig
-        )
-        lepsc.return_value = {
-            test_skills.ENTRYPOINT_SKILL_NAME: ep_skill_config,
-        }
-
-        if "_skill_configs" in expected_kw:
-            patched["_load_filesystem_skill_configs"] = lfssc
-            patched["_load_entrypoint_skill_configs"] = lepsc
-
-        with mock.patch.multiple(config_installation, **patched):
-            expected = config_installation.InstallationConfig(
-                **expected_kw,
-                _config_path=config_path,
-            )
 
         if "upload_path" in expected_kw:
             exp_upload_path = temp_dir / expected_kw["upload_path"]
@@ -1680,11 +1737,10 @@ def test_installationconfig_from_yaml(
 
         expected = dataclasses.replace(expected, room_paths=exp_room_paths)
 
-        with mock.patch.multiple(config_installation, **patched):
-            found = config_installation.InstallationConfig.from_yaml(
-                config_path,
-                config_dict,
-            )
+        found = config_installation.InstallationConfig.from_yaml(
+            config_path,
+            config_dict,
+        )
 
         if "secrets" in expected_kw:
             replaced_secrets = []
@@ -2394,29 +2450,200 @@ def test_installationconfig_avl_ep_skill_configs_w_existing(
     assert found["skill_2"] == SC_2
 
 
-def test_installationconfig_skill_configs_wo_set():
+def test_installationconfig_skill_configs_permissive_default():
+    # With no '_skill_configs' set and both availability maps populated,
+    # every discovered skill is included.
+    fs_skill = object()
+    ep_skill = object()
+
+    kw = BARE_INSTALLATION_CONFIG_KW.copy()
+    kw["_available_filesystem_skill_configs"] = {
+        test_skills.FILESYSTEM_SKILL_NAME: fs_skill,
+    }
+    kw["_available_entrypoint_skill_configs"] = {
+        test_skills.ENTRYPOINT_SKILL_NAME: ep_skill,
+    }
+
+    i_config = config_installation.InstallationConfig(**kw)
+
+    assert i_config.skill_configs == {
+        test_skills.FILESYSTEM_SKILL_NAME: fs_skill,
+        test_skills.ENTRYPOINT_SKILL_NAME: ep_skill,
+    }
+
+
+def test_installationconfig_skill_configs_empty_availability(
+    no_skill_discovery,
+):
+    # Sanity check: no whitelist + no discovered skills → empty map, and
+    # the loaders are consulted exactly once each via the cached property.
     kw = BARE_INSTALLATION_CONFIG_KW.copy()
 
     i_config = config_installation.InstallationConfig(**kw)
 
     assert i_config.skill_configs == {}
+    no_skill_discovery[
+        "_load_filesystem_skill_configs"
+    ].assert_called_once_with(i_config)
+    no_skill_discovery[
+        "_load_entrypoint_skill_configs"
+    ].assert_called_once_with(i_config)
 
 
-def test_installationconfig_skill_configs_w_set():
+def test_installationconfig_skill_configs_w_fs_whitelist():
+    # Filesystem whitelist suppresses non-listed fs skills but leaves
+    # entrypoint skills permissive.
+    fs_skill = object()
+    other_fs = object()
+    ep_skill = object()
+
     kw = BARE_INSTALLATION_CONFIG_KW.copy()
-    skill_config = mock.create_autospec(config_skills._SkillConfigModelBase)
-    kw["_skill_configs"] = {
-        test_skills.SKILL_NAME: skill_config,
-    }
+    kw["_skill_configs"] = [
+        {"kind": "filesystem", "skill_name": test_skills.SKILL_NAME},
+    ]
     kw["_available_filesystem_skill_configs"] = {
-        test_skills.SKILL_NAME: skill_config,
-        "other-skill": object(),
+        test_skills.SKILL_NAME: fs_skill,
+        "other-fs-skill": other_fs,
     }
-    kw["_available_entrypoint_skill_configs"] = {}
+    kw["_available_entrypoint_skill_configs"] = {
+        test_skills.ENTRYPOINT_SKILL_NAME: ep_skill,
+    }
 
     i_config = config_installation.InstallationConfig(**kw)
 
-    assert i_config.skill_configs == {test_skills.SKILL_NAME: skill_config}
+    assert i_config.skill_configs == {
+        test_skills.SKILL_NAME: fs_skill,
+        test_skills.ENTRYPOINT_SKILL_NAME: ep_skill,
+    }
+
+
+def test_installationconfig_skill_configs_memoized():
+    kw = BARE_INSTALLATION_CONFIG_KW.copy()
+    cached = {"sentinel": object()}
+    kw["_resolved_skill_configs"] = cached
+
+    i_config = config_installation.InstallationConfig(**kw)
+
+    assert i_config.skill_configs == cached
+    assert i_config.skill_configs is not cached  # property returns a copy
+
+
+def test_resolve_skill_configs_empty():
+    # Empty explicit + empty availability → empty result. Exercises the
+    # permissive-default branch for both kinds (no whitelist → copy
+    # availability), which is empty here.
+    assert config_installation.resolve_skill_configs([], {}, {}) == {}
+
+
+def test_resolve_skill_configs_permissive_default_returns_all_available():
+    fs_skill_a = object()
+    fs_skill_b = object()
+    ep_skill = object()
+    available_fs = {"fs-a": fs_skill_a, "fs-b": fs_skill_b}
+    available_ep = {"ep": ep_skill}
+
+    resolved = config_installation.resolve_skill_configs(
+        [],
+        available_fs,
+        available_ep,
+    )
+
+    assert resolved == {
+        "fs-a": fs_skill_a,
+        "fs-b": fs_skill_b,
+        "ep": ep_skill,
+    }
+
+
+def test_resolve_skill_configs_fs_whitelist_leaves_ep_permissive():
+    named_fs = object()
+    other_fs = object()
+    ep_skill = object()
+    explicit = [{"kind": "filesystem", "skill_name": "named-fs"}]
+    available_fs = {"named-fs": named_fs, "other-fs": other_fs}
+    available_ep = {"ep": ep_skill}
+
+    resolved = config_installation.resolve_skill_configs(
+        explicit,
+        available_fs,
+        available_ep,
+    )
+
+    # 'other-fs' is suppressed by the fs whitelist; 'ep' rides the
+    # permissive default because no entrypoint entry appeared in explicit.
+    assert resolved == {"named-fs": named_fs, "ep": ep_skill}
+
+
+def test_resolve_skill_configs_ep_whitelist_leaves_fs_permissive():
+    fs_skill = object()
+    named_ep = object()
+    other_ep = object()
+    explicit = [{"kind": "entrypoint", "skill_name": "named-ep"}]
+    available_fs = {"fs": fs_skill}
+    available_ep = {"named-ep": named_ep, "other-ep": other_ep}
+
+    resolved = config_installation.resolve_skill_configs(
+        explicit,
+        available_fs,
+        available_ep,
+    )
+
+    assert resolved == {"fs": fs_skill, "named-ep": named_ep}
+
+
+def test_resolve_skill_configs_filters_by_kind():
+    fs_skill = object()
+    ep_skill = object()
+    available_fs = {test_skills.FILESYSTEM_SKILL_NAME: fs_skill}
+    available_ep = {test_skills.ENTRYPOINT_SKILL_NAME: ep_skill}
+    explicit = [
+        {
+            "kind": "filesystem",
+            "skill_name": test_skills.FILESYSTEM_SKILL_NAME,
+        },
+        {
+            "kind": "entrypoint",
+            "skill_name": test_skills.ENTRYPOINT_SKILL_NAME,
+        },
+    ]
+
+    resolved = config_installation.resolve_skill_configs(
+        explicit,
+        available_fs,
+        available_ep,
+    )
+
+    assert resolved == {
+        test_skills.ENTRYPOINT_SKILL_NAME: ep_skill,
+        test_skills.FILESYSTEM_SKILL_NAME: fs_skill,
+    }
+
+
+def test_resolve_skill_configs_filesystem_wins_on_name_conflict():
+    fs_skill = object()
+    ep_skill = object()
+    shared = "shared-name"
+    explicit = [
+        {"kind": "entrypoint", "skill_name": shared},
+        {"kind": "filesystem", "skill_name": shared},
+    ]
+
+    resolved = config_installation.resolve_skill_configs(
+        explicit,
+        {shared: fs_skill},
+        {shared: ep_skill},
+    )
+
+    assert resolved == {shared: fs_skill}
+
+
+def test_resolve_skill_configs_unknown_skill_raises():
+    with pytest.raises(KeyError):
+        config_installation.resolve_skill_configs(
+            [{"kind": "filesystem", "skill_name": "missing"}],
+            {},
+            {},
+        )
 
 
 @pytest.mark.parametrize(
@@ -2485,6 +2712,7 @@ def test_installationconfig_reload_configurations(temp_dir):
     kw["_available_filesystem_skill_configs"] = {}
     kw["_available_entrypoint_skill_configs"] = {}
     kw["_skill_configs"] = ()
+    kw["_resolved_skill_configs"] = {"stale": object()}
     i_config = config_installation.InstallationConfig(
         _config_path=temp_dir / "installation.yaml",
         **kw,
@@ -2534,6 +2762,10 @@ def test_installationconfig_reload_configurations(temp_dir):
     config_patch["_load_entrypoint_skill_configs"].assert_called_once_with(
         i_config,
     )
+
+    # Stale resolved-skills cache must be invalidated so the next access
+    # recomputes against the reloaded availability maps.
+    assert i_config._resolved_skill_configs is None
 
 
 @pytest.fixture
