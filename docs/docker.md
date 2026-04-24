@@ -46,11 +46,11 @@ defaults work without adjustment.
 ### Health Check
 
 Both targets include a `HEALTHCHECK` instruction that polls the
-`GET /ok` endpoint:
+`GET /api/ok` endpoint:
 
 ```text
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/ok')"
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/ok')"
 ```
 
 Docker uses this to report container health and to drive restart
@@ -374,4 +374,4 @@ chmod -R 755 db/
 - Configure OIDC authentication: [OIDC Providers](config/oidc_providers.md)
 - Set up rooms: [Room Configuration](config/rooms.md)
 - Configure agents: [Agent Configuration](config/agents.md)
-- Review server documentation: [Server Setup](server.md)
+- Review server documentation: [Server Setup](server/index.md)

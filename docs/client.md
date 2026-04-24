@@ -14,8 +14,8 @@ interface for interacting with the RAG system.
 1. Clone the client repository:
 
    ```bash
-   git clone git@github.com:soliplex/soliplex.git
-   cd soliplex/src/flutter
+   git clone git@github.com:soliplex/frontend.git
+   cd frontend/
    ```
 
 2. Install Flutter dependencies:
@@ -41,4 +41,4 @@ The client uses:
 - Flutter 3.35+ with Material Design
 - Riverpod for state management
 - `go_router` for navigation
-- WebSocket connections for real-time chat
+- [AG-UI](https://docs.ag-ui.com/introduction) streams over [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events/)

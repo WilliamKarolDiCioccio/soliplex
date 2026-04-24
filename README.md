@@ -10,7 +10,7 @@ An AI-powered Retrieval-Augmented Generation (RAG) system with a modern web inte
 - **AI Agent System**: Function calling and tool integration for AI agents
 - **OIDC Authentication**: Enterprise SSO with Keycloak integration
 - **Model Context Protocol (MCP)**: Extended AI capabilities through MCP client or exposing Room as MCP server
-- **Real-time Communication**: WebSocket-based conversation streams
+- **Real-time Communication**: [AG-UI](https://docs.ag-ui.com/introduction) streams over [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events/)
 - **Quiz System**: Custom quizzes with LLM-based evaluation
 - **Observability**: Logfire integration for monitoring
 
@@ -38,7 +38,10 @@ Key modules:
 - `mcp_server.py` / `mcp_client.py` - Model Context Protocol integration
 - `tui/` - Terminal user interface
 
-### Frontend (`/src/flutter/`)
+### Frontend
+
+The Flutter client lives in its own
+[repository](https://github.com/soliplex/frontend).
 
 **Flutter 3.35+ / Dart 3.10.0+**
 
@@ -48,13 +51,6 @@ Key modules:
 - **Authentication**: Flutter AppAuth (9.0.1) for OIDC
 - **Real-time**: WebSocket communication
 - **Secure Storage**: Flutter Secure Storage for credentials
-
-Key files:
-- `main.dart` - Application entry point
-- `soliplex_client.dart` - Backend API client
-- `oidc_client.dart` - OIDC authentication client
-- `controllers.dart` - Riverpod state management
-- `configure.dart` - Configuration UI
 
 ### TUI (`src/soliplex/tui`)
 
@@ -277,37 +273,15 @@ See `example/` directory for sample configurations.
 
 ### Environment Variables
 
-Non-secret environment variables can and mostly should be configured
-directly in the `installation.yaml` file (e.g. `example/installation.yaml`,
-`example/minimal.yaml`, etc.).
-
-Those files are checked into the Soliplex repository, and cannot know
-the URL of your Ollama server (if you use Ollama), They therefore declare
-the `OLLAMA_BASE_URL` variable without a value, meaning that the configuration
-expects the value to be present in the environments (see:
-<https://soliplex.github.io/soliplex/config/environment/>).
-
-Those files also must not contain secrets (API keys, etc.):  instead,
-they configure secret values to be found from the environment (see
-<https://soliplex.github.io/soliplex/config/secrets/>).
-
-If your installation configures such values to be found from the OS
-environment, you can create a `.env` file which defines them, and arrange
-for the file to be sourced into your environment before startin the Soliplex
-application.
-
-Copy `.env.example` to `.env` and edit it to configure your values:
-
-```bash
-cp .env.example .env
-```
+See the [environment](docs/server/environment.md) docs for an explanation
+of when to configure Soliplex using OS environment variables.
 
 ## Documentation
 
 Comprehensive documentation is available in the `docs/` directory:
 
 - **[Prerequisites Guide](docs/prerequisites.md)** - Step-by-step installation checklist
-- **[Server Setup](docs/server.md)** - Backend server configuration and CLI reference
+- **[Server Setup](docs/server/index.md)** - Backend server configuration and CLI reference
 - **[Client Setup](docs/client.md)** - Frontend Flutter application setup
 - **[Docker Deployment](docs/docker.md)** - Complete Docker and docker-compose guide
 - **[RAG Setup](docs/rag.md)** - RAG database initialization and management

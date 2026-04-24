@@ -17,7 +17,7 @@ to OpenAI and provides RAG functionality.
   A token from logfire ([login here](https://logfire-us.pydantic.dev/login))
   allows for visibility into the application. See:
 
-- [Soliplex Logfire configuration](config/logfire.md)
+- [Soliplex Logfire configuration](../config/logfire.md)
 
 - [Logfire docs on FastAPI integration](https://logfire.pydantic.dev/docs/integrations/web-frameworks/fastapi/)
 
@@ -151,91 +151,8 @@ soliplex-cli serve example/installation.yaml
 
 The server will be available at `http://localhost:8000` by default.
 
-### Server Command Options
-
-```bash
-soliplex-cli serve [OPTIONS] INSTALLATION_CONFIG_PATH
-```
-
-**Basic Options:**
-
-- `INSTALLATION_CONFIG_PATH` - Path to installation YAML file (required)
-- `--help` - Show help message
-
-**Network Options:**
-
-- `--host HOST` - Bind to specific host (default: `127.0.0.1`)
-  - Use `0.0.0.0` to accept connections from any network interface
-  - Example: `--host 0.0.0.0`
-
-- `--port PORT` - Listen on specific port (default: `8000`)
-  - Example: `--port 8080`
-
-**Authentication Options:**
-
-- `--no-auth-mode` - Disable authentication (development/testing only)
-  - **WARNING**: Never use in production
-  - Example: `--no-auth-mode`
-
-**Hot Reload Options:**
-
-- `--reload {python,config,both}` / `-r {python,config,both}` - Enable hot reload
-  - `python` - Watch Python source files for changes
-  - `config` - Watch YAML configuration files for changes
-  - `both` - Watch both Python and config files
-  - Example: `--reload both` or `-r both`
-
-- `--reload-dirs DIRS` - Additional directories to watch (repeatable)
-  - Example: `--reload-dirs ./custom_modules --reload-dirs ./plugins`
-
-- `--reload-includes PATTERNS` - File patterns to include in watch (repeatable)
-  - Example: `--reload-includes "*.yaml" --reload-includes "*.json"`
-
-**Proxy Options:**
-
-- `--proxy-headers` - Enable parsing of X-Forwarded-* headers
-  - Use when running behind a reverse proxy (nginx, traefik, etc.)
-  - Example: `--proxy-headers`
-
-- `--forwarded-allow-ips IPS` - Trusted IP addresses for proxy headers (comma-separated)
-  - Default: `127.0.0.1`
-  - Example: `--forwarded-allow-ips "127.0.0.1,10.0.0.0/8"`
-
-### Common Usage Examples
-
-**Development with hot reload:**
-
-```bash
-soliplex-cli serve example/installation.yaml \
-  --reload both \
-  --no-auth-mode
-```
-
-**Production (behind nginx):**
-
-```bash
-soliplex-cli serve example/installation.yaml \
-  --host 127.0.0.1 \
-  --port 8000 \
-  --proxy-headers \
-  --forwarded-allow-ips "127.0.0.1"
-```
-
-**Docker container (all network interfaces):**
-
-```bash
-soliplex-cli serve example/installation.yaml \
-  --host 0.0.0.0 \
-  --port 8000
-```
-
-**Custom port for testing:**
-
-```bash
-soliplex-cli serve example/minimal.yaml \
-  --port 8080 \
-  --no-auth-mode
-```
+See the [`soliplex-cli` reference](cli.md) for the full list of
+subcommands, options, and common usage examples.
 
 ### Verifying the Server
 
@@ -250,7 +167,7 @@ curl -X 'GET' \
 To check server health:
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl http://127.0.0.1:8000/api/ok
 ```
 
 ### Running Behind a Load Balancer
@@ -263,21 +180,21 @@ when running multiple Soliplex server instances behind a load balancer:
   storage (the default), or a filesystem-based storage (`sqlite` does not
   support multiple writers to a shared filesystem database).  Instead,
   configure the SQLAlchemy using a supported relational database
-  server, as described [here](config/dburis.md#thread_persistence_dburi).
+  server, as described [here](../config/dburis.md#thread_persistence_dburi).
 
 - The SQLAlchemy DBURI used to store authorization data should not
   be configured to use the `sqlite` engine, using either the RAM-based
   storage (the default), or a filesystem-based storage (`sqlite` does not
   support multiple writers to a shared filesystem database).  Instead,
   configure the SQLAlchemy using a supported relational database
-  server, as described [here](config/dburis.md#authorization_dburi).
+  server, as described [here](../config/dburis.md#authorization_dburi).
 
-- The [secret](config/secrets.md#session_middleware_token) used to manage
+- The [secret](../config/secrets.md#session_middleware_token) used to manage
   session encryption should not be configured to use a `random_chars` secret
   source, because that value cannot be shared across Soliplex server
   instances.
 
-- The [secret](config/secrets.md#url_safe_token_secret) used to generate
+- The [secret](../config/secrets.md#url_safe_token_secret) used to generate
   bearer tokens for MCP clients should not be configured to use the
   `random_chars` secret source, because that value cannot be shared across
   Soliplex server instances.

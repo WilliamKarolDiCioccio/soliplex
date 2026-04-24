@@ -43,6 +43,9 @@ Follow these steps in order for a successful setup.
 
 ### Step 1: Install Python 3.13
 
+**Note**: If you aren't running on a platform which mandates using
+an already-installed Python 3.12, prefer using Python >= 3.13.
+
 #### Windows
 
 ```bash
@@ -181,8 +184,8 @@ If using Option 2, configure `example/haiku.rag.yaml` to use remote processing.
 
 ### Step 7: Configure Environment Variables
 
-See the `Environment Variables` section in the [README](README.md) for
-an explanation of when to configure Soliplex using OS environment variables.
+See [this page](server/environment.md) for an explanation of when to
+configure Soliplex using OS environment variables.
 
 1. **Copy example environment file**
 
@@ -326,7 +329,7 @@ In a new terminal, test the API:
 
 ```bash
 # Test health endpoint
-curl http://localhost:8000/health
+curl http://localhost:8000/api/ok
 
 # List rooms
 curl http://localhost:8000/api/v1/rooms
@@ -345,10 +348,12 @@ If you want to use the web UI:
    # Follow instructions at https://flutter.dev/docs/get-started/install
    ```
 
-2. **Navigate to Flutter directory**
+2. **Clone the Flutter client repository**
 
    ```bash
-   cd src/flutter
+   cd ..
+   git clone https://github.com/soliplex/frontend.git
+   cd frontend/
    ```
 
 3. **Install dependencies**

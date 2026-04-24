@@ -59,7 +59,11 @@ nav:
   - Home: index.md
   - Overview: overview.md
   - Setup:
-      - Server: server.md
+      - Prerequisites: prerequisites.md
+      - Server:
+        - Overview: server/index.md
+        - CLI: server/cli.md
+        - Environment Variables: server/environment.md
       - Client: client.md
       - Docker: docker.md
       - RAG DB: rag.md
