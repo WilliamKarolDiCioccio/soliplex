@@ -1,4 +1,5 @@
 import pathlib
+import typing
 
 import pydantic
 import pydantic_ai
@@ -9,6 +10,8 @@ from haiku.skills import models as hs_models
 from haiku.skills import parser as hs_parser
 from haiku.skills import state as hs_state
 from pydantic_ai import toolsets as ai_toolests
+
+VolumeName = typing.Literal["thread"] | typing.Literal["room"]
 
 SKILL_NAME = "bubble-sandbox"
 SKILL_DESCRIPTION = """\
@@ -36,10 +39,12 @@ LIST_ENVIRONMENTS_DESCRIPTION = """
 Return a list of information about available sandbox environments
 
 Each entry will contain these fields:
-- 'name' (string) pass this value to the ``execute`` and ``execute_script`` \
+- 'name' (string) pass this value to the ``run`` and ``run_python`` \
 tools to run the tool in the environment.
 - 'description' (string) describes the purposes for which the environment is \
 configured.
+- 'dependencies' (list of string): names of Python projects on which the \
+environment depends.
 """
 
 
@@ -49,7 +54,7 @@ async def skill_list_environments(
     return bwrap_sandbox.config.list_environments()
 
 
-EXECUTE_DESCRIPTION = """\
+RUN_DESCRIPTION = """\
 Execute a shell command in the working directory.
 
 IMPORTANT: This tool is for operations that REQUIRE a real shell — \
@@ -84,7 +89,33 @@ verify the target path/object before executing.
 """
 
 
-async def skill_execute(
+LIST_VOLUME_FILES_DESCRIPTION = """
+Return a list of absolute filenames of files in a sandbox volume
+"""
+
+
+async def skill_list_volume_files(
+    volume: VolumeName,
+    room_upload_path: pathlib.Path,
+    thread_upload_path: pathlib.Path,
+) -> list[str]:
+
+    def _list_volume_files(volume_path: pathlib.Path) -> list[str]:
+        return [
+            sub.absolute().name
+            for sub in volume_path.glob("*")
+            if sub.is_file()
+        ]
+
+    if volume == "thread":
+        return _list_volume_files(thread_upload_path)
+    elif volume == "room":
+        return _list_volume_files(room_upload_path)
+    else:
+        return []
+
+
+async def skill_run(
     bwrap_sandbox: bs_sandbox.BwrapSandbox,
     command: str | list[str],
     environment_name: str = None,
@@ -126,7 +157,7 @@ async def skill_execute(
     return str(output)
 
 
-EXECUTE_SCRIPT_DESCRIPTION = """\
+RUN_PYTHON_DESCRIPTION = """\
 Execute a Python script in the sandbox environment.
 
 IMPORTANT: The ``script`` parameter must be valid Python source code. \
@@ -151,7 +182,7 @@ completely different strategy.
 """
 
 
-async def skill_execute_script(
+async def skill_run_python(
     bwrap_sandbox: bs_sandbox.BwrapSandbox,
     script: str,
     environment_name: str = None,
@@ -170,7 +201,7 @@ async def skill_execute_script(
             the toolset.
     """
     try:
-        result = await bwrap_sandbox.execute_script(
+        result = await bwrap_sandbox.execute_python(
             script=script,
             environment_name=environment_name,
             workdir=workdir,
@@ -270,7 +301,8 @@ def create_sandbox_toolset(
             up to this many times. Defaults to 1.
 
     Returns:
-        FunctionToolset with 'execute' and 'execute_script' tools.
+        FunctionToolset with thses tools:
+        'list_environments, 'list_volume_files', 'run' and 'run_python'.
     """
     if sandbox_config is None:
         sandbox_config = bs_config.Config()
@@ -305,8 +337,27 @@ def create_sandbox_toolset(
     ) -> list[EnvironmentInfo]:
         return await skill_list_environments(bwrap_sandbox=bwrap_sandbox)
 
-    @toolset.tool(description=EXECUTE_DESCRIPTION)
-    async def execute(
+    @toolset.tool(description=LIST_VOLUME_FILES_DESCRIPTION)
+    async def list_volume_files(
+        ctx: pydantic_ai.RunContext,
+        volume: VolumeName,
+    ) -> list[str]:
+        if installation_config is None:
+            return []
+
+        else:
+            state = ctx.deps.state
+            room_id = state.room_id or ""
+            thread_id = state.thread_id or ""
+
+            return await skill_list_volume_files(
+                volume=volume,
+                room_upload_path=rooms_upload_path / room_id,
+                thread_upload_path=threads_upload_path / thread_id,
+            )
+
+    @toolset.tool(description=RUN_DESCRIPTION)
+    async def run(
         ctx: pydantic_ai.RunContext,
         command: str | list[str],
         environment_name: str = None,
@@ -327,7 +378,7 @@ def create_sandbox_toolset(
             state.thread_id or "",
         )
 
-        return await skill_execute(
+        return await skill_run(
             bwrap_sandbox=bwrap_sandbox,
             command=command,
             environment_name=environment_name,
@@ -336,8 +387,8 @@ def create_sandbox_toolset(
             extra_volumes=extra_volumes,
         )
 
-    @toolset.tool(description=EXECUTE_SCRIPT_DESCRIPTION)
-    async def execute_script(
+    @toolset.tool(description=RUN_PYTHON_DESCRIPTION)
+    async def run_python(
         ctx: pydantic_ai.RunContext,
         script: str,
         environment_name: str = None,
@@ -358,7 +409,7 @@ def create_sandbox_toolset(
             state.thread_id or "",
         )
 
-        return await skill_execute_script(
+        return await skill_run_python(
             bwrap_sandbox=bwrap_sandbox,
             script=script,
             environment_name=environment_name,
