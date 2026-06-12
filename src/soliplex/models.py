@@ -800,6 +800,29 @@ class AGUI_Threads(pydantic.BaseModel):
 
 
 # ----------------------------------------------------------------------------
+#   Stats models
+# ----------------------------------------------------------------------------
+
+
+class RoomStats(pydantic.BaseModel):
+    """Aggregate activity statistics for a single room.
+
+    Scoped to the requesting user's own threads, mirroring the access
+    model of the AG-UI thread listing.
+
+    This model is intentionally open-ended: the stats surface is expected
+    to grow (message/thread counts, token usage, ...), so new fields are
+    added here rather than minting a new endpoint per metric.
+
+    'last_message_at': timestamp of the most recent message turn (AG-UI
+        run) in the room, or 'None' when the user has no runs there.
+    """
+
+    room_id: str = KW_ONLY
+    last_message_at: datetime.datetime | None = KW_ONLY_NONE
+
+
+# ----------------------------------------------------------------------------
 #   Room Authorization models
 # ----------------------------------------------------------------------------
 

@@ -248,6 +248,21 @@ class ThreadStorage(abc.ABC):
         """
 
     @abc.abstractmethod
+    async def get_room_last_activity(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+    ) -> datetime.datetime | None:
+        """Return the time of the user's most recent run in the room.
+
+        "Activity" is the creation time of the newest AG-UI run (one run
+        per message turn) across the user's threads in 'room_id'.
+
+        Returns 'None' when the user has no runs in the room.
+        """
+
+    @abc.abstractmethod
     async def get_thread(
         self,
         *,

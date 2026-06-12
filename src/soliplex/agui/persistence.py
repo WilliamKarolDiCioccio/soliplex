@@ -97,6 +97,35 @@ class ThreadStorage(agui_package.ThreadStorage):
             result = await session.scalars(query)
         return result
 
+    async def get_room_last_activity(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+    ) -> datetime.datetime | None:
+        async with self.session as session:
+            query = (
+                sqla_sql.select(
+                    sqla_sql.func.max(agui_schema.Run.created),
+                )
+                .join(agui_schema.Run.thread)
+                .where(agui_schema.Thread.user_name == user_name)
+                .where(agui_schema.Thread.room_id == room_id)
+            )
+            latest = await session.scalar(query)
+
+        if latest is None:
+            return None
+
+        # Run timestamps are written in UTC ('_timestamp'), but some
+        # backends (e.g. SQLite) drop the tzinfo on the round-trip. Re-tag
+        # as UTC so the API contract is an unambiguous instant regardless
+        # of the storage backend.
+        if latest.tzinfo is None:
+            latest = latest.replace(tzinfo=datetime.UTC)
+
+        return latest
+
     async def get_thread(
         self,
         *,
