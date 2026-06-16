@@ -779,12 +779,19 @@ class AGUI_Thread(pydantic.BaseModel):
     created: datetime.datetime | None = KW_ONLY_NONE
     metadata: AGUI_ThreadMetadata | None = KW_ONLY_NONE
 
+    # Timestamp of the most recent message turn (AG-UI run) in the thread,
+    # or 'None' when it has no runs. Lets clients mark threads with unseen
+    # activity without replaying each thread's runs. 'created' is the
+    # thread's birth; this tracks its latest activity.
+    last_activity: datetime.datetime | None = KW_ONLY_NONE
+
     @classmethod
     def from_thread(
         cls,
         a_thread: agui_package.Thread,
         a_thread_meta: AGUI_ThreadMetadata,
         a_thread_runs: AGUI_Runs = None,
+        a_thread_last_activity: datetime.datetime | None = None,
     ):
         return cls(
             room_id=a_thread.room_id,
@@ -792,11 +799,35 @@ class AGUI_Thread(pydantic.BaseModel):
             created=a_thread.created,
             metadata=a_thread_meta,
             runs=a_thread_runs,
+            last_activity=a_thread_last_activity,
         )
 
 
 class AGUI_Threads(pydantic.BaseModel):
     threads: list[AGUI_Thread]
+
+
+# ----------------------------------------------------------------------------
+#   Stats models
+# ----------------------------------------------------------------------------
+
+
+class RoomStats(pydantic.BaseModel):
+    """Aggregate activity statistics for a single room.
+
+    Scoped to the requesting user's own threads, mirroring the access
+    model of the AG-UI thread listing.
+
+    This model is intentionally open-ended: the stats surface is expected
+    to grow (message/thread counts, token usage, ...), so new fields are
+    added here rather than minting a new endpoint per metric.
+
+    'last_activity': timestamp of the most recent message turn (AG-UI
+        run) in the room, or 'None' when the user has no runs there.
+    """
+
+    room_id: str = KW_ONLY
+    last_activity: datetime.datetime | None = KW_ONLY_NONE
 
 
 # ----------------------------------------------------------------------------
