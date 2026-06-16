@@ -263,6 +263,35 @@ class ThreadStorage(abc.ABC):
         """
 
     @abc.abstractmethod
+    async def get_rooms_last_activity(
+        self,
+        *,
+        user_name: str,
+    ) -> dict[str, datetime.datetime]:
+        """Return the user's most recent run time per room, in one query.
+
+        Maps 'room_id' to the creation time of the newest AG-UI run across
+        the user's threads in that room. Rooms in which the user has no
+        runs are omitted (the caller treats an absent room as "no
+        activity"), so the result is suitable for batch-decorating a room
+        list without a per-room round-trip.
+        """
+
+    @abc.abstractmethod
+    async def get_threads_last_activity(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+    ) -> dict[str, datetime.datetime]:
+        """Return the user's most recent run time per thread in a room.
+
+        Maps 'thread_id' (the AG-UI protocol id) to the creation time of
+        the newest run in that thread, across the user's threads in
+        'room_id'. Threads with no runs are omitted.
+        """
+
+    @abc.abstractmethod
     async def get_thread(
         self,
         *,

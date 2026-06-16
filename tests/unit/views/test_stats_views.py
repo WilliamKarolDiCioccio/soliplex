@@ -25,14 +25,14 @@ def the_threads():
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize("last_message_at", [NOW, None])
-async def test_get_room_stats(the_threads, last_message_at):
+@pytest.mark.parametrize("last_activity", [NOW, None])
+async def test_get_room_stats(the_threads, last_activity):
     request = mock.create_autospec(fastapi.Request)
     the_installation = mock.create_autospec(installation.Installation)
     the_authz_policy = mock.create_autospec(authz_package.AuthorizationPolicy)
     the_logger = mock.create_autospec(loggers.LogWrapper)
 
-    the_threads.get_room_last_activity.return_value = last_message_at
+    the_threads.get_room_last_activity.return_value = last_activity
 
     found = await stats_views.get_room_stats(
         request,
@@ -45,7 +45,7 @@ async def test_get_room_stats(the_threads, last_message_at):
     )
 
     assert found.room_id == ROOM_ID
-    assert found.last_message_at == last_message_at
+    assert found.last_activity == last_activity
 
     the_installation.get_room_config.assert_awaited_once_with(
         room_id=ROOM_ID,
@@ -106,3 +106,34 @@ async def test_get_room_stats_unknown_room(the_threads):
 
     assert exc_info.value.status_code == 404
     the_threads.get_room_last_activity.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "claims, expected_user",
+    [
+        (THE_USER_CLAIMS, USER_NAME),
+        (UNKNOWN_USER_CLAIMS, "<unknown>"),
+    ],
+)
+async def test_get_rooms_stats(the_threads, claims, expected_user):
+    request = mock.create_autospec(fastapi.Request)
+    the_logger = mock.create_autospec(loggers.LogWrapper)
+
+    the_threads.get_rooms_last_activity.return_value = {ROOM_ID: NOW}
+
+    found = await stats_views.get_rooms_stats(
+        request,
+        the_threads=the_threads,
+        the_user_claims=claims,
+        the_logger=the_logger,
+    )
+
+    assert set(found) == {ROOM_ID}
+    assert found[ROOM_ID].room_id == ROOM_ID
+    assert found[ROOM_ID].last_activity == NOW
+
+    the_threads.get_rooms_last_activity.assert_awaited_once_with(
+        user_name=expected_user,
+    )
+    the_logger.debug.assert_called_once_with(loggers.STATS_GET_ROOMS_STATS)

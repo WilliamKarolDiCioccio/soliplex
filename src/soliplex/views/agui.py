@@ -122,6 +122,13 @@ async def get_room_agui(
         the_user_claims=the_user_claims,
         the_logger=the_logger,
     )
+    # Per-thread last-activity in one grouped query, so the listing can mark
+    # threads with unseen activity without replaying each thread's runs.
+    last_activity = await the_threads.get_threads_last_activity(
+        user_name=user_name,
+        room_id=room_id,
+    )
+
     model_threads = []
     for a_thread in await the_threads.list_user_threads(
         user_name=user_name,
@@ -136,6 +143,7 @@ async def get_room_agui(
                     thread_meta,
                 ),
                 a_thread_runs=None,
+                a_thread_last_activity=last_activity.get(a_thread.thread_id),
             )
         )
 

@@ -779,12 +779,19 @@ class AGUI_Thread(pydantic.BaseModel):
     created: datetime.datetime | None = KW_ONLY_NONE
     metadata: AGUI_ThreadMetadata | None = KW_ONLY_NONE
 
+    # Timestamp of the most recent message turn (AG-UI run) in the thread,
+    # or 'None' when it has no runs. Lets clients mark threads with unseen
+    # activity without replaying each thread's runs. 'created' is the
+    # thread's birth; this tracks its latest activity.
+    last_activity: datetime.datetime | None = KW_ONLY_NONE
+
     @classmethod
     def from_thread(
         cls,
         a_thread: agui_package.Thread,
         a_thread_meta: AGUI_ThreadMetadata,
         a_thread_runs: AGUI_Runs = None,
+        a_thread_last_activity: datetime.datetime | None = None,
     ):
         return cls(
             room_id=a_thread.room_id,
@@ -792,6 +799,7 @@ class AGUI_Thread(pydantic.BaseModel):
             created=a_thread.created,
             metadata=a_thread_meta,
             runs=a_thread_runs,
+            last_activity=a_thread_last_activity,
         )
 
 
@@ -814,12 +822,12 @@ class RoomStats(pydantic.BaseModel):
     to grow (message/thread counts, token usage, ...), so new fields are
     added here rather than minting a new endpoint per metric.
 
-    'last_message_at': timestamp of the most recent message turn (AG-UI
+    'last_activity': timestamp of the most recent message turn (AG-UI
         run) in the room, or 'None' when the user has no runs there.
     """
 
     room_id: str = KW_ONLY
-    last_message_at: datetime.datetime | None = KW_ONLY_NONE
+    last_activity: datetime.datetime | None = KW_ONLY_NONE
 
 
 # ----------------------------------------------------------------------------

@@ -19,6 +19,21 @@ from soliplex.agui.schema import *  # noqa F403
 FeedbackReviewStatus = agui_package.FeedbackReviewStatus
 
 
+def _as_utc(
+    value: datetime.datetime | None,
+) -> datetime.datetime | None:
+    """Normalize a stored run timestamp to a UTC-aware instant.
+
+    Run timestamps are written in UTC ('_timestamp'), but some backends
+    (e.g. SQLite) drop the tzinfo on the round-trip. Re-tag naive values as
+    UTC so the API contract is an unambiguous instant regardless of the
+    storage backend; aware values (e.g. from PostgreSQL) pass through.
+    """
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=datetime.UTC)
+    return value
+
+
 class NoFeedbackFound(ValueError):
     def __init__(self, run_id: str):
         self.run_id = run_id
@@ -114,17 +129,47 @@ class ThreadStorage(agui_package.ThreadStorage):
             )
             latest = await session.scalar(query)
 
-        if latest is None:
-            return None
+        return _as_utc(latest)
 
-        # Run timestamps are written in UTC ('_timestamp'), but some
-        # backends (e.g. SQLite) drop the tzinfo on the round-trip. Re-tag
-        # as UTC so the API contract is an unambiguous instant regardless
-        # of the storage backend.
-        if latest.tzinfo is None:
-            latest = latest.replace(tzinfo=datetime.UTC)
+    async def get_rooms_last_activity(
+        self,
+        *,
+        user_name: str,
+    ) -> dict[str, datetime.datetime]:
+        async with self.session as session:
+            query = (
+                sqla_sql.select(
+                    agui_schema.Thread.room_id,
+                    sqla_sql.func.max(agui_schema.Run.created),
+                )
+                .join(agui_schema.Run.thread)
+                .where(agui_schema.Thread.user_name == user_name)
+                .group_by(agui_schema.Thread.room_id)
+            )
+            rows = (await session.execute(query)).all()
 
-        return latest
+        return {room_id: _as_utc(latest) for room_id, latest in rows}
+
+    async def get_threads_last_activity(
+        self,
+        *,
+        user_name: str,
+        room_id: str,
+    ) -> dict[str, datetime.datetime]:
+        async with self.session as session:
+            query = (
+                sqla_sql.select(
+                    agui_schema.Thread.thread_id,
+                    sqla_sql.func.max(agui_schema.Run.created),
+                )
+                .join(agui_schema.Run.thread)
+                .where(agui_schema.Thread.user_name == user_name)
+                .where(agui_schema.Thread.room_id == room_id)
+                .group_by(agui_schema.Thread.thread_id)
+            )
+            rows = (await session.execute(query)).all()
+
+        return {thread_id: _as_utc(latest) for thread_id, latest in rows}
 
     async def get_thread(
         self,

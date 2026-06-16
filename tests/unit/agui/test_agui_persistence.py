@@ -389,6 +389,79 @@ async def test_threadstorage_get_room_last_activity_tz_aware(
 
 
 @pytest.mark.asyncio
+async def test_threadstorage_get_rooms_and_threads_last_activity(
+    the_async_session,
+):
+    ts = agui_persistence.ThreadStorage(the_async_session)
+
+    OTHER_ROOM = "other-room"
+    OTHER_USER = "bharney"
+    T1 = NOW
+    T2 = NOW + datetime.timedelta(minutes=5)
+    T3 = NOW + datetime.timedelta(minutes=9)
+
+    async def _set_run_created(thread, when):
+        # Pin the (single) initial run's 'created' so the max is
+        # deterministic; 'new_thread' otherwise stamps "now".
+        (run,) = (await thread.list_runs())[-1:]
+        run.created = when
+        await the_async_session.commit()
+
+    # No threads at all -> empty maps (not missing keys).
+    assert await ts.get_rooms_last_activity(user_name=USER_NAME) == {}
+    assert (
+        await ts.get_threads_last_activity(
+            user_name=USER_NAME,
+            room_id=ROOM_ID,
+        )
+        == {}
+    )
+
+    # Two of the user's threads in ROOM_ID; one in OTHER_ROOM.
+    thread_a = await ts.new_thread(
+        user_name=USER_NAME, email=EMAIL, room_id=ROOM_ID
+    )
+    thread_a_id = await thread_a.awaitable_attrs.thread_id
+    await _set_run_created(thread_a, T1)
+
+    thread_b = await ts.new_thread(
+        user_name=USER_NAME, email=EMAIL, room_id=ROOM_ID
+    )
+    thread_b_id = await thread_b.awaitable_attrs.thread_id
+    await _set_run_created(thread_b, T2)
+
+    thread_c = await ts.new_thread(
+        user_name=USER_NAME, email=EMAIL, room_id=OTHER_ROOM
+    )
+    await _set_run_created(thread_c, T3)
+
+    # Another user's later run in ROOM_ID must not leak in.
+    other_user_thread = await ts.new_thread(
+        user_name=OTHER_USER, email=EMAIL, room_id=ROOM_ID
+    )
+    await _set_run_created(
+        other_user_thread,
+        NOW + datetime.timedelta(hours=1),
+    )
+
+    # Rooms: latest per room, scoped to the user; OTHER_ROOM included.
+    assert await ts.get_rooms_last_activity(user_name=USER_NAME) == {
+        ROOM_ID: T2,
+        OTHER_ROOM: T3,
+    }
+
+    # Threads: per-thread latest within the room, keyed by thread_id;
+    # the other room's thread and the other user are excluded.
+    assert await ts.get_threads_last_activity(
+        user_name=USER_NAME,
+        room_id=ROOM_ID,
+    ) == {
+        thread_a_id: T1,
+        thread_b_id: T2,
+    }
+
+
+@pytest.mark.asyncio
 async def test_threadstorage_thread_run_cru(the_async_session):
     ts = agui_persistence.ThreadStorage(the_async_session)
 

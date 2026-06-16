@@ -79,6 +79,7 @@ ROOM_CHUNK_IMAGES_NOT_AVAILALBE = "chunk images not available: %s"
 ROOM_UNKNOWN_CHUNK_ID = "unknown chunk id: %s"
 
 STATS_GET_ROOM_STATS = "stats get room stats"
+STATS_GET_ROOMS_STATS = "stats get rooms stats"
 
 
 class LogWrapper(logging.LoggerAdapter):
